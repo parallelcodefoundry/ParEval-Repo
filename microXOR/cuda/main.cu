@@ -20,6 +20,10 @@ int main(int argc, char **argv) {
     std::cerr << "N must be divisible by blockEdge" << std::endl;
     return 1;
   }
+  if (blockEdge < 2 || blockEdge > 32) {
+    std::cerr << "blockEdge must be between 2 and 32" << std::endl;
+    return 1;
+  }
   if (N < 4) {
     std::cerr << "N must be at least 4" << std::endl;
     return 1;
@@ -47,10 +51,12 @@ int main(int argc, char **argv) {
 
   cudaMemcpy(output, d_output, N * N * sizeof(int), cudaMemcpyDeviceToHost);
 
+  /*
   for (int i = 0; i < N*N; i++) {
     std::cout << output[i] << " ";
     if (i % N == N - 1) std::cout << std::endl;
   }
+  */
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {
