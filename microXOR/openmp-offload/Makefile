@@ -1,7 +1,8 @@
 # Makefile for OpenMP Offload microXOR
 
-CXX ?= clang++
-CXXFLAGS ?= -O3 -I. -std=c++17 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_75
+CXX_COMPILER ?= clang++
+CUDA_ARCH ?= sm_80
+CXXFLAGS ?= -O3 -I. -std=c++17 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=$(CUDA_ARCH)
 LDFLAGS ?= -lm
 
 CPPFILES = microXOR.cpp main.cpp
@@ -10,10 +11,10 @@ OBJS = $(CPPFILES:.cpp=.o)
 EXE = microXOR
 
 $(EXE): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+	$(CXX_COMPILER) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
 %.o: %.cpp $(DEPS)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX_COMPILER) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJS) $(EXE)

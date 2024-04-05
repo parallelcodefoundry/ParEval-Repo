@@ -1,7 +1,8 @@
 # Makefile for CUDA microXOR
 
 NVCC ?= nvcc
-NVCCFLAGS ?= -O3 -arch=sm_75 -I. -std=c++17
+CUDA_ARCH ?= sm_80
+NVCCFLAGS ?= -O3 -arch=$(CUDA_ARCH) -I. -std=c++17
 LDFLAGS ?= -lcudart
 
 CUFILES = microXOR.cu main.cu
