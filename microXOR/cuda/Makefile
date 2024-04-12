@@ -2,19 +2,25 @@
 
 NVCC ?= nvcc
 CUDA_ARCH ?= sm_80
-NVCCFLAGS ?= -O3 -arch=$(CUDA_ARCH) -I. -std=c++17
+SRC = src
+INC = include
+OBJ = obj
+NVCCFLAGS ?= -O3 -arch=$(CUDA_ARCH) -I$(INC) -std=c++17
 LDFLAGS ?= -lcudart
 
-CUFILES = microXOR.cu main.cu
-DEPS = microXOR.cuh
-OBJS = $(CUFILES:.cu=.o)
-EXE = microXOR
+CUFILES = $(SRC)/microXOR.cu $(SRC)/main.cu
+DEPS = $(INC)/microXOR.cuh
+OBJS = $(CUFILES:$(SRC)/%.cu=$(OBJ)/%.o)
+EXE = microXOR.exe
 
 $(EXE): $(OBJS)
 	$(NVCC) $(NVCCFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-%.o: %.cu $(DEPS)
+$(OBJ)/%.o: $(SRC)/%.cu $(DEPS) | obj
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
 
 clean:
 	rm -f $(OBJS) $(EXE)
