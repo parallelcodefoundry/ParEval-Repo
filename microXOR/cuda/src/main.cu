@@ -1,3 +1,5 @@
+// microXOR driver
+
 #include "microXOR.cuh"
 
 void cleanup(int *input, int *output, int *d_input, int *d_output) {

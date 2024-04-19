@@ -1,3 +1,5 @@
+// microXOR kernel
+
 #include "microXOR.hpp"
 
 /* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.

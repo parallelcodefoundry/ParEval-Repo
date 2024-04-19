@@ -1,3 +1,5 @@
+// microXOR driver
+
 #include "microXOR.hpp"
 
 void cleanup(int *d_input, int *d_output) {
