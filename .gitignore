@@ -1,3 +1,7 @@
 *.o
 microXOR.exe
+a.out
+
 .ipynb_checkpoints
+__pycache__
+*.pyc
