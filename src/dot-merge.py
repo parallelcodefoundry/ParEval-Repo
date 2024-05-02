@@ -8,7 +8,9 @@ parser = argparse.ArgumentParser(description='Merge multiple dot files into one'
 parser.add_argument('files', metavar='file', type=str, nargs='+',
                     help='dot files to merge, separated by space')
 parser.add_argument('output', metavar='output', type=str,
-                    help='output file name, png extension will be appended')
+                    help='output file name template, any extensions will be appended')
+parser.add_argument('--save-png', action='store_true',
+                    help='save the merged graph as a png file')
 parser.add_argument('--verbose', action='store_true',
                     help='verbose output')
 args = parser.parse_args()
@@ -34,4 +36,7 @@ graph = nx.drawing.nx_pydot.to_pydot(graph)
 if args.verbose:
     print(graph.to_string())
 
-graph.write_png(output + '.png')
+if args.save_png:
+    graph.write_png(output + '.png')
+
+graph.write_dot(output + '.dot')
