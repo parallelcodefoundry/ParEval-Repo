@@ -35,6 +35,11 @@ class Repo:
             return [os.path.relpath(f, self._path) for f in all_files]
         return all_files
 
+    def is_code_file(self, filename: os.PathLike) -> bool:
+        """ check if a file is a CUDA C/C++ code file """
+        endings = ['.cu', '.cuh', '.cpp', '.h', '.hpp', '.c', '.cc', '.hh', '.cxx', '.hxx', '.C', '.H']
+        return any([filename.endswith(e) for e in endings])
+
     def get_file_contents(self, rel_path: Optional[os.PathLike] = None, full_path: Optional[os.PathLike] = None) -> str:
         # make sure only one and at least one is provided
         if (rel_path is None and full_path is None) or (rel_path is not None and full_path is not None):
@@ -44,7 +49,7 @@ class Repo:
         if full_path is not None:
             if os.path.commonpath([self._path, full_path]) != self._path:
                 raise ValueError("The provided path is not in the repository.")
-        
+
         # get the full path
         full_path = full_path or os.path.join(self._path, rel_path)
 
@@ -67,7 +72,7 @@ class Repo:
         else:
             # If the given path is a file, record it in the tree
             tree["type"] = "file"
-        
+
         return tree
 
     def _get_file_tree_str(self, root: List[dict], prefix: str = "", ascii: bool = False, depth: int = 0, max_depth: Optional[int] = None):
