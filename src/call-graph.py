@@ -1,5 +1,8 @@
-#!/usr/bin/env python3
+""" CallGraph class for constructing a call graph from a repository.
 
+    author: Josh Davis
+    date: May 2024
+"""
 # std imports
 import sys
 import networkx as nx
@@ -10,25 +13,22 @@ import subprocess
 from typing import Optional, List
 
 # local imports
-from repo import Repo
+from repo import Repo, CompileConfig
+
 
 class CallGraph:
+
     _graph: nx.DiGraph
     _repo: Repo
 
     def __init__(self, repo: Repo):
         """construct a call graph from a repository"""
         self._repo = repo
-        code_files = [f for f in self._repo.get_all_filenames(relpaths=True)
-                      if self._repo.is_code_file(f)]
+        code_files = self._repo.get_all_code_filenames(relpaths=True)
         for f in code_files:
-            subprocess.check_output(['clang++', '-emit-llvm', '-S',
-                                     '--cuda-gpu-arch=sm_80', '-Iinclude',
-                                     '-std=c++17', '-g',
-                                     '-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/cuda/12.0/lib64',
-                                     '-L/global/common/software/nersc/pe/gpu/llvm/17.0.6/lib',
-                                     '-lcudart_static', '-ldl', '-lrt',
-                                     '-pthread', f, '-o', f + '.ll'])
+            file_compilation_entry = self._repo._compile_database.get_compilation_entry(f)
+            full_path = self._repo.get_full_path(rel_path=f)
+            subprocess.check_output(file_compilation_entry.get_llvm_ir_args())
             subprocess.check_output(['opt', '-p dot-callgraph', f,
                                      '-disable-output', '-o',
                                      f + '.mangled.dot'])
