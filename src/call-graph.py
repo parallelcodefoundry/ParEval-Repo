@@ -26,19 +26,19 @@ class CallGraph:
         self._repo = repo
         code_files = self._repo.get_all_code_filenames(relpaths=True)
         for f in code_files:
-            file_compilation_entry = self._repo._compile_database.get_compilation_entry(f)
+            file_compilation_entry = self._repo.get_compilation_entry(rel_path=f)
             full_path = self._repo.get_full_path(rel_path=f)
             subprocess.check_output(file_compilation_entry.get_llvm_ir_args())
             subprocess.check_output(['opt', '-p dot-callgraph', f,
                                      '-disable-output', '-o',
-                                     f + '.mangled.dot'])
+                                     full_path + '.mangled.dot'])
             subprocess.check_output(['cat', f + '.mangled.dot', '|', 'c++filt',
                                      '|', 'sed',
                                      r"'s,>,\\>,g; s,-\\>,->,g; s,<,\\<,g'",
                                      '|', 'gawk',
                                      r"'/external node/{id=$1} $1 != id'", '>',
-                                     f + '.dot'])
-            dot_files.append(f + '.dot')
+                                     full_path + '.dot'])
+            dot_files.append(full_path + '.dot')
 
         graphs = []
         for f in dot_files:
