@@ -1,7 +1,5 @@
-#include "microXOR.cuh"
-
+#include "microXOR.hpp"
 #include <iostream>
-#include <random>
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -34,14 +32,31 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  #pragma omp target enter data map(to: input[0:N*N]) map(alloc: output[0:N*N])
-  #pragma omp target teams distribute parallel for
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
-      cellsXOR(input, output, N);
+  int *d_input, *d_output;
+  d_input = new int[N * N];
+  d_output = new int[N * N];
+
+  #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for collapse(2)
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        d_input[i * N + j] = input[i * N + j];
+      }
     }
   }
-  #pragma omp target exit data map(from: output[0:N*N])
+
+  cellsXOR(d_input, d_output, N);
+
+  #pragma omp target data map(from: d_output[0:N*N]) map(to: output[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for collapse(2)
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        output[i * N + j] = d_output[i * N + j];
+      }
+    }
+  }
 
   /*
   for (int i = 0; i < N*N; i++) {
@@ -54,22 +69,26 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < N; i++) {
     for (size_t j = 0; j < N; j++) {
       int count = 0;
-      if (i > 0 && input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      if (i > 0 && input[(i - 1) * N + j] == 1) count++;
+      if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
+      if (j > 0 && input[i * N + (j - 1)] == 1) count++;
+      if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
       if (count == 1) {
-        if (output[i*N + j] != 1) {
+        if (output[i * N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
           delete[] input;
           delete[] output;
+          delete[] d_input;
+          delete[] d_output;
           return 1;
         }
       } else {
-        if (output[i*N + j] != 0) {
+        if (output[i * N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
           delete[] input;
           delete[] output;
+          delete[] d_input;
+          delete[] d_output;
           return 1;
         }
       }
@@ -78,5 +97,7 @@ int main(int argc, char **argv) {
   std::cout << "Validation passed." << std::endl;
   delete[] input;
   delete[] output;
+  delete[] d_input;
+  delete[] d_output;
   return 0;
 }

@@ -1,5 +1,5 @@
-#ifndef MICROXOR_CUH
-#define MICROXOR_CUH
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
 
 #include <iostream>
 #include <random>

@@ -1,18 +1,13 @@
-#include "microXOR.cuh"
-
+#include "microXOR.hpp"
 #include <iostream>
 #include <random>
 
-#define restrict __restrict__
-
-extern "C" void cellsXOR(const int *restrict input, int *restrict output, size_t N);
-
-void cleanup(int *input, int *output) {
+void cleanup(int* input, int* output) {
   delete[] input;
   delete[] output;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   if (argc != 3) {
     std::cerr << "Usage: " << argv[0] << " N blockEdge" << std::endl;
     return 1;
@@ -34,8 +29,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  int *input = new int[N * N];
-  int *output = new int[N * N];
+  int* input = new int[N * N];
+  int* output = new int[N * N];
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<int> dis(0, 1);
@@ -43,27 +38,7 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  #pragma omp target data map(to: input[0:N*N]) map(alloc: output[0:N*N])
-  {
-    #pragma omp target teams distribute parallel for thread_limit(256) collapse(2)
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < N; ++j) {
-        output[i * N + j] = input[i * N + j];
-      }
-    }
-
-    #pragma omp target teams distribute parallel for thread_limit(256) collapse(2)
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < N; ++j) {
-        int count = 0;
-        if (i > 0 && input[(i - 1) * N + j] == 1) count++;
-        if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
-        if (j > 0 && input[i * N + (j - 1)] == 1) count++;
-        if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
-        output[i * N + j] = (count == 1) ? 1 : 0;
-      }
-    }
-  }
+  cellsXOR(input, output, N);
 
   /*
   for (int i = 0; i < N*N; i++) {
@@ -76,18 +51,18 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < N; i++) {
     for (size_t j = 0; j < N; j++) {
       int count = 0;
-      if (i > 0 && input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      if (i > 0 && input[(i - 1) * N + j] == 1) count++;
+      if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
+      if (j > 0 && input[i * N + (j - 1)] == 1) count++;
+      if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
       if (count == 1) {
-        if (output[i*N + j] != 1) {
+        if (output[i * N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
           cleanup(input, output);
           return 1;
         }
       } else {
-        if (output[i*N + j] != 0) {
+        if (output[i * N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
           cleanup(input, output);
           return 1;

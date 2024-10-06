@@ -30,8 +30,10 @@ def translate_cuda_to_openmp():
 
     {microXOR_code}
 
-    Translate all four files from CUDA to OpenMP Offload. Then, make sure to output all four translated code files as follows for each file:
-    
+    Translate all three CUDA files to OpenMP Offload and update the Makefile if necessary. 
+    The new files should be in C++ (.cpp or .hpp files), and any CUDA content should be substituted with OpenMP Offload. 
+    Lastly, output all four newly-translated files as follows for each file:
+
     File: file_name
 
     # File's Code
@@ -54,17 +56,27 @@ def translate_cuda_to_openmp():
     model = genai.GenerativeModel("gemini-1.5-flash")
 
     response = model.generate_content(updated_prompt)
+    comments_text = (response.text)[response.text.rfind("```") + 4:]
     response_text = (response.text)[:response.text.rfind("```") + 3]
     # print(response_text)
 
     # Step 3: Write the translated code to a new output file
     os.makedirs(output_folder, exist_ok=True)
 
-    pattern = r'## File: (include/microXOR\.cuh|src/microXOR\.cu|src/main\.cu|Makefile)\n(.*?)(?=\n## File:|$)'
+    pattern = r'## File: (.+?)\n(.*?)(?=\n## File:|$)'
 
     matches = re.findall(pattern, response_text, re.DOTALL)
 
     for file_name, code in matches:
+        
+        # Update file_name if necessary
+        if file_name.strip() == "microXOR.hpp":
+            file_name = "include/microXOR.hpp"
+        elif file_name.strip() == "microXOR.cpp" or file_name.strip() == "main.cpp":
+            file_name = "src/" + file_name.strip()
+
+        print(file_name.strip())
+
         output_file_path = os.path.join(output_folder, file_name.strip())
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
         if file_name != "Makefile":
@@ -82,6 +94,15 @@ def translate_cuda_to_openmp():
             output_file.write(code.strip())
         
         print(f"Wrote {file_name.strip()} to {output_file_path}")
+
+    # Store Gemini's comments in a textfile
+    comments_file_path = os.path.join(output_folder, "comments.txt")
+
+    # Write the comments to the text file
+    with open(comments_file_path, 'w') as comments_file:
+        comments_file.write(comments_text.strip())
+
+    print(f"Wrote comments to {comments_file_path}")
 
 for i in range(0, 5):
     new_folder = "/output-" + str(i)

@@ -1,13 +1,9 @@
-#include "microXOR.cuh"
-
+#include "microXOR.hpp"
 #include <iostream>
-#include <random>
 
-void cleanup(int *input, int *output, int *d_input, int *d_output) {
+void cleanup(int *input, int *output) {
   delete[] input;
   delete[] output;
-  cudaFree(d_input);
-  cudaFree(d_output);
 }
 
 int main(int argc, char **argv) {
@@ -41,18 +37,7 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  int *d_input, *d_output;
-  cudaMalloc(&d_input, N * N * sizeof(int));
-  cudaMalloc(&d_output, N * N * sizeof(int));
-
-  cudaMemcpy(d_input, input, N * N * sizeof(int), cudaMemcpyHostToDevice);
-
-  dim3 threadsPerBlock(blockEdge, blockEdge);
-  dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                 (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
-  cellsXOR<<<numBlocks, threadsPerBlock>>>(d_input, d_output, N);
-
-  cudaMemcpy(output, d_output, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+  cellsXOR(input, output, N);
 
   /*
   for (int i = 0; i < N*N; i++) {
@@ -72,19 +57,19 @@ int main(int argc, char **argv) {
       if (count == 1) {
         if (output[i*N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          cleanup(input, output, d_input, d_output);
+          cleanup(input, output);
           return 1;
         }
       } else {
         if (output[i*N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          cleanup(input, output, d_input, d_output);
+          cleanup(input, output);
           return 1;
         }
       }
     }
   }
   std::cout << "Validation passed." << std::endl;
-  cleanup(input, output, d_input, d_output);
+  cleanup(input, output);
   return 0;
 }

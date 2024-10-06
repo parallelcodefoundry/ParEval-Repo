@@ -1,21 +1,22 @@
-NVCC ?= nvcc
-CUDA_ARCH ?= sm_80
+CXX = g++
+CXXFLAGS ?= -O3 -fopenmp -Iinclude -std=c++17
+LDFLAGS ?= -fopenmp
+
 SRC = src
 INC = include
 OBJ = obj
-NVCCFLAGS ?= -O3 -arch=$(CUDA_ARCH) -I$(INC) -std=c++17
-LDFLAGS ?= -lcudart
+EXE = microXOR
 
-CUFILES = $(SRC)/microXOR.cu $(SRC)/main.cu
-DEPS = $(INC)/microXOR.cuh
-OBJS = $(CUFILES:$(SRC)/%.cu=$(OBJ)/%.o)
-EXE = microXOR.exe
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
 
 $(EXE): $(OBJS)
-	$(NVCC) $(NVCCFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-$(OBJ)/%.o: $(SRC)/%.cu $(DEPS) | obj
-	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 obj:
 	mkdir -p $(OBJ)
