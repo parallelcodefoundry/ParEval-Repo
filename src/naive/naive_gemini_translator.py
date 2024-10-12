@@ -1,111 +1,98 @@
-""" Naively translate microXOR using Gemini from CUDA to OpenMP Offload
-"""
+# """ Naively translates a repository file-by-file from one execution model to another execution model using Gemini
+# """
+
+#     original_prompt = """
+#     Below is a stencil computation benchmark computing an XOR operation over a 2D grid of cells, called microXOR. 
+#     This version of microXOR is written in CUDA for GPU execution.
+#     We are translating microXOR to OpenMP Offload.
+#     Here is the code for microXOR:
+
+#     {microXOR_code}
+
+#     Translate all three CUDA files to OpenMP Offload and update the Makefile if necessary. 
+#     The new files should be in C++ (.cpp or .hpp files), and any CUDA content should be substituted with OpenMP Offload. 
+#     Lastly, output all four newly-translated files as follows for each file:
+
+#     File: file_name
+
+#     # File's Code
+
+#     """
 
 import os
 import re
-import requests
+import sys
 import google.generativeai as genai
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from translator import Translator
+from repo import Repo
 
-# these are the CUDA files which will be transformed into OpenMP Offload
-cuda_files = ['/Users/ishan/pssg/code-translation/targets/microXOR/cuda/Makefile',
-              '/Users/ishan/pssg/code-translation/targets/microXOR/cuda/include/microXOR.cuh',
-              '/Users/ishan/pssg/code-translation/targets/microXOR/cuda/src/main.cu',
-              '/Users/ishan/pssg/code-translation/targets/microXOR/cuda/src/microXOR.cu']
+class NaiveGeminiTranslator(Translator):
+    SYSTEM_TEMPLATE: str = """You are a helpful coding assistant.
+You are helping a software developer translate a codebase from the {src_model} execution model to the {dst_model} execution model."""
 
-# the output folder collection in data/microXOR
-output_folder = '/Users/ishan/pssg/code-translation/data/microXOR/naive-gemini-cuda-to-omp'
+    PROMPT_TEMPLATE: str = """Below is a codebase written in the {src_model} execution model. We are translating it to the {dst_model} execution model.
+Here is the file tree of the entire repository:
 
-# reads the cuda files
-def read_cuda_file(file_path):
-    with open(file_path, 'r') as file:
-        return file.read()
+{file_tree}
 
-def translate_cuda_to_openmp():
+Here is the code for each file in the codebase:
 
-    naive_prompt = """
-    Below is a stencil computation benchmark computing an XOR operation over a 2D grid of cells, called microXOR. 
-    This version of microXOR is written in CUDA for GPU execution.
-    We are translating microXOR to OpenMP Offload.
-    Here is the code for microXOR:
+{all_files}
 
-    {microXOR_code}
+Translate the {filename} file to the {dst_model} execution model. Output the translated code in one code block.
+"""
 
-    Translate all three CUDA files to OpenMP Offload and update the Makefile if necessary. 
-    The new files should be in C++ (.cpp or .hpp files), and any CUDA content should be substituted with OpenMP Offload. 
-    Lastly, output all four newly-translated files as follows for each file:
+    def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str):
+        super().__init__(input_repo, output_repo, src_model, dst_model)
+        genai.configure(api_key=os.environ["API_KEY"])
+        self._model = genai.GenerativeModel("gemini-1.5-flash")
 
-    File: file_name
+    def get_system_prompt(self):
+        return self.SYSTEM_TEMPLATE.format(src_model=self._src_model, dst_model=self._dst_model)
 
-    # File's Code
+    def get_prompt(self, fname: str):
+        file_tree = self._input_repo.get_file_tree_str()
+        all_fpaths = self._input_repo.get_all_filenames(relpaths=True)
+        all_files_str = "\n\n".join(
+            map(lambda fpath: fpath + ":\n" + self._input_repo.get_file_contents(rel_path=fpath), all_fpaths)
+        )
+        return self.PROMPT_TEMPLATE.format(
+            src_model=self._src_model,
+            dst_model=self._dst_model,
+            file_tree=file_tree,
+            all_files=all_files_str,
+            filename=fname
+        )
 
-    """
+    CODE_BLOCK_PATTERN = re.compile(r"```(?:\w+)?\n(.*?)\n```", re.DOTALL)
 
-    # Step 1: Read the CUDA code
-    cummulative_microXOR_code = ""
-    for cuda_file in cuda_files:
-        if os.path.exists(cuda_file):
-            microXOR_code = read_cuda_file(cuda_file)
-            cummulative_microXOR_code += microXOR_code + "\n"
-        else:
-            print(f"File {cuda_file} does not exist.")
+    def _postprocess(self, output: str) -> str:
+        match = self.CODE_BLOCK_PATTERN.search(output)
+        if match is None:
+            raise ValueError("No code block found in output.")
+        return match.group(1)
 
-    updated_prompt = naive_prompt.format(microXOR_code=cummulative_microXOR_code)
+    def translate(self, dry: bool = False):
+        system_prompt = self.get_system_prompt()
+        all_files = self._input_repo.get_all_filenames(relpaths=True)
 
-    # Step 2: Make a request to Gemini's API to translate the code
-    genai.configure(api_key=os.environ["API_KEY"])
-    model = genai.GenerativeModel("gemini-1.5-flash")
+        for fpath in all_files:
+            prompt = self.get_prompt(fpath)
+            
+            if dry:
+                print(prompt)
+                continue
 
-    response = model.generate_content(updated_prompt)
-    comments_text = (response.text)[response.text.rfind("```") + 4:]
-    response_text = (response.text)[:response.text.rfind("```") + 3]
-    # print(response_text)
+            response = self._model.generate_content(prompt)
+            output = response.text
+            output = self._postprocess(output)
 
-    # Step 3: Write the translated code to a new output file
-    os.makedirs(output_folder, exist_ok=True)
+            output_fpath = os.path.join(self._output_fpath, fpath)
 
-    pattern = r'## File: (.+?)\n(.*?)(?=\n## File:|$)'
+            os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
 
-    matches = re.findall(pattern, response_text, re.DOTALL)
+            with open(output_fpath, 'w') as f:
+                f.write(output)
 
-    for file_name, code in matches:
-        
-        # Update file_name if necessary
-        if file_name.strip() == "microXOR.hpp":
-            file_name = "include/microXOR.hpp"
-        elif file_name.strip() == "microXOR.cpp" or file_name.strip() == "main.cpp":
-            file_name = "src/" + file_name.strip()
-
-        print(file_name.strip())
-
-        output_file_path = os.path.join(output_folder, file_name.strip())
-        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-        if file_name != "Makefile":
-            # removes starting ```
-            code = code[8:]
-            # removes ending ```
-            code = code[:len(code) - 4]
-        else:
-            # removes starting ```
-            code = code[13:]
-            # removes ending ```
-            code = code[:len(code) - 3]
-
-        with open(output_file_path, 'w') as output_file:
-            output_file.write(code.strip())
-        
-        print(f"Wrote {file_name.strip()} to {output_file_path}")
-
-    # Store Gemini's comments in a textfile
-    comments_file_path = os.path.join(output_folder, "comments.txt")
-
-    # Write the comments to the text file
-    with open(comments_file_path, 'w') as comments_file:
-        comments_file.write(comments_text.strip())
-
-    print(f"Wrote comments to {comments_file_path}")
-
-for i in range(0, 5):
-    new_folder = "/output-" + str(i)
-    output_folder += new_folder
-    translate_cuda_to_openmp()
-    output_folder = output_folder[:len(output_folder) - 9]
+            print(f"Translated {fpath} to {output_fpath}")

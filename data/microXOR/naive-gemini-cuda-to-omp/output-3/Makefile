@@ -1,25 +1,23 @@
-CXX = g++
-CXXFLAGS ?= -O3 -fopenmp -Iinclude -std=c++17
+# Makefile for OpenMP offload microXOR
+
+CXX_COMPILER ?= g++
+OMP_FLAGS ?= -fopenmp -march=native -O3
+CXXFLAGS ?= $(OMP_FLAGS) -Iinclude -std=c++17
 LDFLAGS ?= -fopenmp
 
-SRC = src
-INC = include
-OBJ = obj
-EXE = microXOR
-
-CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
-DEPS = $(INC)/microXOR.hpp
-
-OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+CUFILES = src/microXOR.cpp src/main.cpp
+DEPS = include/microXOR.cuh
+OBJS = $(CUFILES:src/%.cpp=obj/%.o)
+EXE = microXOR.exe
 
 $(EXE): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+	$(CXX_COMPILER) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(OBJ)/%.o: src/%.cpp $(DEPS) | obj
+	$(CXX_COMPILER) $(CXXFLAGS) -c $< -o $@
 
 obj:
-	mkdir -p $(OBJ)
+	mkdir -p obj
 
 clean:
 	rm -f $(OBJS) $(EXE)

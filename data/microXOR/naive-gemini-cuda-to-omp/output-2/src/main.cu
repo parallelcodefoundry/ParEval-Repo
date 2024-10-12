@@ -1,5 +1,13 @@
-#include "microXOR.hpp"
-#include <iostream>
+// microXOR driver
+
+#include "microXOR.cuh"
+
+void cleanup(int *input, int *output, int *d_input, int *d_output) {
+  delete[] input;
+  delete[] output;
+  free(d_input);
+  free(d_output);
+}
 
 int main(int argc, char **argv) {
   if (argc != 3) {
@@ -33,28 +41,34 @@ int main(int argc, char **argv) {
   }
 
   int *d_input, *d_output;
-  d_input = new int[N * N];
-  d_output = new int[N * N];
+  d_input = (int*) malloc(N * N * sizeof(int));
+  d_output = (int*) malloc(N * N * sizeof(int));
 
   #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
   {
-    #pragma omp target teams distribute parallel for collapse(2)
+    #pragma omp target teams distribute parallel for map(tofrom: d_input[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      d_input[i] = input[i];
+    }
+
+    #pragma omp target teams distribute parallel for thread_limit(256) map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
     for (int i = 0; i < N; i++) {
       for (int j = 0; j < N; j++) {
-        d_input[i * N + j] = input[i * N + j];
+        int count = 0;
+        if (i > 0 && d_input[(i-1)*N + j] == 1) count++;
+        if (i < N-1 && d_input[(i+1)*N + j] == 1) count++;
+        if (j > 0 && d_input[i*N + (j-1)] == 1) count++;
+        if (j < N-1 && d_input[i*N + (j+1)] == 1) count++;
+        d_output[i*N + j] = (count == 1) ? 1 : 0;
       }
     }
   }
 
-  cellsXOR(d_input, d_output, N);
-
-  #pragma omp target data map(from: d_output[0:N*N]) map(to: output[0:N*N])
+  #pragma omp target data map(from: d_output[0:N*N])
   {
-    #pragma omp target teams distribute parallel for collapse(2)
-    for (int i = 0; i < N; i++) {
-      for (int j = 0; j < N; j++) {
-        output[i * N + j] = d_output[i * N + j];
-      }
+    #pragma omp target teams distribute parallel for map(tofrom: output[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      output[i] = d_output[i];
     }
   }
 
@@ -69,35 +83,26 @@ int main(int argc, char **argv) {
   for (size_t i = 0; i < N; i++) {
     for (size_t j = 0; j < N; j++) {
       int count = 0;
-      if (i > 0 && input[(i - 1) * N + j] == 1) count++;
-      if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
-      if (j > 0 && input[i * N + (j - 1)] == 1) count++;
-      if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
       if (count == 1) {
-        if (output[i * N + j] != 1) {
+        if (output[i*N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          delete[] input;
-          delete[] output;
-          delete[] d_input;
-          delete[] d_output;
+          cleanup(input, output, d_input, d_output);
           return 1;
         }
       } else {
-        if (output[i * N + j] != 0) {
+        if (output[i*N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          delete[] input;
-          delete[] output;
-          delete[] d_input;
-          delete[] d_output;
+          cleanup(input, output, d_input, d_output);
           return 1;
         }
       }
     }
   }
   std::cout << "Validation passed." << std::endl;
-  delete[] input;
-  delete[] output;
-  delete[] d_input;
-  delete[] d_output;
+  cleanup(input, output, d_input, d_output);
   return 0;
 }

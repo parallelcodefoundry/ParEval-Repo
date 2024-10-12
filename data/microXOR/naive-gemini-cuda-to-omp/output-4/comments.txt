@@ -1,3 +1,0 @@
-This translation replaces CUDA with OpenMP offload for device code and removes the CUDA-specific functions like `cudaMalloc` and `cudaMemcpy`. Instead, it uses `omp target data` and `omp target teams distribute parallel for` to perform data transfers and offload computation to the device. 
-
-Remember that this is a basic translation and may require further optimization depending on your specific target platform and application requirements.

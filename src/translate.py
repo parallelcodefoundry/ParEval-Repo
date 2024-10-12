@@ -13,7 +13,7 @@ import os
 from repo import Repo
 from translator import Translator
 from naive.naive_translator import NaiveTranslator
-
+from naive.naive_gemini_translator import NaiveGeminiTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -33,6 +33,8 @@ def get_args():
 def get_translator_cls(method: str):
     if method == "naive":
         return NaiveTranslator
+    elif method == "gemini":
+        return NaiveGeminiTranslator
     else:
         raise ValueError(f"Translation method {method} not recognized.")
 

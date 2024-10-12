@@ -1,1 +1,0 @@
-This will compile the code and run it with a grid size of 16x16 and a block edge of 4.

@@ -1,11 +1,12 @@
-#include <iostream>
-#include <random>
-#include <omp.h>
-#include "microXOR.hpp"
+// microXOR driver
 
-void cleanup(int *input, int *output) {
+#include "microXOR.cuh"
+
+void cleanup(int *input, int *output, int *d_input, int *d_output) {
   delete[] input;
   delete[] output;
+  free(d_input);
+  free(d_output);
 }
 
 int main(int argc, char **argv) {
@@ -39,7 +40,34 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  cellsXOR(input, output, N);
+  int *d_input, *d_output;
+  d_input = (int*) malloc(N * N * sizeof(int));
+  d_output = (int*) malloc(N * N * sizeof(int));
+
+  #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for map(to: input[0:N*N]) map(from: d_input[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      d_input[i] = input[i];
+    }
+
+    #pragma omp target teams distribute parallel for map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
+    for (size_t i = 0; i < N; i++) {
+      for (size_t j = 0; j < N; j++) {
+        int count = 0;
+        if (i > 0 && d_input[(i-1)*N + j] == 1) count++;
+        if (i < N-1 && d_input[(i+1)*N + j] == 1) count++;
+        if (j > 0 && d_input[i*N + (j-1)] == 1) count++;
+        if (j < N-1 && d_input[i*N + (j+1)] == 1) count++;
+        d_output[i*N + j] = (count == 1) ? 1 : 0;
+      }
+    }
+
+    #pragma omp target teams distribute parallel for map(from: output[0:N*N]) map(to: d_output[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      output[i] = d_output[i];
+    }
+  }
 
   /*
   for (int i = 0; i < N*N; i++) {
@@ -59,19 +87,19 @@ int main(int argc, char **argv) {
       if (count == 1) {
         if (output[i*N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          cleanup(input, output);
+          cleanup(input, output, d_input, d_output);
           return 1;
         }
       } else {
         if (output[i*N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          cleanup(input, output);
+          cleanup(input, output, d_input, d_output);
           return 1;
         }
       }
     }
   }
   std::cout << "Validation passed." << std::endl;
-  cleanup(input, output);
+  cleanup(input, output, d_input, d_output);
   return 0;
 }

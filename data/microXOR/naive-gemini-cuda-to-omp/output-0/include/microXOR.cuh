@@ -1,5 +1,7 @@
-#ifndef MICROXOR_HPP
-#define MICROXOR_HPP
+// microXOR header file
+
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
 
 #include <iostream>
 #include <random>

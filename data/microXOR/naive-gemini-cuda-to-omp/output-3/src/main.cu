@@ -1,9 +1,12 @@
-#include "microXOR.hpp"
-#include <iostream>
+// microXOR driver
 
-void cleanup(int *input, int *output) {
+#include "microXOR.cuh"
+
+void cleanup(int *input, int *output, int *d_input, int *d_output) {
   delete[] input;
   delete[] output;
+  free(d_input);
+  free(d_output);
 }
 
 int main(int argc, char **argv) {
@@ -37,7 +40,34 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  cellsXOR(input, output, N);
+  int *d_input, *d_output;
+  d_input = (int*)malloc(N * N * sizeof(int));
+  d_output = (int*)malloc(N * N * sizeof(int));
+
+  #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for map(tofrom: d_input[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      d_input[i] = input[i];
+    }
+  }
+
+  dim3 threadsPerBlock(blockEdge, blockEdge);
+  dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                 (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+  #pragma omp target teams distribute parallel for map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
+  for (size_t i = 0; i < N * N; i++) {
+    d_output[i] = cellsXOR(d_input, N, i);
+  }
+
+  #pragma omp target data map(from: d_output[0:N*N]) map(to: output[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for
+    for (size_t i = 0; i < N * N; i++) {
+      output[i] = d_output[i];
+    }
+  }
 
   /*
   for (int i = 0; i < N*N; i++) {
@@ -57,19 +87,19 @@ int main(int argc, char **argv) {
       if (count == 1) {
         if (output[i*N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          cleanup(input, output);
+          cleanup(input, output, d_input, d_output);
           return 1;
         }
       } else {
         if (output[i*N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-          cleanup(input, output);
+          cleanup(input, output, d_input, d_output);
           return 1;
         }
       }
     }
   }
   std::cout << "Validation passed." << std::endl;
-  cleanup(input, output);
+  cleanup(input, output, d_input, d_output);
   return 0;
 }
