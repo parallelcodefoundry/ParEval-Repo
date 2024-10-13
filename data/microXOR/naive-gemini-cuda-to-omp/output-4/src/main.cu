@@ -47,37 +47,30 @@ int main(int argc, char **argv) {
   #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
   {
     #pragma omp target teams distribute parallel for map(tofrom: d_input[0:N*N])
-    for (size_t i = 0; i < N * N; i++) {
+    for (int i = 0; i < N * N; i++) {
       d_input[i] = input[i];
     }
-  }
 
-  #pragma omp target teams distribute parallel for map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
-  for (size_t i = 0; i < N; i++) {
-    for (size_t j = 0; j < N; j++) {
-      int count = 0;
-      if (i > 0 && d_input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && d_input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && d_input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && d_input[i*N + (j+1)] == 1) count++;
-      d_output[i*N + j] = (count == 1) ? 1 : 0;
+    #pragma omp target teams distribute parallel for map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        int count = 0;
+        if (i > 0 && d_input[(i-1)*N + j] == 1) count++;
+        if (i < N-1 && d_input[(i+1)*N + j] == 1) count++;
+        if (j > 0 && d_input[i*N + (j-1)] == 1) count++;
+        if (j < N-1 && d_input[i*N + (j+1)] == 1) count++;
+        d_output[i*N + j] = (count == 1) ? 1 : 0;
+      }
     }
   }
 
-  #pragma omp target data map(from: d_output[0:N*N]) map(to: output[0:N*N])
+  #pragma omp target data map(from: d_output[0:N*N])
   {
     #pragma omp target teams distribute parallel for map(tofrom: output[0:N*N])
-    for (size_t i = 0; i < N * N; i++) {
+    for (int i = 0; i < N * N; i++) {
       output[i] = d_output[i];
     }
   }
-
-  /*
-  for (int i = 0; i < N*N; i++) {
-    std::cout << output[i] << " ";
-    if (i % N == N - 1) std::cout << std::endl;
-  }
-  */
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {

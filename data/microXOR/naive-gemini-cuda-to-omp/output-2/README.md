@@ -10,4 +10,4 @@ OpenMP with offload support must be installed.
 
 ## Build
 
-To build microXOR, use `make`, setting `CUDA_ARCH` as appropriate for your system. For example, the following will build microXOR for an NVIDIA GPU with compute capability 80.
+To build microXOR, use `make` with `CXX_COMPILER` set to the correct compiler and `CUDA_ARCH` set to the appropriate target GPU architecture. For example, the following will build microXOR for an NVIDIA GPU with compute capability 80 using the Clang compiler:

@@ -31,14 +31,8 @@ __global__ void cellsXOR(const int *input, int *output, size_t N) {
   }
 }
 
-#if defined(__CUDA_ARCH__)
-#define cellsXOR_device cellsXOR
-#else
-#define cellsXOR_device cellsXOR_openmp
-#endif
-
 #pragma omp declare target
-__global__ void cellsXOR_openmp(const int *input, int *output, size_t N) {
+__global__ void cellsXOR(const int *input, int *output, size_t N) {
   int i = blockIdx.y * blockDim.y + threadIdx.y;
   int j = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < N && j < N) {

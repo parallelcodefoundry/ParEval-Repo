@@ -1,23 +1,26 @@
 # Makefile for OpenMP offload microXOR
 
 CXX_COMPILER ?= g++
-OMP_FLAGS ?= -fopenmp -march=native -O3
-CXXFLAGS ?= $(OMP_FLAGS) -Iinclude -std=c++17
-LDFLAGS ?= -fopenmp
+OMP_TARGET_ARCH ?= nvptx-none
+SRC = src
+INC = include
+OBJ = obj
+CXXFLAGS ?= -O3 -fopenmp -Xopenmp-target -march=$(OMP_TARGET_ARCH) -I$(INC) -std=c++17
+LDFLAGS ?= -fopenmp -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/cuda/12.0/lib64 -L/global/common/software/nersc/pe/gpu/llvm/17.0.6/lib -lcudart_static -ldl -lrt -pthread
 
-CUFILES = src/microXOR.cpp src/main.cpp
-DEPS = include/microXOR.cuh
-OBJS = $(CUFILES:src/%.cpp=obj/%.o)
+CUFILES = $(SRC)/microXOR.cu $(SRC)/main.cu
+DEPS = $(INC)/microXOR.cuh
+OBJS = $(CUFILES:$(SRC)/%.cu=$(OBJ)/%.o)
 EXE = microXOR.exe
 
 $(EXE): $(OBJS)
 	$(CXX_COMPILER) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-$(OBJ)/%.o: src/%.cpp $(DEPS) | obj
+$(OBJ)/%.o: $(SRC)/%.cu $(DEPS) | obj
 	$(CXX_COMPILER) $(CXXFLAGS) -c $< -o $@
 
 obj:
-	mkdir -p obj
+	mkdir -p $(OBJ)
 
 clean:
 	rm -f $(OBJS) $(EXE)

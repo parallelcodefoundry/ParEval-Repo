@@ -1,11 +1,11 @@
-# Makefile for CUDA microXOR using the Clang compiler with OpenMP offloading
+# Makefile for CUDA microXOR using the Clang compiler
 
 CXX_COMPILER ?= clang++
 CUDA_ARCH ?= sm_80
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -O3 -fopenmp-targets=nvptx64-nvidia-cuda -I$(INC) -std=c++17
+CXXFLAGS ?= -O3 -fopenmp -Xopenmp-target -march=$(CUDA_ARCH) -I$(INC) -std=c++17
 LDFLAGS ?= -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/cuda/12.0/lib64 -L/global/common/software/nersc/pe/gpu/llvm/17.0.6/lib -lcudart_static -ldl -lrt -pthread
 
 CUFILES = $(SRC)/microXOR.cu $(SRC)/main.cu

@@ -19,14 +19,14 @@ def get_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to the input source code repository.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
-    parser.add_argument("--method", choices=["naive"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive", "gemini"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--dry", action="store_true", help="Dry run the translation.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4"], default="gpt-4", help="The LLM to use for translation.")
+    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4", "gemini"], default="gpt-4", help="The LLM to use for translation.")
     return parser.parse_args()
 
 

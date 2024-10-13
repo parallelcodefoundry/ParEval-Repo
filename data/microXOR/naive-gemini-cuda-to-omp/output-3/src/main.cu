@@ -46,24 +46,29 @@ int main(int argc, char **argv) {
 
   #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
   {
-    #pragma omp target teams distribute parallel for map(tofrom: d_input[0:N*N])
+    #pragma omp target teams distribute parallel for thread_limit(256)
     for (size_t i = 0; i < N * N; i++) {
       d_input[i] = input[i];
     }
   }
 
-  dim3 threadsPerBlock(blockEdge, blockEdge);
-  dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                 (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
-
-  #pragma omp target teams distribute parallel for map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
-  for (size_t i = 0; i < N * N; i++) {
-    d_output[i] = cellsXOR(d_input, N, i);
+  size_t numThreads = blockEdge * blockEdge;
+  size_t numTeams = (N + blockEdge - 1) / blockEdge;
+  #pragma omp target teams distribute parallel for thread_limit(numThreads) num_teams(numTeams)
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
+      int count = 0;
+      if (i > 0 && d_input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && d_input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && d_input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && d_input[i*N + (j+1)] == 1) count++;
+      d_output[i*N + j] = (count == 1) ? 1 : 0;
+    }
   }
 
-  #pragma omp target data map(from: d_output[0:N*N]) map(to: output[0:N*N])
+  #pragma omp target data map(from: d_output[0:N*N]) map(alloc: output[0:N*N])
   {
-    #pragma omp target teams distribute parallel for
+    #pragma omp target teams distribute parallel for thread_limit(256)
     for (size_t i = 0; i < N * N; i++) {
       output[i] = d_output[i];
     }

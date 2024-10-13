@@ -31,18 +31,17 @@ __global__ void cellsXOR(const int *input, int *output, size_t N) {
   }
 }
 
-#if defined(__CUDA_ARCH__)
-#pragma omp target teams distribute parallel for map(to:input[0:N*N]) map(tofrom:output[0:N*N])
-#else
-#pragma omp parallel for collapse(2)
-#endif
-for (int i = 0; i < N; ++i) {
-  for (int j = 0; j < N; ++j) {
+#pragma omp declare target
+__global__ void cellsXOR(const int *input, int *output, size_t N) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y;
+  int j = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i < N && j < N) {
     int count = 0;
-    if (i > 0 && input[(i - 1) * N + j] == 1) count++;
-    if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
-    if (j > 0 && input[i * N + (j - 1)] == 1) count++;
-    if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
-    output[i * N + j] = (count == 1) ? 1 : 0;
+    if (i > 0 && input[(i-1)*N + j] == 1) count++;
+    if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+    if (j > 0 && input[i*N + (j-1)] == 1) count++;
+    if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+    output[i*N + j] = (count == 1) ? 1 : 0;
   }
 }
+#pragma omp end declare target

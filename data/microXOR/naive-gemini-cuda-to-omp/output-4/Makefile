@@ -1,11 +1,11 @@
 # Makefile for OpenMP offload microXOR
 
 CXX_COMPILER ?= g++
-OMP_TARGET_ARCH ?= nvptx-none
+OMP_FLAGS ?= -fopenmp -Xopenmp-target -march=native
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -O3 -fopenmp -fopenmp-targets=$(OMP_TARGET_ARCH) -I$(INC) -std=c++17
+CXXFLAGS ?= -O3 -I$(INC) -std=c++17 $(OMP_FLAGS)
 LDFLAGS ?= -fopenmp
 
 CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
