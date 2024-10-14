@@ -7,7 +7,6 @@ OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
 MPI         ?= no
-ALIGNED     ?= yes
 CUDA_ARCH   ?= 80
 
 #===============================================================================
@@ -87,11 +86,6 @@ endif
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
-endif
-
-# Workload alignment for accurate comparison
-ifeq ($(ALIGNED),yes)
-	CFLAGS += -DALIGNED_WORK
 endif
 
 # MPI
