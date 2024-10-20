@@ -86,6 +86,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
 
             response = self._model.generate_content(prompt)
             output = response.text
+            print(output)
             output = self._postprocess(output)
 
             output_fpath = os.path.join(self._output_fpath, fpath)
