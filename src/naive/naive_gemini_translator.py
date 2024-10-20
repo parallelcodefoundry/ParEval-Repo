@@ -70,7 +70,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     def _postprocess(self, output: str) -> str:
         match = self.CODE_BLOCK_PATTERN.search(output)
         if match is None:
-            raise ValueError("No code block found in output.")
+            # raise ValueError("No code block found in output.")
+            return None
         return match.group(1)
 
     def translate(self, dry: bool = False):
@@ -79,6 +80,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
 
         for fpath in all_files:
             prompt = self.get_prompt(fpath)
+            if fpath == 'train_gpt2_fp32.cu':
+                continue
             
             if dry:
                 print(prompt)
@@ -86,8 +89,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
 
             response = self._model.generate_content(prompt)
             output = response.text
-            print(output)
-            output = self._postprocess(output)
+            if self._postprocess(output) != None:
+                output = self._postprocess(output)
 
             output_fpath = os.path.join(self._output_fpath, fpath)
 
