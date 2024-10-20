@@ -66,8 +66,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         all_files = self._input_repo.get_all_filenames(relpaths=True)
 
         for fpath in alive_it(all_files, title="Translating files"):
+            print(fpath)
             prompt = self.get_prompt(fpath)
-            
             if dry:
                 print(prompt)
                 continue
