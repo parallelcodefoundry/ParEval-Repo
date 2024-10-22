@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 # local imports
 from util import await_input
+from build import build_repo
 
 def get_args():
     parser = ArgumentParser(description="Compile and run all the generated code repositories.")
@@ -24,7 +25,7 @@ def get_args():
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
     parser.add_argument("-m", "--models", nargs="+", type=str, help="List of execution models to run, case-insensitive.", choices=["omp"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
-    parser.add_argument("--dry", action="store_true", help="Dry run. Do not actually compile or run the code repositories.")
+    parser.add_argument("-d", "--dry", action="store_true", help="Dry run. Do not actually compile or run the code repositories.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="If outputs are already in DB for a given prompt, then overwrite them. Default behavior is to skip existing results.")
     parser.add_argument("--hide-progress", action="store_true", help="If provided, do not show progress bar.")
     parser.add_argument("--build-only", action="store_true", help="If provided, only build the code repositories, do not run.")
@@ -55,7 +56,7 @@ Want to create list of dictionaries of the form:
     "path": path
 }
 '''
-def gather_code_repos(args):
+def gather_code_repos(args, results):
     code_repos = []
 
     # For logging what we find
@@ -106,6 +107,18 @@ def gather_code_repos(args):
                             "output_number": output_number,
                             "path": output_path
                         })
+                        results.append({
+                            "app": app,
+                            "prompt_strategy": prompt_strategy,
+                            "llm_name": llm_name,
+                            "source_model": source_model,
+                            "target_model": target_model,
+                            "output_number": output_number,
+                            "path": output_path,
+                            "build_results": {},
+                            "debug_results": {},
+                            "perf_results": {}
+                        })
 
     logging.info(f"Found {len(code_repos)} code repositories.")
     logging.info(f"Found apps: {apps_found}")
@@ -147,7 +160,15 @@ def main():
     with open(args.run_config, "r") as f:
         run_configs = json.load(f)
 
-    code_repos = gather_code_repos(args)
+    # Create empty list for results dicts
+    results = []
+
+    # Gather all the code repositories
+    code_repos = gather_code_repos(args, results)
+
+    # Build each code repository
+    for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
+        build_repo(code_repo, build_configs, results, args)
 
 if __name__ == "__main__":
     main()

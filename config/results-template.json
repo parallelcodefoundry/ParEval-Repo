@@ -1,0 +1,47 @@
+[
+    {
+        "app": "microxor",
+        "prompt_strategy": "naive",
+        "llm_name": "gpt_3.5",
+        "source_model": "cuda",
+        "target_model": "omp",
+        "output_number": 1,
+        "path": "data/microXOR/naive-gpt_3.5-cuda-to-omp/output-1",
+        "build_results": {
+            "build_result_debug": 0,
+            "build_result_perf": 0,
+            "build_stdout_debug": "",
+            "build_stdout_perf": "",
+            "build_stderr_debug": "",
+            "build_stderr_perf": ""
+        },
+        "debug_results": {
+            "run_results_debug": [
+                0,
+                0,
+                0
+            ],
+            "run_stdouts_debug": [
+                "Validation passed.",
+                "Validation passed.",
+                "Validation passed."
+            ],
+            "run_stderrs_debug": [
+                "",
+                "",
+                ""
+            ]
+        },
+        "perf_results": {
+            "run_results_perf": [
+                0
+            ],
+            "run_stdouts_perf": [
+                "Validation passed."
+            ],
+            "run_stderrs_perf": [
+                ""
+            ]
+        }
+    }
+]
