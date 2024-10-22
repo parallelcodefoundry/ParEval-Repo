@@ -1,4 +1,4 @@
-#!/usr/env/bin python3
+#!/usr/bin/env python3
 '''
 Run all generated code repositories
 author: Josh Davis
