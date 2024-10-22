@@ -17,6 +17,7 @@ from tqdm import tqdm
 # local imports
 from util import await_input
 from build import build_repo
+from run import run_repo
 
 def get_args():
     parser = ArgumentParser(description="Compile and run all the generated code repositories.")
@@ -112,8 +113,6 @@ def gather_code_repos(args, results):
 
                         # Hash the metadata to use as a key in the results dict
                         hashcode = hash(json.dumps(repo_metadata, sort_keys=True))
-                        logging.debug(f"Data to hash: {json.dumps(repo_metadata, sort_keys=True)}")
-                        logging.debug(f"Hashcode to save: {hashcode}")
 
                         if hashcode in results:
                             logging.warning(f"Skipping duplicate code repository: {output_path}")
@@ -181,9 +180,14 @@ def main():
     # Build each code repository
     for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
         logging.debug(f"Building code repository: {code_repo['path']}")
-        logging.debug(f"Code repo metadata to hash: {json.dumps(code_repo, sort_keys=True)}")
         hashcode = hash(json.dumps(code_repo, sort_keys=True))
         build_repo(code_repo, build_configs, results[hashcode], args)
+
+    # Run each code repository
+    for code_repo in tqdm(code_repos, desc="Running code repositories", disable=args.hide_progress):
+        logging.debug(f"Running code repository: {code_repo['path']}")
+        hashcode = hash(json.dumps(code_repo, sort_keys=True))
+        run_repo(code_repo, run_configs, results[hashcode], args)
 
     # Filter out results that are already in the output
     if args.output and os.path.exists(args.output):
