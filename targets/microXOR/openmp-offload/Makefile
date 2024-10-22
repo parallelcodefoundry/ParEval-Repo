@@ -1,7 +1,7 @@
 # Makefile for OpenMP Offload microXOR
 
 CXX_COMPILER ?= clang++
-CUDA_ARCH ?= sm_80
+SM_VERSION ?= sm_80
 SRC = src
 INC = include
 OBJ = obj
