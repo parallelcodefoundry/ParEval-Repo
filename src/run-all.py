@@ -4,13 +4,17 @@ Run all generated code repositories
 author: Josh Davis
 date: October 2024
 '''
-
+# std imports
 from argparse import ArgumentParser
 import json
 import os
 import logging
 
+# tpl imports
 from tqdm import tqdm
+
+# local imports
+from util import await_input
 
 def get_args():
     parser = ArgumentParser(description="Compile and run all the generated code repositories.")
@@ -37,6 +41,83 @@ def get_args():
     parser.add_argument("--log", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", type=str.upper, help="Logging level.")
     return parser.parse_args()
 
+'''
+Gather all the generated code repositories. Root directory format is:
+translations_root/app/prompt_strategy-llm_name-source_model-to-target_model/output-number
+Want to create list of dictionaries of the form:
+{
+    "app": app,
+    "prompt_strategy": prompt_strategy,
+    "llm_name": llm_name,
+    "source_model": source_model,
+    "target_model": target_model,
+    "output_number": output_number,
+    "path": path
+}
+'''
+def gather_code_repos(args):
+    code_repos = []
+
+    # For logging what we find
+    apps_found = []
+    target_models_found = []
+    source_models_found = []
+    llms_found = []
+    prompt_strategies_found = []
+
+    for app_candidate in os.listdir(args.translations_root):
+        if not args.apps or app_candidate.lower() in args.apps:
+            if app_candidate not in apps_found:
+                apps_found.append(app_candidate)
+
+            app = app_candidate
+            app_path = os.path.join(args.translations_root, app)
+
+            for config in os.listdir(app_path):
+                if not args.models or config.lower() in args.models:
+                    logging.debug(f"Found config: {config}")
+                    prompt_strategy, llm_name, source_model, _, target_model = config.split("-")
+
+                    if prompt_strategy not in prompt_strategies_found:
+                        prompt_strategies_found.append(prompt_strategy)
+                    if llm_name not in llms_found:
+                        llms_found.append(llm_name)
+                    if target_model not in target_models_found:
+                        target_models_found.append(target_model)
+                    if source_model not in source_models_found:
+                        source_models_found.append(source_model)
+
+                    config_path = os.path.join(args.translations_root, app, config)
+
+                    for output in os.listdir(config_path):
+                        output_number = output.split("-")[-1]
+                        output_path = os.path.join(config_path, output)
+
+                        if not os.path.isdir(output_path):
+                            logging.warning(f"Skipping non-directory {output_path}.")
+                            continue
+
+                        code_repos.append({
+                            "app": app,
+                            "prompt_strategy": prompt_strategy,
+                            "llm_name": llm_name,
+                            "source_model": source_model,
+                            "target_model": target_model,
+                            "output_number": output_number,
+                            "path": output_path
+                        })
+
+    logging.info(f"Found {len(code_repos)} code repositories.")
+    logging.info(f"Found apps: {apps_found}")
+    logging.info(f"Found prompt strategies: {prompt_strategies_found}")
+    logging.info(f"Found llms: {llms_found}")
+    logging.info(f"Found target models: {target_models_found}")
+    logging.info(f"Found source models: {source_models_found}")
+    logging.debug("Code repositories:")
+    logging.debug("\n" + json.dumps(code_repos, indent=4))
+
+    return code_repos
+
 def main():
     args = get_args()
 
@@ -60,47 +141,13 @@ def main():
             return
 
     # Load build and run configs
-    with open(args.build_config, "r") as f:
-        build_configs = json.load(f)
+    #with open(args.build_config, "r") as f:
+    #    build_configs = json.load(f)
 
-    with open(args.run_config, "r") as f:
-        run_configs = json.load(f)
+    #with open(args.run_config, "r") as f:
+    #    run_configs = json.load(f)
 
-    '''
-    Gather all the generated code repositories. Root directory format is:
-    translations_root/app/prompt_strategy-llm_name-source_model-to-target_model/output-number
-    Want to create list of dictionaries of the form:
-    {
-        "app": app,
-        "prompt_strategy": prompt_strategy,
-        "llm_name": llm_name,
-        "source_model": source_model,
-        "target_model": target_model,
-        "output_number": output_number,
-        "path": path
-    }
-    '''
-    code_repos = []
-    for app_candidate in os.listdir(args.translations_root):
-        if not args.apps or app_candidate.lower() in args.apps:
-            app = app_candidate
-            app_path = os.path.join(args.translations_root, app)
-            for config in os.listdir(app_path):
-                if not args.models or config.lower() in args.models:
-                    prompt_strategy, llm_name, source_model, target_model = config.split("-")
-                    config_path = os.path.join(args.translations_root, app, config)
-                    for output in os.listdir(config_path):
-                        output_number = output.split("-")[-1]
-                        output_path = os.path.join(config_path, output)
-                        code_repos.append({
-                            "app": app,
-                            "prompt_strategy": prompt_strategy,
-                            "llm_name": llm_name,
-                            "source_model": source_model,
-                            "target_model": target_model,
-                            "output_number": output_number,
-                            "path": output_path
-                        })
+    code_repos = gather_code_repos(args)
 
-    logging.info(f"Found {len(code_repos)} code repositories.")
-    logging.debug(f"Code repositories: {code_repos}")
+if __name__ == "__main__":
+    main()
