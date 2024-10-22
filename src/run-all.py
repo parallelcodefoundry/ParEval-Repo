@@ -141,11 +141,11 @@ def main():
             return
 
     # Load build and run configs
-    #with open(args.build_config, "r") as f:
-    #    build_configs = json.load(f)
+    with open(args.build_config, "r") as f:
+        build_configs = json.load(f)
 
-    #with open(args.run_config, "r") as f:
-    #    run_configs = json.load(f)
+    with open(args.run_config, "r") as f:
+        run_configs = json.load(f)
 
     code_repos = gather_code_repos(args)
 

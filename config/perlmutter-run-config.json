@@ -3,26 +3,22 @@
     "model": "omp",
     "debug_type": "match",
     "pre_run_commands": "module load PrgEnv-llvm cudatoolkit",
-    "run_commands_debug":
-    [
+    "run_commands_debug": [
         "./microXOR.exe 4 2",
         "./microXOR.exe 1024 32",
-        "./microXOR.exe 4096 16",
+        "./microXOR.exe 4096 16"
     ],
-    "debug_outputs":
-    [
+    "debug_outputs": [
         "Validation passed.",
         "Validation passed.",
-        "Validation passed.",
+        "Validation passed."
     ],
-    "run_commands_perf":
-    [
-        "./microXOR.exe 4096 16",
+    "run_commands_perf": [
+        "./microXOR.exe 4096 16"
     ],
-    "perf_outputs":
-    [
-        "Validation passed.",
+    "perf_outputs": [
+        "Validation passed."
     ],
     "exec_validation_command": "ncu ./microXOR.exe 4096 16",
-    "exec_validation_fail_text": "==WARNING== No kernels were profiled.",
+    "exec_validation_fail_text": "==WARNING== No kernels were profiled."
 }
