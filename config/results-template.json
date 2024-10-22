@@ -1,4 +1,5 @@
-[
+{
+    "123abc":
     {
         "app": "microxor",
         "prompt_strategy": "naive",
@@ -44,4 +45,4 @@
             ]
         }
     }
-]
+}

@@ -98,7 +98,7 @@ def gather_code_repos(args, results):
                             logging.warning(f"Skipping non-directory {output_path}.")
                             continue
 
-                        code_repos.append({
+                        repo_metadata = {
                             "app": app,
                             "prompt_strategy": prompt_strategy,
                             "llm_name": llm_name,
@@ -106,19 +106,20 @@ def gather_code_repos(args, results):
                             "target_model": target_model,
                             "output_number": output_number,
                             "path": output_path
-                        })
-                        results.append({
-                            "app": app,
-                            "prompt_strategy": prompt_strategy,
-                            "llm_name": llm_name,
-                            "source_model": source_model,
-                            "target_model": target_model,
-                            "output_number": output_number,
-                            "path": output_path,
-                            "build_results": {},
-                            "debug_results": {},
-                            "perf_results": {}
-                        })
+                        }
+                        code_repos.append(repo_metadata)
+
+                        # Hash the metadata to use as a key in the results dict
+                        hashcode = hash(json.dumps(repo_metadata, sort_keys=True))
+
+                        if hashcode in results:
+                            logging.warning(f"Skipping duplicate code repository: {output_path}")
+                        else:
+                            results[hashcode] = repo_metadata
+                            results[hashcode]["build_results"] = {}
+                            results[hashcode]["debug_results"] = {}
+                            results[hashcode]["perf_results"] = {}
+                            logging.debug(f"Found code repository: {output_path}")
 
     logging.info(f"Found {len(code_repos)} code repositories.")
     logging.info(f"Found apps: {apps_found}")
@@ -160,15 +161,16 @@ def main():
     with open(args.run_config, "r") as f:
         run_configs = json.load(f)
 
-    # Create empty list for results dicts
-    results = []
+    # Create empty dict of (hashcode,dict) pairs for results dicts
+    results = {}
 
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
 
     # Build each code repository
     for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
-        build_repo(code_repo, build_configs, results, args)
+        hashcode = hash(json.dumps(code_repo, sort_keys=True))
+        build_repo(code_repo, build_configs, results[hashcode], args)
 
 if __name__ == "__main__":
     main()
