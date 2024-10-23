@@ -28,7 +28,7 @@ def run_repo(repo_data, configs, result, args):
         return
 
     # Run prerequisite commands
-    run_bash(run_config["pre_run_commands"], dry=args.dry)
+    #run_bash(run_config["pre_run_commands"], dry=args.dry)
 
     # Loop over the run commands
     run_results = []

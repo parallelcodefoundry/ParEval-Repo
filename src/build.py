@@ -10,7 +10,7 @@ def build_repo(repo_data, configs, result, args):
         return
 
     # Run prerequisite commands
-    run_bash(build_config["pre_build_commands"], dry=args.dry)
+    #run_bash(build_config["pre_build_commands"], dry=args.dry)
 
     # Build the repo
     build_command = build_config["build_commands_debug"]
