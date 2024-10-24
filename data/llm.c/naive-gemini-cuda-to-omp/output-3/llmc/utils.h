@@ -1,4 +1,3 @@
-```c++
 /*
  This file contains utilities shared between the different training scripts.
  In particular, we define a series of macros xxxCheck that call the corresponding
@@ -222,4 +221,3 @@ extern inline int ends_with_bin(const char* str) {
 }
 
 #endif
-```

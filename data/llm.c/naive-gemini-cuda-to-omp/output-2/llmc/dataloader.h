@@ -1,4 +1,3 @@
-```c++
 #ifndef DATALOADER_H
 #define DATALOADER_H
 
@@ -197,21 +196,27 @@ void dataloader_init(DataLoader *loader,
 }
 
 void dataloader_load_batch(DataLoader* loader) {
-    #pragma omp target data map(to:loader->buffer[0:(loader->B * loader->T + 1)]) map(tofrom:loader->inputs[0:(loader->B * loader->T)]) map(tofrom:loader->targets[0:(loader->B * loader->T)])
-    {
-        assert(!loader->should_shuffle || (loader->should_shuffle && loader->intra_shard_indices != NULL));
-        assert(loader->current_sample_idx < loader->shard_num_samples);
-        size_t idx = loader->should_shuffle ? loader->intra_shard_indices[loader->current_sample_idx] : loader->current_sample_idx;
-        size_t global_batch_offset_bytes = idx * loader->total_batch_size_bytes;
-        int64_t current_offset = loader->header_bytes + global_batch_offset_bytes + loader->local_batch_offset_bytes;
+    assert(!loader->should_shuffle || (loader->should_shuffle && loader->intra_shard_indices != NULL));
+    assert(loader->current_sample_idx < loader->shard_num_samples);
+    size_t idx = loader->should_shuffle ? loader->intra_shard_indices[loader->current_sample_idx] : loader->current_sample_idx;
+    size_t global_batch_offset_bytes = idx * loader->total_batch_size_bytes;
+    int64_t current_offset = loader->header_bytes + global_batch_offset_bytes + loader->local_batch_offset_bytes;
 
-        size_t B = loader->B;
-        size_t T = loader->T;
-        // read B*T+1 uint16_t tokens from the file into buffer
-        fseekCheck(loader->tokens_file, (int) current_offset, SEEK_SET);
-        freadCheck(loader->buffer, sizeof(uint16_t), B*T+1, loader->tokens_file);
-        // decode the buffer into inputs and targets (cast to int)
-        #pragma omp parallel for
+    size_t B = loader->B;
+    size_t T = loader->T;
+    // read B*T+1 uint16_t tokens from the file into buffer
+#pragma omp target data map(to: current_offset) map(from: loader->buffer[0:B*T+1])
+    {
+#pragma omp teams distribute parallel for
+        for (int i = 0; i < B*T+1; i++) {
+            fseekCheck(loader->tokens_file, (int) current_offset + i*sizeof(uint16_t), SEEK_SET);
+            freadCheck(&loader->buffer[i], sizeof(uint16_t), 1, loader->tokens_file);
+        }
+    }
+    // decode the buffer into inputs and targets (cast to int)
+#pragma omp target data map(to: loader->buffer[0:B*T+1]) map(from: loader->inputs[0:B*T], loader->targets[0:B*T])
+    {
+#pragma omp teams distribute parallel for
         for (int i = 0; i < B*T; i++) {
             loader->inputs[i] = (int)loader->buffer[i];
             loader->targets[i] = (int)loader->buffer[i+1];
@@ -413,42 +418,34 @@ void evalloader_next_example_(EvalLoader *loader, int example_batch_index) {
     int context_length = (int)loader->buffer[2];
     uint16_t *context_tokens_start = &loader->buffer[3]; // where the tokens start
     assert(context_length > 0 && context_length < T); // context is non-empty and up to T
-    #pragma omp target data map(tofrom:loader->inputs[0:(B * T)])
-    {
-        #pragma omp parallel for
-        for (int b = 0; b < num_completions; b++) {
-            for (int i = 0; i < context_length; i++) {
-                int boff = batch_dim_offset + b;
-                int tok_cur = (int)context_tokens_start[i];
-                loader->inputs[boff * T + i] = tok_cur;
-            }
+    for (int b = 0; b < num_completions; b++) {
+        for (int i = 0; i < context_length; i++) {
+            int boff = batch_dim_offset + b;
+            int tok_cur = (int)context_tokens_start[i];
+            loader->inputs[boff * T + i] = tok_cur;
         }
     }
     // process the completions, insert them in their row, right after the (shared) context
     uint16_t *completions_iter = loader->buffer + 3 + context_length;
-    #pragma omp target data map(tofrom:loader->inputs[0:(B * T)]) map(tofrom:loader->targets[0:(B * T)]) map(tofrom:loader->mask[0:(B * T)])
-    {
-        #pragma omp parallel for
-        for (int c = 0; c < num_completions; c++) {
-            int coff = batch_dim_offset + c;
-            int completion_length = (int)completions_iter[0];
-            uint16_t *completion_tokens_start = completions_iter + 1;
-            assert(completion_length > 0 && context_length + completion_length < T); // things fit?
-            for (int i = 0; i < completion_length; i++) {
-                int tok_cur = (int)completion_tokens_start[i];
-                // at inputs, the completions simply follow the context
-                loader->inputs[coff * T + context_length + i] = tok_cur;
-                // at targets things start to get tricky
-                // we expect the last context token to predict the first completion token
-                // and then onwards from there.
-                loader->targets[coff * T + context_length + i - 1] = tok_cur;
-                // and at these positions, we want to set mask=1, because these are the
-                // positions where we want to average the loss, in each row, to determine
-                // its overall probability of following the context.
-                loader->mask[coff * T + context_length + i - 1] = 1;
-            }
-            completions_iter += 1 + completion_length; // move to the next completion
+    for (int c = 0; c < num_completions; c++) {
+        int coff = batch_dim_offset + c;
+        int completion_length = (int)completions_iter[0];
+        uint16_t *completion_tokens_start = completions_iter + 1;
+        assert(completion_length > 0 && context_length + completion_length < T); // things fit?
+        for (int i = 0; i < completion_length; i++) {
+            int tok_cur = (int)completion_tokens_start[i];
+            // at inputs, the completions simply follow the context
+            loader->inputs[coff * T + context_length + i] = tok_cur;
+            // at targets things start to get tricky
+            // we expect the last context token to predict the first completion token
+            // and then onwards from there.
+            loader->targets[coff * T + context_length + i - 1] = tok_cur;
+            // and at these positions, we want to set mask=1, because these are the
+            // positions where we want to average the loss, in each row, to determine
+            // its overall probability of following the context.
+            loader->mask[coff * T + context_length + i - 1] = 1;
         }
+        completions_iter += 1 + completion_length; // move to the next completion
     }
     // advance the current example to point to the next one we'd load
     loader->current_example_index += 1;
@@ -465,15 +462,11 @@ void evalloader_next_batch(EvalLoader *loader) {
     // each example has some number of completions (usually 4)
     // so we want to pack as many examples into rows of B as we can fit
     int can_fit_examples = (int) (B / ASSUMED_NUM_COMPLETIONS); // how many examples can we fit in the batch?
-    #pragma omp target data map(tofrom:loader->inputs[0:(B * T)]) map(tofrom:loader->targets[0:(B * T)]) map(tofrom:loader->mask[0:(B * T)]) map(tofrom:loader->label[0:can_fit_examples])
-    {
-        #pragma omp parallel for
-        for (int i = 0; i < can_fit_examples; i++) {
-            if (loader->current_example_index >= loader->end_example_index) {
-                break; // this process has exhausted its work, noop from here on
-            }
-            evalloader_next_example_(loader, i);
+    for (int i = 0; i < can_fit_examples; i++) {
+        if (loader->current_example_index >= loader->end_example_index) {
+            break; // this process has exhausted its work, noop from here on
         }
+        evalloader_next_example_(loader, i);
     }
 }
 
@@ -488,37 +481,33 @@ int evalloader_stat_losses(EvalLoader *loader, float* losses) {
     size_t T = loader->T;
     // iterate the examples in this batch
     int can_fit_examples = (int) (B / ASSUMED_NUM_COMPLETIONS);
-    #pragma omp target data map(to:losses[0:(B * T)]) map(to:loader->mask[0:(B * T)]) map(to:loader->label[0:can_fit_examples])
-    {
-        #pragma omp parallel for reduction(+:correct)
-        for (int i = 0; i < can_fit_examples; i++) {
-            float min_loss = 0.0f;
-            int min_loss_index = -1;
-            char active = 0; // is this example active or fully empty?
-            // iterate the completions in this example
-            for (int b = 0; b < ASSUMED_NUM_COMPLETIONS; b++) {
-                int boff = i * ASSUMED_NUM_COMPLETIONS + b;
-                // evaluate the quality of this completion
-                // its quality is simply the average loss over the tokens
-                float average_loss = 0.0f;
-                int count = 0;
-                for (int t = 0; t < T; t++) {
-                    char mask = loader->mask[boff * T + t];
-                    if (mask == 1) {
-                        active = 1;
-                        average_loss += losses[boff * T + t];
-                        count++;
-                    }
-                }
-                if (count > 0) { average_loss /= count; }
-                if (b == 0 || average_loss < min_loss) {
-                    min_loss = average_loss;
-                    min_loss_index = b;
+    for (int i = 0; i < can_fit_examples; i++) {
+        float min_loss = 0.0f;
+        int min_loss_index = -1;
+        char active = 0; // is this example active or fully empty?
+        // iterate the completions in this example
+        for (int b = 0; b < ASSUMED_NUM_COMPLETIONS; b++) {
+            int boff = i * ASSUMED_NUM_COMPLETIONS + b;
+            // evaluate the quality of this completion
+            // its quality is simply the average loss over the tokens
+            float average_loss = 0.0f;
+            int count = 0;
+            for (int t = 0; t < T; t++) {
+                char mask = loader->mask[boff * T + t];
+                if (mask == 1) {
+                    active = 1;
+                    average_loss += losses[boff * T + t];
+                    count++;
                 }
             }
-            if (active && (min_loss_index == loader->label[i])) {
-                correct += 1;
+            if (count > 0) { average_loss /= count; }
+            if (b == 0 || average_loss < min_loss) {
+                min_loss = average_loss;
+                min_loss_index = b;
             }
+        }
+        if (active && (min_loss_index == loader->label[i])) {
+            correct += 1;
         }
     }
     return correct;
@@ -534,4 +523,3 @@ void evalloader_free(EvalLoader *loader) {
 }
 
 #endif // DATALOADER_H
-```

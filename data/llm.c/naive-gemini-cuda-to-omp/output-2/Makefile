@@ -1,7 +1,7 @@
 CC ?= clang
-CFLAGS = -Ofast -Wno-unused-result -Wno-ignored-pragmas -Wno-unknown-attributes
+CFLAGS = -Ofast -Wno-unused-result -Wno-ignored-pragmas -Wno-unknown-attributes -fopenmp
 LDFLAGS =
-LDLIBS = -lm
+LDLIBS = -lm -lOpenMP
 INCLUDES =
 CFLAGS_COND = -march=native
 
@@ -9,7 +9,6 @@ CFLAGS_COND = -march=native
 SHELL_UNAME = $(shell uname)
 REMOVE_FILES = rm -f
 OUTPUT_FILE = -o $@
-CUDA_OUTPUT_FILE = -o $@
 
 # Default O3 CPU optimization level for NVCC (0 for fastest compile time)
 FORCE_NVCC_O ?= 3
@@ -129,3 +128,4 @@ test_gpt2fp32cu: test_gpt2_fp32.cu
 clean:
 	$(REMOVE_FILES) $(TARGETS)
 	$(REMOVE_BUILD_OBJECT_FILES)
+```

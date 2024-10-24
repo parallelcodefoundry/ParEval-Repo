@@ -1,4 +1,3 @@
-```c++
 #ifndef RAND_H
 #define RAND_H
 
@@ -165,4 +164,3 @@ void random_permutation(int* data, int numel, mt19937_state* state) {
 }
 
 #endif
-```

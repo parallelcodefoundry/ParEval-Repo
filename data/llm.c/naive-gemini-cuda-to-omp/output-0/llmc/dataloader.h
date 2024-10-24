@@ -1,4 +1,3 @@
-```c++
 #ifndef DATALOADER_H
 #define DATALOADER_H
 
@@ -209,7 +208,6 @@ void dataloader_load_batch(DataLoader* loader) {
     fseekCheck(loader->tokens_file, (int) current_offset, SEEK_SET);
     freadCheck(loader->buffer, sizeof(uint16_t), B*T+1, loader->tokens_file);
     // decode the buffer into inputs and targets (cast to int)
-    #pragma omp target teams distribute parallel for
     for (int i = 0; i < B*T; i++) {
         loader->inputs[i] = (int)loader->buffer[i];
         loader->targets[i] = (int)loader->buffer[i+1];
@@ -410,7 +408,6 @@ void evalloader_next_example_(EvalLoader *loader, int example_batch_index) {
     int context_length = (int)loader->buffer[2];
     uint16_t *context_tokens_start = &loader->buffer[3]; // where the tokens start
     assert(context_length > 0 && context_length < T); // context is non-empty and up to T
-    #pragma omp target teams distribute parallel for
     for (int b = 0; b < num_completions; b++) {
         for (int i = 0; i < context_length; i++) {
             int boff = batch_dim_offset + b;
@@ -420,7 +417,6 @@ void evalloader_next_example_(EvalLoader *loader, int example_batch_index) {
     }
     // process the completions, insert them in their row, right after the (shared) context
     uint16_t *completions_iter = loader->buffer + 3 + context_length;
-    #pragma omp target teams distribute parallel for
     for (int c = 0; c < num_completions; c++) {
         int coff = batch_dim_offset + c;
         int completion_length = (int)completions_iter[0];
@@ -456,7 +452,6 @@ void evalloader_next_batch(EvalLoader *loader) {
     // each example has some number of completions (usually 4)
     // so we want to pack as many examples into rows of B as we can fit
     int can_fit_examples = (int) (B / ASSUMED_NUM_COMPLETIONS); // how many examples can we fit in the batch?
-    #pragma omp target teams distribute parallel for
     for (int i = 0; i < can_fit_examples; i++) {
         if (loader->current_example_index >= loader->end_example_index) {
             break; // this process has exhausted its work, noop from here on
@@ -476,20 +471,17 @@ int evalloader_stat_losses(EvalLoader *loader, float* losses) {
     size_t T = loader->T;
     // iterate the examples in this batch
     int can_fit_examples = (int) (B / ASSUMED_NUM_COMPLETIONS);
-    #pragma omp target teams distribute parallel for reduction(+:correct)
     for (int i = 0; i < can_fit_examples; i++) {
         float min_loss = 0.0f;
         int min_loss_index = -1;
         char active = 0; // is this example active or fully empty?
         // iterate the completions in this example
-        #pragma omp parallel for reduction(min:min_loss) reduction(max:min_loss_index)
         for (int b = 0; b < ASSUMED_NUM_COMPLETIONS; b++) {
             int boff = i * ASSUMED_NUM_COMPLETIONS + b;
             // evaluate the quality of this completion
             // its quality is simply the average loss over the tokens
             float average_loss = 0.0f;
             int count = 0;
-            #pragma omp parallel for reduction(+:average_loss) reduction(+:count)
             for (int t = 0; t < T; t++) {
                 char mask = loader->mask[boff * T + t];
                 if (mask == 1) {
@@ -521,4 +513,3 @@ void evalloader_free(EvalLoader *loader) {
 }
 
 #endif // DATALOADER_H
-```

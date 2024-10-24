@@ -1,4 +1,3 @@
-```c++
 #ifndef DATALOADER_H
 #define DATALOADER_H
 
@@ -514,4 +513,3 @@ void evalloader_free(EvalLoader *loader) {
 }
 
 #endif // DATALOADER_H
-```

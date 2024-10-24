@@ -1,4 +1,3 @@
-```c++
 #define TESTING
 #include "train_gpt2_fp32.cu"
 
@@ -200,4 +199,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-```

@@ -1,4 +1,3 @@
-```c++
 #define TESTING
 #include "train_gpt2_fp32.cu"
 
@@ -28,23 +27,27 @@ int check_tensor(float *a, float *b, int n, const char* label) {
 int main(int argc, char *argv[]) {
 
     // set up the device
-    // No device setup needed for OpenMP offload, as we're using the host CPU
-    // int deviceIdx = 0;
+    int deviceIdx = 0;
+    // No need to set device in OpenMP offload
     // cudaCheck(cudaSetDevice(deviceIdx));
-    // cudaDeviceProp deviceProp;
+    cudaDeviceProp deviceProp;
+    // No need to get device properties in OpenMP offload
     // cudaGetDeviceProperties(&deviceProp, deviceIdx);
-    // printf("[System]\n");
+    printf("[System]\n");
+    // No need to print device name in OpenMP offload
     // printf("Device %d: %s\n", deviceIdx, deviceProp.name);
 
     // setup cuBLAS and cuBLASLt
-    // No cuBLAS/cuBLASLt needed in this OpenMP offload translation.
+    // No need for cuBLAS in OpenMP offload
     // cublasCheck(cublasCreate(&cublas_handle));
-    // // TF32 precision is equivalent to torch.set_float32_matmul_precision('high')
-    // int enable_tf32 = deviceProp.major >= 8 ? 1 : 0;
-    // enable_tf32 = 0; // NOTE: disable TF32 for testing!!!
-    // printf("enable_tf32: %d\n", enable_tf32);
+    // TF32 precision is equivalent to torch.set_float32_matmul_precision('high')
+    int enable_tf32 = deviceProp.major >= 8 ? 1 : 0;
+    enable_tf32 = 0; // NOTE: disable TF32 for testing!!!
+    printf("enable_tf32: %d\n", enable_tf32);
+    // No need to set compute type in OpenMP offload
     // cublas_compute_type = enable_tf32 ? CUBLAS_COMPUTE_32F_FAST_TF32 : CUBLAS_COMPUTE_32F;
     // cublasMath_t cublas_math_mode = enable_tf32 ? CUBLAS_TF32_TENSOR_OP_MATH : CUBLAS_DEFAULT_MATH;
+    // No need to set math mode in OpenMP offload
     // cublasCheck(cublasSetMathMode(cublas_handle, cublas_math_mode));
 
     // build the GPT-2 model from a checkpoint
@@ -97,17 +100,43 @@ int main(int argc, char *argv[]) {
     int allok = 1;
 
     // First, do target-free forward pass to validate logits
-    gpt2_forward(&model, x, NULL, B, T);
+    // Allocate device memory for activations
+    size_t act_sizes[NUM_ACTIVATION_TENSORS];
+    fill_in_activation_sizes(act_sizes, B, T, model.config);
+    size_t num_activations = 0;
+    for (size_t i = 0; i < NUM_ACTIVATION_TENSORS; i++) {
+        num_activations += act_sizes[i];
+    }
+    float* acts_memory;
+    cudaMalloc((void**)&acts_memory, num_activations * sizeof(float));
+    ActivationTensors acts;
+    float** ptrs[] = {
+        &acts.encoded, &acts.ln1, &acts.ln1_mean, &acts.ln1_rstd, &acts.atty,
+        &acts.att, &acts.attproj, &acts.residual2, &acts.ln2, &acts.ln2_mean,
+        &acts.ln2_rstd, &acts.fch, &acts.fch_gelu, &acts.fcproj, &acts.residual3, &acts.lnf,
+        &acts.lnf_mean, &acts.lnf_rstd, &acts.losses, &acts.qkvr, &acts.output
+    };
+    float* acts_memory_iterator = acts_memory;
+    for (size_t i = 0; i < NUM_ACTIVATION_TENSORS; i++) {
+        *(ptrs[i]) = acts_memory_iterator;
+        acts_memory_iterator += act_sizes[i];
+    }
+    // Allocate device memory for inputs
+    int* inputs;
+    cudaMalloc((void**)&inputs, B * T * sizeof(int));
+    // Allocate device memory for targets
+    int* targets;
+    cudaMalloc((void**)&targets, B * T * sizeof(int));
+    // Copy input data to device
+    cudaMemcpy(inputs, x, B * T * sizeof(int), cudaMemcpyHostToDevice);
+    #pragma omp target data map(to: model.params, acts) map(from: acts) map(tofrom: inputs)
+    {
+        gpt2_forward(&model, inputs, targets, B, T);
+    }
     // at this point, target should be equal to expected_logits, let's compare
     // copy logits to CPU so we can compare them
     float* logits_cpu = (float*)mallocCheck(B * T * Vp * sizeof(float));
-    #pragma omp target data map(tofrom:logits_cpu[0:B*T*Vp]) map(to:model.acts.output[0:B*T*Vp])
-    {
-        #pragma omp teams distribute parallel for
-        for (int i = 0; i < B * T * Vp; i++) {
-            logits_cpu[i] = model.acts.output[i];
-        }
-    }
+    cudaMemcpy(logits_cpu, acts.output, B * T * Vp * sizeof(float), cudaMemcpyDeviceToHost);
 
     // compare the output logits from the forward pass
     // also careful that we don't access and compare the padded columns of logits
@@ -134,14 +163,43 @@ int main(int argc, char *argv[]) {
     if(!logits_ok) { printf("NOT "); }
     printf("OK (LOGITS)\n");
 
+    // Allocate device memory for gradients of activations
+    size_t bw_act_sizes[NUM_BACKWARD_TENSORS];
+    GPT2Config cfg = model.config;
+    cfg.num_layers = 1;
+    fill_in_grad_act_sizes(bw_act_sizes, B, T, cfg);
+    size_t num_grad_acts = 0;
+    for (int i = 0; i < NUM_BACKWARD_TENSORS; i++) {
+        num_grad_acts += bw_act_sizes[i];
+    }
+    float* grads_acts_memory;
+    cudaMalloc((void**)&grads_acts_memory, num_grad_acts * sizeof(float));
+    GradActTensors grads_acts;
+    float** ptrs_grad_acts[] = {
+        &grads_acts.bt4c, &grads_acts.preatt, &grads_acts.residual3
+    };
+    float* grads_acts_memory_iterator = grads_acts_memory;
+    for (size_t i = 0; i < NUM_BACKWARD_TENSORS; i++) {
+        *(ptrs_grad_acts[i]) = grads_acts_memory_iterator;
+        grads_acts_memory_iterator += bw_act_sizes[i];
+    }
+    // Allocate device memory for gradients of parameters
+    float* grads_memory = malloc_and_point_parameters(&model.grads, model.param_sizes, 1);
     // let's do 10 training iterations, following the pytorch code
     float losses[10];
     for (int step = 0; step < 10; step++) {
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
-        gpt2_forward(&model, x, y, B, T);
-        gpt2_zero_grad(&model);
-        gpt2_backward(&model);
+        // Copy target data to device
+        cudaMemcpy(targets, y, B * T * sizeof(int), cudaMemcpyHostToDevice);
+        // Zero out gradients
+        cudaMemset(grads_acts_memory, 0, num_grad_acts * sizeof(float));
+        cudaMemset(grads_memory, 0, model.num_parameters * sizeof(float));
+        #pragma omp target data map(to: model.params, acts, grads) map(from: acts, grads) map(tofrom: inputs, targets)
+        {
+            gpt2_forward(&model, inputs, targets, B, T);
+            gpt2_backward(&model);
+        }
         clock_gettime(CLOCK_MONOTONIC, &end);
         double time_elapsed_s = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 
@@ -158,17 +216,15 @@ int main(int argc, char *argv[]) {
             }
 
             // compare the gradients ona the parameters all at once
-            #pragma omp target data map(tofrom:calculated_grads_memory[0:model.num_parameters]) map(to:model.grads_memory[0:model.num_parameters])
-            {
-                #pragma omp teams distribute parallel for
-                for (int i = 0; i < model.num_parameters; i++) {
-                    calculated_grads_memory[i] = model.grads_memory[i];
-                }
-            }
+            cudaMemcpy(calculated_grads_memory, model.grads_memory, model.num_parameters * sizeof(float), cudaMemcpyDeviceToHost);
             check_tensor(calculated_grads_memory, expected_grads_memory, model.num_parameters, "grads");
         }
 
-        gpt2_update(&model, 1e-4f, 0.9f, 0.999f, 1e-8f, 0.01f, step+1);
+        // Update parameters on the device
+        #pragma omp target data map(tofrom: model.params)
+        {
+            gpt2_update(&model, 1e-4f, 0.9f, 0.999f, 1e-8f, 0.01f, step+1);
+        }
 
         // print the timing information at the end
         printf("step %d: loss %f (took %f ms)\n", step, model.mean_loss, time_elapsed_s * 1000);
@@ -209,10 +265,13 @@ int main(int argc, char *argv[]) {
     free(expected_loss);
     free(expected_grads_memory);
     free(calculated_grads_memory);
-    gpt2_free(&model);
-    // No cuBLAS cleanup needed
+    cudaFree(acts_memory);
+    cudaFree(grads_acts_memory);
+    cudaFree(grads_memory);
+    cudaFree(inputs);
+    cudaFree(targets);
+    // No need to destroy cuBLAS in OpenMP offload
     // cublasCheck(cublasDestroy(cublas_handle));
 
     return 0;
 }
-```

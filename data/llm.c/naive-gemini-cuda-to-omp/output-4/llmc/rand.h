@@ -1,4 +1,3 @@
-```c++
 #ifndef RAND_H
 #define RAND_H
 
@@ -78,7 +77,7 @@ inline double randfloat64(mt19937_state* state) {
 }
 
 void uniform_(float* data, unsigned int numel, float from, float to, mt19937_state* state) {
-    #pragma omp target teams distribute parallel for map(tofrom: data[0:numel])
+    #pragma omp target teams distribute parallel for
     for (unsigned int t = 0; t < numel; t++) {
         data[t] = randfloat32(state) * (to - from) + from;
     }
@@ -88,7 +87,7 @@ void uniform_(float* data, unsigned int numel, float from, float to, mt19937_sta
 // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
 void normal_fill_16(float* data, float mean, float std) {
     #define EPSILONE 1e-12f
-    #pragma omp target teams distribute parallel for map(tofrom: data[0:16])
+    #pragma omp simd
     for (unsigned int t = 0; t < 8; t++) {
         float u1 = 1 - data[t];
         float u2 = data[t + 8];
@@ -100,7 +99,7 @@ void normal_fill_16(float* data, float mean, float std) {
 }
 
 void normal_fill(float* data, unsigned int numel, float mean, float std, mt19937_state* state) {
-    #pragma omp target teams distribute parallel for map(tofrom: data[0:numel])
+    #pragma omp target teams distribute parallel for
     for (unsigned int t = 0; t < numel; t++) {
         data[t] = randfloat32(state);
     }
@@ -110,7 +109,7 @@ void normal_fill(float* data, unsigned int numel, float mean, float std, mt19937
     if (numel % 16 != 0) {
         // recompute the last 16 values
         data = data + numel - 16;
-        #pragma omp target teams distribute parallel for map(tofrom: data[0:16])
+        #pragma omp simd
         for (unsigned int i = 0; i < 16; i++) {
             data[i] = randfloat32(state);
         }
@@ -126,7 +125,7 @@ void normal_(float* data, unsigned int numel, float mean, float std, mt19937_sta
     else {
         double next_double_normal_sample = 0.0; // make compiler warning happy, won't be used
         int has_next_double_normal_sample = 0;
-        #pragma omp target teams distribute parallel for map(tofrom: data[0:numel])
+        #pragma omp simd
         for (unsigned int  t = 0; t < numel; t++) {
             if (has_next_double_normal_sample) {
                 data[t] = (float)(next_double_normal_sample * std + mean);
@@ -146,14 +145,14 @@ void normal_(float* data, unsigned int numel, float mean, float std, mt19937_sta
 }
 
 void init_identity_permutation(int *data, int numel) {
-    #pragma omp target teams distribute parallel for map(tofrom: data[0:numel])
+    #pragma omp target teams distribute parallel for
     for (int i = 0; i < numel; i++) {
         data[i] = i;
     }
 }
 
 void random_permutation(int* data, int numel, mt19937_state* state) {
-    #pragma omp target teams distribute parallel for map(tofrom: data[0:numel])
+    #pragma omp target teams distribute parallel for
     for (int i = numel - 1; i > 0; i--) {
         // pick an index j in [0, i] with equal probability
         int j = randint32(state) % (i + 1);
@@ -165,4 +164,3 @@ void random_permutation(int* data, int numel, mt19937_state* state) {
 }
 
 #endif
-```

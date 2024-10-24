@@ -1,57 +1,87 @@
-```c++
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <omp.h>
 
-#define BASE_URL "https://huggingface.co/datasets/karpathy/llmc-starter-pack/resolve/main/"
+using namespace std;
 
-#define SAVE_DIR_PARENT "."
-#define SAVE_DIR_TINY "data/tinyshakespeare"
-#define SAVE_DIR_HELLA "data/hellaswag"
+#ifdef _WIN32
+#define mkdir(path, mode) _mkdir(path)
+#endif
 
-void download_file(const char *file_name) {
-  char file_url[512];
-  sprintf(file_url, "%s%s?download=true", BASE_URL, file_name);
-  char file_path[512];
-  if (strstr(file_name, "tiny_shakespeare") != NULL) {
-    sprintf(file_path, "%s/%s", SAVE_DIR_TINY, file_name);
-  } else if (strstr(file_name, "hellaswag") != NULL) {
-    sprintf(file_path, "%s/%s", SAVE_DIR_HELLA, file_name);
-  } else {
-    sprintf(file_path, "%s/%s", SAVE_DIR_PARENT, file_name);
-  }
-
-  char command[1024];
-  sprintf(command, "curl -s -L -o \"%s\" \"%s\"", file_path, file_url);
-  system(command);
-  printf("Downloaded %s to %s\n", file_name, file_path);
+// Function to check if a file exists
+bool fileExists(const string& filename) {
+  struct stat buffer;
+  return (stat(filename.c_str(), &buffer) == 0);
 }
 
-int main(int argc, char *argv[]) {
-  const char *files[] = {
+// Function to download a file using curl
+void downloadFile(const string& url, const string& filename) {
+  string command = "curl -s -L -o " + filename + " " + url;
+  system(command.c_str());
+  cout << "Downloaded " << filename << " from " << url << endl;
+}
+
+// Function to create a directory if it doesn't exist
+void createDirectory(const string& dirPath) {
+  if (mkdir(dirPath.c_str(), 0700) != 0) {
+    cout << "ERROR: Could not create directory: " << dirPath << endl;
+    exit(EXIT_FAILURE);
+  }
+  cout << "Created directory: " << dirPath << endl;
+}
+
+int main() {
+  // Base URL
+  const string BASE_URL = "https://huggingface.co/datasets/karpathy/llmc-starter-pack/resolve/main/";
+
+  // Directory paths based on script location
+  string scriptDir = "/path/to/dev/download_starter_pack.sh";
+  string saveDirParent = scriptDir.substr(0, scriptDir.find_last_of('/')) + "/..";
+  string saveDirTiny = scriptDir + "/data/tinyshakespeare";
+  string saveDirHella = scriptDir + "/data/hellaswag";
+
+  // Create directories if they don't exist
+  createDirectory(saveDirTiny);
+  createDirectory(saveDirHella);
+
+  // Files to download
+  vector<string> files = {
     "gpt2_124M.bin",
     "gpt2_124M_bf16.bin",
     "gpt2_124M_debug_state.bin",
     "gpt2_tokenizer.bin",
     "tiny_shakespeare_train.bin",
     "tiny_shakespeare_val.bin",
-    "hellaswag_val.bin",
+    "hellaswag_val.bin"
   };
 
-  // Create directories if they don't exist
-  mkdir(SAVE_DIR_TINY, 0700);
-  mkdir(SAVE_DIR_HELLA, 0700);
-
-  // Download files in parallel
+  // Download files in parallel using OpenMP offloading
   #pragma omp parallel for
-  for (int i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
-    download_file(files[i]);
+  for (size_t i = 0; i < files.size(); ++i) {
+    string fileName = files[i];
+    string fileUrl = BASE_URL + fileName + "?download=true";
+    string filePath;
+
+    // Determine the save directory based on the file name
+    if (fileName.find("tiny_shakespeare") != string::npos) {
+      filePath = saveDirTiny + "/" + fileName;
+    } else if (fileName.find("hellaswag") != string::npos) {
+      filePath = saveDirHella + "/" + fileName;
+    } else {
+      filePath = saveDirParent + "/" + fileName;
+    }
+
+    // Download the file if it doesn't already exist
+    if (!fileExists(filePath)) {
+      downloadFile(fileUrl, filePath);
+    }
   }
 
-  printf("All files downloaded and saved in their respective directories\n");
+  cout << "All files downloaded and saved in their respective directories." << endl;
 
   return 0;
 }
@@ -59,24 +89,45 @@ int main(int argc, char *argv[]) {
 
 **Explanation:**
 
-1. **Headers:** The code includes necessary headers for file operations (`stdio.h`, `stdlib.h`, `string.h`, `unistd.h`, `sys/stat.h`) and OpenMP (`omp.h`).
-2. **Constants:** Constants like `BASE_URL`, `SAVE_DIR_PARENT`, `SAVE_DIR_TINY`, and `SAVE_DIR_HELLA` are defined to store the base URL for downloads and directory paths.
-3. **`download_file` Function:** The `download_file` function takes a file name as input, constructs the download URL, determines the correct save path, and executes a `curl` command to download the file.
-4. **`main` Function:**
-   - The `main` function defines an array of file names to download.
-   - It creates the necessary directories using `mkdir`.
-   - The `#pragma omp parallel for` directive parallelizes the download process using OpenMP. Each thread downloads a different file.
-   - Finally, it prints a success message.
+1. **Includes and Definitions:**
+   - Includes necessary headers for file operations, string manipulation, and OpenMP.
+   - Defines `mkdir` for Windows compatibility.
 
-**To compile and run:**
+2. **File Existence Check:**
+   - `fileExists` function uses `stat` to check if a file exists.
 
-1. **Compile:**
+3. **File Download Function:**
+   - `downloadFile` uses `system` to execute a `curl` command for downloading a file.
+
+4. **Directory Creation Function:**
+   - `createDirectory` uses `mkdir` to create a directory if it doesn't exist.
+
+5. **Main Function:**
+   - Sets up base URL, directory paths, and the list of files to download.
+   - Uses an OpenMP parallel for loop to download files in parallel:
+     - **`#pragma omp parallel for`**: This directive instructs the compiler to distribute the loop iterations across available threads.
+     - **Inside the loop**:
+       - Determine the save directory based on the file name.
+       - Check if the file already exists using `fileExists`.
+       - If the file doesn't exist, download it using `downloadFile`.
+
+6. **Output:**
+   - Prints a message indicating that all files have been downloaded.
+
+**Key Improvements:**
+
+- **Parallel Downloading:** OpenMP offloading significantly speeds up the download process by utilizing multiple threads.
+- **File Existence Check:** Avoids redundant downloads by checking if a file already exists before attempting to download it.
+- **Clean Code:** Provides clear and concise function definitions for better organization and maintainability.
+
+**To Compile and Run:**
+
+1. **Save the code as a `.cpp` file (e.g., `download_starter_pack.cpp`).**
+2. **Compile using a C++ compiler with OpenMP support:**
    ```bash
    g++ -fopenmp download_starter_pack.cpp -o download_starter_pack
    ```
-2. **Run:**
+3. **Run the executable:**
    ```bash
    ./download_starter_pack
    ```
-
-This will download the necessary files to the specified directories in parallel.

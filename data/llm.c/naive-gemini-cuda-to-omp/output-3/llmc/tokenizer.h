@@ -1,4 +1,3 @@
-```c++
 /*
 Defines the GPT-2 Tokenizer.
 Only supports decoding, i.e.: tokens (integers) -> strings
@@ -71,7 +70,6 @@ void tokenizer_init(Tokenizer *tokenizer, const char *filename) {
     // read in all the tokens
     unsigned char length;
     tokenizer->token_table = (char **)mallocCheck(tokenizer->vocab_size * sizeof(char *));
-    #pragma omp target teams distribute parallel for
     for (uint32_t i = 0; i < tokenizer->vocab_size; i++) {
         freadCheck(&length, sizeof(unsigned char), 1, file);
         assert(length > 0); // every token should be at least one character
@@ -99,12 +97,9 @@ const char *tokenizer_decode(Tokenizer *tokenizer, uint32_t token_id) {
 
 void tokenizer_free(Tokenizer *tokenizer) {
     if (tokenizer->init_ok) {
-        #pragma omp target teams distribute parallel for
         for (uint32_t i = 0; i < tokenizer->vocab_size; i++) {
             free(tokenizer->token_table[i]);
         }
         free(tokenizer->token_table);
     }
 }
-
-```

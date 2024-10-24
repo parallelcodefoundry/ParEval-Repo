@@ -1,93 +1,87 @@
-```c++
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
 #include <sys/stat.h>
-#include <omp.h>
+#include <unistd.h>
 
-#define BASE_URL "https://huggingface.co/datasets/karpathy/llmc-starter-pack/resolve/main/"
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#endif
 
-#define SAVE_DIR_PARENT "."
-#define SAVE_DIR_TINY "data/tinyshakespeare"
-#define SAVE_DIR_HELLA "data/hellaswag"
-
-#define HEADER_SIZE 256
-
-// Function to download files to the appropriate directory
-void download_file(const char *file_name) {
-    char file_url[512];
-    char file_path[512];
-    sprintf(file_url, "%s%s?download=true", BASE_URL, file_name);
-
-    if (strncmp(file_name, "tiny_shakespeare", 16) == 0) {
-        sprintf(file_path, "%s/%s", SAVE_DIR_TINY, file_name);
-    } else if (strncmp(file_name, "hellaswag", 9) == 0) {
-        sprintf(file_path, "%s/%s", SAVE_DIR_HELLA, file_name);
-    } else {
-        sprintf(file_path, "%s/%s", SAVE_DIR_PARENT, file_name);
+// Helper function to create a directory if it doesn't exist
+void create_dir_if_not_exists(const std::string& dir) {
+  struct stat info;
+  if (stat(dir.c_str(), &info) != 0) {
+    if (mkdir(dir.c_str(), 0700) != 0) {
+      std::cerr << "Error: Could not create directory: " << dir << std::endl;
+      exit(EXIT_FAILURE);
     }
+    std::cout << "Created directory: " << dir << std::endl;
+  }
+}
 
-    // Create the directories if they don't exist
-    #pragma omp target teams distribute parallel for
-    for (int i = 0; i < 2; i++) {
-        if (i == 0) {
-            mkdir(SAVE_DIR_TINY, 0700);
-        } else {
-            mkdir(SAVE_DIR_HELLA, 0700);
-        }
-    }
-
-    // Download the file
-    char command[1024];
-    sprintf(command, "curl -s -L -o \"%s\" \"%s\"", file_path, file_url);
-    system(command);
-    printf("Downloaded %s to %s\n", file_name, file_path);
+// Helper function to download a file using curl
+void download_file(const std::string& file_name, const std::string& file_url) {
+  std::string command = "curl -s -L -o " + file_name + " " + file_url;
+  int result = system(command.c_str());
+  if (result != 0) {
+    std::cerr << "Error: Failed to download file: " << file_name << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  std::cout << "Downloaded " << file_name << " from " << file_url << std::endl;
 }
 
 int main() {
-    const char *files[] = {
-        "gpt2_124M.bin",
-        "gpt2_124M_bf16.bin",
-        "gpt2_124M_debug_state.bin",
-        "gpt2_tokenizer.bin",
-        "tiny_shakespeare_train.bin",
-        "tiny_shakespeare_val.bin",
-        "hellaswag_val.bin"
-    };
-    int num_files = sizeof(files) / sizeof(files[0]);
+  // Get the directory of the script
+  std::string script_dir = __FILE__;
+  script_dir.erase(script_dir.find_last_of("/\\") + 1);
 
-    #pragma omp target teams distribute parallel for
-    for (int i = 0; i < num_files; i++) {
-        download_file(files[i]);
+  // Base URL
+  std::string base_url = "https://huggingface.co/datasets/karpathy/llmc-starter-pack/resolve/main/";
+
+  // Directory paths based on script location
+  std::string save_dir_parent = script_dir + "../";
+  std::string save_dir_tiny = script_dir + "data/tinyshakespeare";
+  std::string save_dir_hella = script_dir + "data/hellaswag";
+
+  // Create the directories if they don't exist
+  create_dir_if_not_exists(save_dir_tiny);
+  create_dir_if_not_exists(save_dir_hella);
+
+  // Files to download
+  std::vector<std::string> files = {
+    "gpt2_124M.bin",
+    "gpt2_124M_bf16.bin",
+    "gpt2_124M_debug_state.bin",
+    "gpt2_tokenizer.bin",
+    "tiny_shakespeare_train.bin",
+    "tiny_shakespeare_val.bin",
+    "hellaswag_val.bin"
+  };
+
+  // Download the files
+  for (const auto& file : files) {
+    std::string file_url = base_url + file + "?download=true";
+    std::string file_path;
+
+    // Determine the save directory based on the file name
+    if (file.find("tiny_shakespeare") != std::string::npos) {
+      file_path = save_dir_tiny + "/" + file;
+    } else if (file.find("hellaswag") != std::string::npos) {
+      file_path = save_dir_hella + "/" + file;
+    } else {
+      file_path = save_dir_parent + file;
     }
 
-    printf("All files downloaded and saved in their respective directories\n");
-    return 0;
+    download_file(file_path, file_url);
+  }
+
+  std::cout << "All files downloaded and saved in their respective directories" << std::endl;
+
+  return 0;
 }
 ```
 
-**Explanation:**
-
-1. **Headers:** We include necessary headers for standard input/output, file operations, and OpenMP.
-2. **Constants:** We define constants for the base URL, directory paths, and the header size.
-3. **`download_file` function:**
-   - Takes the file name as input.
-   - Constructs the download URL.
-   - Determines the save path based on the file name.
-   - Creates the necessary directories using OpenMP offload.
-   - Constructs a `curl` command string.
-   - Executes the command using `system()`.
-   - Prints a success message.
-4. **`main` function:**
-   - Defines an array of file names to download.
-   - Uses OpenMP offload to download each file in parallel.
-   - Prints a final success message.
-
-**Key Changes:**
-
-- **OpenMP Offload:**  The `#pragma omp target teams distribute parallel for` directive is used to offload the file downloads to the target device. This allows for parallel execution.
-- **`mkdir`:** The `mkdir` function is called within the OpenMP loop to create the necessary directories on the target device.
-- **`system`:** The `system` function is used to execute the `curl` command directly on the target device. This avoids data transfer back to the host for the download operation.
-
-This code is a basic translation of the script to use OpenMP offload. You can further refine it based on the capabilities of your target device and optimize for performance. For example, you could use the OpenMP `teams` construct to distribute the downloads across multiple teams on the target device.
+This code uses the `system` function to execute `curl` commands to download the files. It also includes logic to determine the appropriate save path based on the filename. The directory creation and file download logic is encapsulated in helper functions for better code organization.  

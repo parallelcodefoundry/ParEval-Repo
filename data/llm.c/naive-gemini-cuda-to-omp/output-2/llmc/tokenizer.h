@@ -1,4 +1,3 @@
-```c++
 /*
 Defines the GPT-2 Tokenizer.
 Only supports decoding, i.e.: tokens (integers) -> strings
@@ -104,4 +103,3 @@ void tokenizer_free(Tokenizer *tokenizer) {
         free(tokenizer->token_table);
     }
 }
-```
