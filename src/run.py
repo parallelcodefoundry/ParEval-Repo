@@ -11,20 +11,16 @@ def check_output(repo_data, run_config, run_result, i):
             logging.debug(f"Expected output to contain: {run_config['debug_outputs'][i]}")
             logging.debug(f"Actual output: {run_result.stdout}")
             run_result.returncode = 1
-            return 1
     run_result.returncode = 0
-    return 0
 
-def check_exec(repo_data, run_config, run_result, i, args):
+def check_exec(repo_data, run_config, i, args):
     # Check that binary executes as expected for this input
     if run_config["exec_check_command"] != "":
         exec_check_result = run_bash(run_config["exec_check_command"], cwd=repo_data['path'], timeout=args.run_timeout, dry=args.dry)
         fail_text = run_config["exec_check_fail_text"]
         if fail_text in exec_check_result.stdout or fail_text in exec_check_result.stderr:
             logging.debug(f"Execution check failed for {repo_data['app']} with model {repo_data['target_model']} test {i}.")
-            run_result.returncode = 1
             return 1
-    run_result.returncode = 0
     return 0
 
 def run_repo(repo_data, configs, result, args):
@@ -51,7 +47,7 @@ def run_repo(repo_data, configs, result, args):
         check_output(repo_data, run_config, run_result, i)
 
         # Validate binary executes as expected for this input
-        exec_check = check_exec(repo_data, run_config, run_result, i, args)
+        exec_check = check_exec(repo_data, run_config, i, args)
 
         if args.log_run_output:
             logging.info(f"Run output: {run_result.stdout}")
