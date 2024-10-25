@@ -27,8 +27,7 @@ def run_repo(repo_data, configs, result, args):
     if not run_config:
         return
 
-    # Run prerequisite commands
-    #run_bash(run_config["pre_run_commands"], dry=args.dry)
+    pre_run_command = run_config["pre_run_commands"]
 
     # Loop over the run commands
     run_results = []
@@ -38,7 +37,7 @@ def run_repo(repo_data, configs, result, args):
         run_command = run_config["run_commands_debug"][i]
 
         # Run the repo
-        run_result = run_bash(run_command, cwd=repo_data['path'],
+        run_result = run_bash(pre_run_command + ' && ' + run_command, cwd=repo_data['path'],
                               timeout=args.run_timeout, dry=args.dry)
 
         # Check the run output against the expected output

@@ -9,12 +9,11 @@ def build_repo(repo_data, configs, result, args):
     if not build_config:
         return
 
-    # Run prerequisite commands
-    #run_bash(build_config["pre_build_commands"], dry=args.dry)
-
     # Build the repo
+    pre_build_command = build_config["pre_build_commands"]
     build_command = build_config["build_commands_debug"]
-    build_result = run_bash(build_command, cwd=repo_data['path'], timeout=args.build_timeout, dry=args.dry)
+    build_result = run_bash(pre_build_command + ' && ' + build_command,
+                            cwd=repo_data['path'], timeout=args.build_timeout, dry=args.dry)
 
     # Log the build result
     if build_result.returncode != 0:
