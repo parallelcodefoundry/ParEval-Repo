@@ -22,8 +22,8 @@ def run_bash(cmd, cwd=None, timeout=None, dry=False):
         logging.info(f"Skipped command was in {cwd}")
         return CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
     else:
-        cmd = shlex.split(cmd)
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        #cmd = shlex.split(cmd)
+        return subprocess.run(cmd, capture_output=True, text=True, shell=True, timeout=timeout, cwd=cwd)
 
 def find_config(configs, app, model):
     """ Find the config for the given app and model """

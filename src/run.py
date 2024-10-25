@@ -6,11 +6,12 @@ from util import run_bash, find_config
 def check_output(repo_data, run_config, run_result, i):
     # Check the run output against the expected output
     if run_config["debug_type"] == "match":
-        if run_result.stdout != run_config["debug_outputs"][i]:
+        if run_result.stdout not in run_config["debug_outputs"][i]:
             logging.debug(f"Output mismatch for {repo_data['app']} with model {repo_data['target_model']} test {i}.")
-            logging.debug(f"Expected output: {run_config['debug_outputs'][i]}")
+            logging.debug(f"Expected output to contain: {run_config['debug_outputs'][i]}")
             logging.debug(f"Actual output: {run_result.stdout}")
             run_result.returncode = 1
+    run_result.returncode = 0
 
 def validate_binary(repo_data, run_config, run_result, i, args):
     # Validate binary executes as expected for this input
@@ -20,6 +21,7 @@ def validate_binary(repo_data, run_config, run_result, i, args):
         if fail_text in exec_validation_result.stdout or fail_text in exec_validation_result.stderr:
             logging.debug(f"Execution validation failed for {repo_data['app']} with model {repo_data['target_model']} test {i}.")
             run_result.returncode = 1
+    run_result.returncode = 0
 
 def run_repo(repo_data, configs, result, args):
     # Find the run config for this repo

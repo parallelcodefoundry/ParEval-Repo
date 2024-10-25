@@ -3,7 +3,7 @@
         "app": "microxor",
         "model": "omp",
         "debug_type": "match",
-        "pre_run_commands": "module load PrgEnv-llvm cudatoolkit",
+        "pre_run_commands": "module load PrgEnv-gnu cudatoolkit",
         "run_commands_debug": [
             "./microXOR.exe 4 2",
             "./microXOR.exe 1024 32",

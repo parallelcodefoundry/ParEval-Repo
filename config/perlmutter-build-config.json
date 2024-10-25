@@ -2,7 +2,7 @@
     {
         "app": "microxor",
         "model": "omp",
-        "pre_build_commands": "module load PrgEnv-llvm cuda-toolkit",
+        "pre_build_commands": "module load PrgEnv-gnu cudatoolkit",
         "build_commands_debug": "make SM_VERSION=sm_80 DEBUG=TRUE",
         "build_commands_perf": "make SM_VERSION=sm_80"
     }
