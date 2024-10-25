@@ -6,7 +6,7 @@ from util import run_bash, find_config
 def check_output(repo_data, run_config, run_result, i):
     # Check the run output against the expected output
     if run_config["debug_type"] == "match":
-        if run_result.stdout not in run_config["debug_outputs"][i]:
+        if run_config["debug_outputs"][i] not in run_result.stdout:
             logging.debug(f"Output mismatch for {repo_data['app']} with model {repo_data['target_model']} test {i}.")
             logging.debug(f"Expected output to contain: {run_config['debug_outputs'][i]}")
             logging.debug(f"Actual output: {run_result.stdout}")
