@@ -10,8 +10,8 @@ def check_output(repo_data, run_config, run_result, i):
             logging.debug(f"Output mismatch for {repo_data['app']} with model {repo_data['target_model']} test {i}.")
             logging.debug(f"Expected output to contain: {run_config['debug_outputs'][i]}")
             logging.debug(f"Actual output: {run_result.stdout}")
-            run_result.returncode = 1
-    run_result.returncode = 0
+            return 1
+    return 0
 
 def check_exec(repo_data, run_config, i, args):
     # Check that binary executes as expected for this input
@@ -44,7 +44,7 @@ def run_repo(repo_data, configs, result, args):
                               timeout=args.run_timeout, dry=args.dry)
 
         # Check the run output against the expected output
-        check_output(repo_data, run_config, run_result, i)
+        run_result.returncode = check_output(repo_data, run_config, run_result, i)
 
         # Validate binary executes as expected for this input
         exec_check = check_exec(repo_data, run_config, i, args)
