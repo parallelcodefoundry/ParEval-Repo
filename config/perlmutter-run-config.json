@@ -20,7 +20,7 @@
         "perf_outputs": [
             "Validation passed."
         ],
-        "exec_validation_command": "ncu ./microXOR.exe 4096 16",
-        "exec_validation_fail_text": "==WARNING== No kernels were profiled."
+        "exec_check_command": "ncu ./microXOR.exe 4096 16",
+        "exec_check_fail_text": "==WARNING== No kernels were profiled."
     }
 ]

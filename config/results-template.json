@@ -22,6 +22,11 @@
                 0,
                 0
             ],
+            "run_exec_checks_debug": [
+                0,
+                0,
+                0
+            ],
             "run_stdouts_debug": [
                 "Validation passed.",
                 "Validation passed.",
@@ -35,6 +40,9 @@
         },
         "perf_results": {
             "run_results_perf": [
+                0
+            ],
+            "run_exec_checks_perf": [
                 0
             ],
             "run_stdouts_perf": [
