@@ -1,5 +1,3 @@
-// microXOR kernel
-
 #include <cuda_runtime.h>
 #include "microXOR.cuh"
 

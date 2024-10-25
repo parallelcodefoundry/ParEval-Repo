@@ -1,13 +1,13 @@
 # Makefile for OpenMP offload microXOR
 
 CXX_COMPILER ?= g++
-OMP_FLAGS ?= -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda
-CXXFLAGS ?= -O3 -Iinclude $(OMP_FLAGS) -std=c++17
-LDFLAGS ?= -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/cuda/12.0/lib64 -L/global/common/software/nersc/pe/gpu/llvm/17.0.6/lib -lcudart_static -ldl -lrt -pthread
-
+OMP_TARGET_ARCH ?= nvptx-none
 SRC = src
 INC = include
 OBJ = obj
+CXXFLAGS ?= -O3 -fopenmp -Xopenmp-target -march=$(OMP_TARGET_ARCH) -I$(INC) -std=c++17
+LDFLAGS ?= -fopenmp -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.1/cuda/12.0/lib64 -L/global/common/software/nersc/pe/gpu/llvm/17.0.6/lib -lcudart_static -ldl -lrt -pthread
+
 CUFILES = $(SRC)/microXOR.cu $(SRC)/main.cu
 DEPS = $(INC)/microXOR.cuh
 OBJS = $(CUFILES:$(SRC)/%.cu=$(OBJ)/%.o)

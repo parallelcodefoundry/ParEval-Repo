@@ -44,27 +44,29 @@ int main(int argc, char **argv) {
   d_input = (int*) malloc(N * N * sizeof(int));
   d_output = (int*) malloc(N * N * sizeof(int));
 
-  #pragma omp target data map(to: input[0:N*N]) map(to: d_input[0:N*N]) map(alloc: d_output[0:N*N])
+  #pragma omp target data map(to: input[0:N*N]) map(alloc: d_input[0:N*N])
   {
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(blockEdge*blockEdge)
-    for (size_t i = 0; i < N; i++) {
-      for (size_t j = 0; j < N; j++) {
-        d_input[i*N + j] = input[i*N + j];
-      }
+    #pragma omp target teams distribute parallel for map(tofrom: d_input[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      d_input[i] = input[i];
     }
 
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(blockEdge*blockEdge)
-    for (size_t i = 0; i < N; i++) {
-      for (size_t j = 0; j < N; j++) {
-        cellsXOR(d_input, d_output, N, i, j);
-      }
+    dim3 threadsPerBlock(blockEdge, blockEdge);
+    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    #pragma omp target teams distribute parallel for thread_limit(blockEdge*blockEdge) map(to: d_input[0:N*N]) map(from: d_output[0:N*N])
+    for (int i = 0; i < numBlocks.x * numBlocks.y; i++) {
+      int tidx = i % numBlocks.x;
+      int tidy = i / numBlocks.x;
+      cellsXOR(d_input, d_output, N, tidx, tidy, threadsPerBlock);
     }
+  }
 
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(blockEdge*blockEdge)
-    for (size_t i = 0; i < N; i++) {
-      for (size_t j = 0; j < N; j++) {
-        output[i*N + j] = d_output[i*N + j];
-      }
+  #pragma omp target data map(from: d_output[0:N*N]) map(to: output[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for map(tofrom: output[0:N*N])
+    for (size_t i = 0; i < N * N; i++) {
+      output[i] = d_output[i];
     }
   }
 

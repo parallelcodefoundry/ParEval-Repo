@@ -2,11 +2,11 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written in OpenMP offload for execution on a GPU.
+This version of microXOR is written in OpenMP for offloading to the GPU.
 
 ## Prerequisites
 
-OpenMP offload must be enabled in your compiler.
+OpenMP with offloading support must be installed.
 
 ## Build
 
