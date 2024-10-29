@@ -40,7 +40,7 @@ Here is the code for each file in the codebase:
 
 {all_files}
 
-Translate the {filename} file to the {dst_model} execution model. Output the translated code in one code block.
+Translate the {filename} file to the {dst_model} execution model. Output each translated code file (source files, header files, and Makefiles) in one code block.
 """
 
     def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str):
