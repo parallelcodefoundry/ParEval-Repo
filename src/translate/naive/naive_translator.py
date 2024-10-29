@@ -34,6 +34,12 @@ Here is the code for each file in the codebase:
 Translate the {filename} file to the {dst_model} execution model. Output each translated code file (source files, header files, and Makefiles) in one code block.
 """
 
+    MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
+"""
+
+    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume reasonable filenames for a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
+"""
+
     def get_system_prompt(self):
         return self.SYSTEM_TEMPLATE.format(src_model=self._src_model, dst_model=self._dst_model)
 
