@@ -47,13 +47,25 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
         file_tree = self._input_repo.get_file_tree_str()
         all_fpaths = self._input_repo.get_all_filenames(relpaths=True)
         all_files_str = "\n\n".join(map(lambda fpath: fpath + ":\n" + self._input_repo.get_file_contents(rel_path=fpath), all_fpaths))
-        return self.PROMPT_TEMPLATE.format(
+        base_prompt = self.PROMPT_TEMPLATE.format(
             src_model=self._src_model,
             dst_model=self._dst_model,
             file_tree=file_tree,
             all_files=all_files_str,
             filename=fname
         )
+        if fname == self._prompt_config["main_filename"]:
+            base_prompt += ("\n" + MAIN_ADDENDUM.format(
+                dst_model=self._dst_model,
+                ex_run_cmd=self._prompt_config["ex_run_cmd"],
+                ex_run_desc=self._prompt_config["ex_run_desc"]))
+        if fname == self._prompt_config["build_filename"]:
+            base_prompt += ("\n" + MAKEFILE_ADDENDUM.format(
+                dst_model=self._dst_model,
+                filename_desc=self._prompt_config["filename_desc"],
+                ex_build_cmd=self._prompt_config["ex_build_cmd"],
+                ex_build_desc=self._prompt_config["ex_build_desc"]))
+        return base_prompt
 
     CODE_BLOCK_PATTERN = re.compile(r"```(?:\w+)?\n(.*?)\n```", re.DOTALL)
 

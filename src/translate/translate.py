@@ -9,6 +9,7 @@
 # std imports
 from argparse import ArgumentParser
 import os
+import json
 
 # local imports
 from repo import Repo
@@ -27,6 +28,7 @@ def get_args():
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
     parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", action="store_true", help="Dry run the translation.")
+    parser.add_argument("--prompt-config", type=str, help="Path to the prompt config file for the app and target model.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
@@ -60,6 +62,19 @@ def main():
 
     # create a Repo object for the input directory
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
+
+    # set default prompt config if not provided and check that prompt config exists
+    if args.prompt_config_path:
+        prompt_config_path = args.prompt_config
+    else:
+        prompt_config_path = "data/{name}-{dst}.json".format(name=args.input.split('/')[1],
+                                                             dst=args.dst_model)
+    if not os.path.isfile(prompt_config_path):
+        raise FileExistsError(f"Prompt config {prompt_config_path} does not exist.")
+
+    # load prompt config
+    with open(prompt_config_path, "r") as f:
+        prompt_config = json.load(f)
 
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method, args.naive_llm)
