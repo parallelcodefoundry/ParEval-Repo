@@ -32,7 +32,6 @@ def get_args():
     parser.add_argument("--hide-progress", action="store_true", help="If provided, do not show progress bar.")
     parser.add_argument("--build-only", action="store_true", help="If provided, only build the code repositories, do not run.")
     parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
-    parser.add_argument("--early-exit-runs", action="store_true", help="If provided, stop evaluating a model output after the first run configuration fails.")
     parser.add_argument("--build-config", type=str, default="build-config.json", help="Config for how to build samples.")
     parser.add_argument("--run-config", type=str, default="run-config.json", help="Config for how to run samples.")
     parser.add_argument("--build-timeout", type=int, default=30, help="Timeout in seconds for building a program.")
