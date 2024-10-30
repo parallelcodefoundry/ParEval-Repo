@@ -6,8 +6,6 @@ from util import run_bash, find_config
 def build_repo(repo_data, configs, result, args):
     # Find the build config for this repo
     build_config = find_config(configs, repo_data["app"], repo_data["target_model"])
-    if not build_config:
-        return
 
     # Build the repo
     pre_build_command = build_config["pre_build_commands"]

@@ -26,8 +26,6 @@ def check_exec(repo_data, run_config, i, args):
 def run_repo(repo_data, configs, result, args):
     # Find the run config for this repo
     run_config = find_config(configs, repo_data["app"], repo_data["target_model"])
-    if not run_config:
-        return
 
     pre_run_command = run_config["pre_run_commands"]
 

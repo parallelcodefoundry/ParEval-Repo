@@ -32,4 +32,4 @@ def find_config(configs, app, model):
         if config["app"] == app.lower() and config["model"] == model.lower():
             return config
     logging.error(f"No config found for {app} with model {model}.")
-    return None
+    raise ValueError(f"No config found for {app} with model {model}.")
