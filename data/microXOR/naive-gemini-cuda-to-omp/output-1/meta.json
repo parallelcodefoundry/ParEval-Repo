@@ -5,5 +5,5 @@
     "source_model": "cuda",
     "target_model": "omp",
     "output_number": "1",
-    "path": "data/microXOR/naive-gemini-cuda-to-omp/output-1"
+    "path": "data/microXOR/naive-gemini-cuda-to-omp/output-1/repo"
 }

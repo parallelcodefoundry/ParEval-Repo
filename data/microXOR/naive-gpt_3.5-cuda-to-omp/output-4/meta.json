@@ -5,5 +5,5 @@
     "source_model": "cuda",
     "target_model": "omp",
     "output_number": "4",
-    "path": "data/microXOR/naive-gpt_3.5-cuda-to-omp/output-4"
+    "path": "data/microXOR/naive-gpt_3.5-cuda-to-omp/output-4/repo"
 }
