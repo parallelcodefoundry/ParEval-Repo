@@ -5,7 +5,12 @@ CUDA_ARCH ?= sm_80
 SRC = src
 INC = include
 OBJ = obj
-NVCCFLAGS ?= -O3 -arch=$(CUDA_ARCH) -I$(INC) -std=c++17
+NVCCFLAGS ?= -arch=$(CUDA_ARCH) -I$(INC) -std=c++17
+ifneq ($(DEBUG), yes)
+	NVCCFLAGS += -O3
+else
+	NVCCFLAGS += -g -G
+endif
 LDFLAGS ?= -lcudart
 
 CUFILES = $(SRC)/microXOR.cu $(SRC)/main.cu

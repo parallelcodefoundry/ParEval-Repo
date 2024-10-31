@@ -5,7 +5,12 @@ SM_VERSION ?= sm_80
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -O3 -I$(INC) -std=c++17 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=$(CUDA_ARCH)
+CXXFLAGS ?= -I$(INC) -std=c++17 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=$(CUDA_ARCH)
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
 LDFLAGS ?= -lm
 
 CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
