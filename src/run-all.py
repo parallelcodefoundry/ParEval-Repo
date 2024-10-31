@@ -25,15 +25,14 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, help="Output JSON file containing the results.")
     parser.add_argument("--scratch-dir", type=str, help="If provided, put scratch files here.")
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
-    parser.add_argument("-m", "--models", nargs="+", type=str, help="List of execution models to run, case-insensitive.", choices=["omp"])
+    parser.add_argument("-m", "--models", nargs="+", type=str, help="List of target execution models to run, case-insensitive.", choices=["omp"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
     parser.add_argument("-d", "--dry", action="store_true", help="Dry run. Do not actually compile or run the code repositories.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="If outputs are already in DB for a given prompt, then overwrite them. Default behavior is to skip existing results.")
     parser.add_argument("--hide-progress", action="store_true", help="If provided, do not show progress bar.")
     parser.add_argument("--build-only", action="store_true", help="If provided, only build the code repositories, do not run.")
     parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
-    parser.add_argument("--build-config", type=str, default="build-config.json", help="Config for how to build samples.")
-    parser.add_argument("--run-config", type=str, default="run-config.json", help="Config for how to run samples.")
+    parser.add_argument("--system-config", type=str, default="config/perlmutter-config.json", help="Config for system-specific options like CUDA architecture and module load commands.")
     parser.add_argument("--build-timeout", type=int, default=30, help="Timeout in seconds for building a program.")
     parser.add_argument("--run-timeout", type=int, default=120, help="Timeout in seconds for running a program.")
     parser.add_argument("--log-build-output", action="store_true", help="On all builds, display the stdout of the build process.")
@@ -45,8 +44,9 @@ def get_args():
 
 '''
 Gather all the generated code repositories. Root directory format is:
-translations_root/app/prompt_strategy-llm_name-source_model-to-target_model/output-number
-Want to create list of dictionaries of the form:
+translations_root/app/case-name/output-number/, including meta.json and repo/
+under each output-number directory. repo/ contains the generated code. Want to
+create list of dictionaries of the form:
 {
     "app": app,
     "prompt_strategy": prompt_strategy,
@@ -56,6 +56,7 @@ Want to create list of dictionaries of the form:
     "output_number": output_number,
     "path": path
 }
+where all entries are read in from the meta.json file.
 '''
 def gather_code_repos(args, results):
     code_repos = []
@@ -67,18 +68,40 @@ def gather_code_repos(args, results):
     llms_found = []
     prompt_strategies_found = []
 
-    for app_candidate in os.listdir(args.translations_root):
-        if not args.apps or app_candidate.lower() in args.apps:
-            if app_candidate not in apps_found:
-                apps_found.append(app_candidate)
+    for app in os.listdir(args.translations_root):
+        if args.apps and app.lower() not in args.apps:
+            logging.debug(f"Skipping {app} because it is not in {args.apps}.")
+            continue
+        if app not in apps_found:
+            apps_found.append(app)
 
-            app = app_candidate
-            app_path = os.path.join(args.translations_root, app)
+        app_path = os.path.join(args.translations_root, app)
 
-            for config in os.listdir(app_path):
-                if not args.models or config.lower() in args.models:
-                    logging.debug(f"Found config: {config}")
-                    prompt_strategy, llm_name, source_model, _, target_model = config.split("-")
+        for case_set_name in os.listdir(app_path):
+            for case_name in os.listdir(os.path.join(app_path, case_set_name)):
+                case_path = os.path.join(app_path, case_set_name, case_name)
+                meta_path = os.path.join(case_path, "meta.json")
+                repo_path = os.path.join(case_path, "repo")
+                if not os.path.isfile(meta_path):
+                    logging.error(f"Could not find meta.json for {case_name} under {case_path}.")
+                    raise FileNotFoundError(f"Could not find meta.json for {case_name} under {case_path}.")
+                if not os.path.isdir(repo_path):
+                    logging.error(f"Could not find repo for {case_name} under {case_path}.")
+                    raise FileNotFoundError(f"Could not find repo for {case_name} under {case_path}.")
+
+                with open(meta_path, "r") as f:
+                    meta = json.load(f)
+
+                    if args.models and meta["target_model"] not in args.models:
+                        logging.debug(f"Skipping {case_path}/{case_name} because target model {meta['target_model']} not in {args.models}.")
+                        continue
+
+                    prompt_strategy = meta["prompt_strategy"]
+                    llm_name = meta["llm_name"]
+                    source_model = meta["source_model"]
+                    target_model = meta["target_model"]
+                    output_number = meta["output_number"]
+                    output_path = meta["path"]
 
                     if prompt_strategy not in prompt_strategies_found:
                         prompt_strategies_found.append(prompt_strategy)
@@ -89,38 +112,19 @@ def gather_code_repos(args, results):
                     if source_model not in source_models_found:
                         source_models_found.append(source_model)
 
-                    config_path = os.path.join(args.translations_root, app, config)
+                    code_repos.append(meta)
 
-                    for output in os.listdir(config_path):
-                        output_number = output.split("-")[-1]
-                        output_path = os.path.join(config_path, output)
+                    # Hash the metadata to use as a key in the results dict
+                    hashcode = hash(json.dumps(meta, sort_keys=True))
 
-                        if not os.path.isdir(output_path):
-                            logging.warning(f"Skipping non-directory {output_path}.")
-                            continue
-
-                        repo_metadata = {
-                            "app": app,
-                            "prompt_strategy": prompt_strategy,
-                            "llm_name": llm_name,
-                            "source_model": source_model,
-                            "target_model": target_model,
-                            "output_number": output_number,
-                            "path": output_path
-                        }
-                        code_repos.append(repo_metadata)
-
-                        # Hash the metadata to use as a key in the results dict
-                        hashcode = hash(json.dumps(repo_metadata, sort_keys=True))
-
-                        if hashcode in results:
-                            logging.warning(f"Skipping duplicate code repository: {output_path}")
-                        else:
-                            results[hashcode] = copy.deepcopy(repo_metadata)
-                            results[hashcode]["build_results"] = {}
-                            results[hashcode]["debug_results"] = {}
-                            results[hashcode]["perf_results"] = {}
-                            logging.debug(f"Found code repository: {output_path}")
+                    if hashcode in results:
+                        logging.warning(f"Skipping duplicate code repository: {output_path}")
+                    else:
+                        results[hashcode] = copy.deepcopy(meta)
+                        results[hashcode]["build_results"] = {}
+                        results[hashcode]["debug_results"] = {}
+                        results[hashcode]["perf_results"] = {}
+                        logging.debug(f"Found code repository: {output_path}")
 
     logging.info(f"Found {len(code_repos)} code repositories.")
     logging.info(f"Found apps: {apps_found}")
@@ -150,7 +154,7 @@ def main():
     logging.warning("This script will compile and run code generated by an LLM. " +
                     "It is recommended that you run this script in a sandboxed environment.")
     if not args.yes_to_all:
-        response = await_input("Continue? [y/n]: ", lambda r: r.lower() in ["y", "n", "yes", "no"])
+        response = await_input("Continue knowing that this script runs LLM-generated code? [y/n]: ", lambda r: r.lower() in ["y", "n", "yes", "no"])
         if response.lower() not in ["y", "yes"]:
             logging.warning("Exiting.")
             return
@@ -163,12 +167,10 @@ def main():
             logging.warning("Exiting.")
             return
 
-    # Load build and run configs
-    with open(args.build_config, "r") as f:
-        build_configs = json.load(f)
-
-    with open(args.run_config, "r") as f:
-        run_configs = json.load(f)
+    # Load system config
+    with open(args.system_config, "r") as f:
+        system_config = json.load(f)
+    logging.debug(f"Loaded system config: {system_config}")
 
     # Create empty dict of (hashcode,dict) pairs for results dicts
     results = {}
@@ -176,6 +178,7 @@ def main():
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
 
+    '''
     # Build each code repository
     for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
         logging.debug(f"Building code repository: {code_repo['path']}")
@@ -202,6 +205,7 @@ def main():
     if args.output:
         with open(args.output, "w") as f:
             json.dump(results, f, indent=4)
+    '''
 
 if __name__ == "__main__":
     main()
