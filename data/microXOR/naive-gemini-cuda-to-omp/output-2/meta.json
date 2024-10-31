@@ -1,0 +1,9 @@
+{
+    "app": "microxor",
+    "prompt_strategy": "naive",
+    "llm_name": "gemini",
+    "source_model": "cuda",
+    "target_model": "omp",
+    "output_number": "2",
+    "path": "data/microXOR/naive-gemini-cuda-to-omp/output-2"
+}
