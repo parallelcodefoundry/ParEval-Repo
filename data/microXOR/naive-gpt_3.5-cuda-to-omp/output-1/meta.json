@@ -3,7 +3,7 @@
     "prompt_strategy": "naive",
     "llm_name": "gpt_3.5",
     "source_model": "cuda",
-    "target_model": "omp",
     "output_number": "1",
-    "path": "data/microXOR/naive-gpt_3.5-cuda-to-omp/output-1/repo"
+    "path": "data/microXOR/naive-gpt_3.5-cuda-to-omp/output-1/repo",
+    "dest_model": "omp"
 }

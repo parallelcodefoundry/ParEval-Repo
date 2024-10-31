@@ -23,9 +23,8 @@ def main():
 
                     # Edit the contents of the meta.json file here
                     print("Editing", path)
-                    print("Old path:", data["path"])
-                    print("New path:", os.path.join(data["path"], "repo"))
-                    data["path"] = os.path.join(data["path"], "repo")
+                    data["dest_model"] = data["target_model"]
+                    del data["target_model"]
 
                 print("Writing to", path)
                 with open(path, 'w') as f:

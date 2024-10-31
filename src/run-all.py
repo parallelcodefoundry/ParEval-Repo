@@ -25,13 +25,14 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, help="Output JSON file containing the results.")
     parser.add_argument("--scratch-dir", type=str, help="If provided, put scratch files here.")
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
-    parser.add_argument("-m", "--models", nargs="+", type=str, help="List of target execution models to run, case-insensitive.", choices=["omp"])
+    parser.add_argument("-m", "--models", nargs="+", type=str, help="List of dest execution models to run, case-insensitive.", choices=["omp"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
     parser.add_argument("-d", "--dry", action="store_true", help="Dry run. Do not actually compile or run the code repositories.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="If outputs are already in DB for a given prompt, then overwrite them. Default behavior is to skip existing results.")
     parser.add_argument("--hide-progress", action="store_true", help="If provided, do not show progress bar.")
     parser.add_argument("--build-only", action="store_true", help="If provided, only build the code repositories, do not run.")
     parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
+    parser.add_argument("--target-path", type=str, default="targets", help="Path to the target repos including ground truths for destination models and configuration files per repo.")
     parser.add_argument("--system-config", type=str, default="config/perlmutter-config.json", help="Config for system-specific options like CUDA architecture and module load commands.")
     parser.add_argument("--build-timeout", type=int, default=30, help="Timeout in seconds for building a program.")
     parser.add_argument("--run-timeout", type=int, default=120, help="Timeout in seconds for running a program.")
@@ -52,7 +53,7 @@ create list of dictionaries of the form:
     "prompt_strategy": prompt_strategy,
     "llm_name": llm_name,
     "source_model": source_model,
-    "target_model": target_model,
+    "dest_model": dest_model,
     "output_number": output_number,
     "path": path
 }
@@ -63,7 +64,7 @@ def gather_code_repos(args, results):
 
     # For logging what we find
     apps_found = []
-    target_models_found = []
+    dest_models_found = []
     source_models_found = []
     llms_found = []
     prompt_strategies_found = []
@@ -92,14 +93,14 @@ def gather_code_repos(args, results):
                 with open(meta_path, "r") as f:
                     meta = json.load(f)
 
-                    if args.models and meta["target_model"] not in args.models:
-                        logging.debug(f"Skipping {case_path}/{case_name} because target model {meta['target_model']} not in {args.models}.")
+                    if args.models and meta["dest_model"] not in args.models:
+                        logging.debug(f"Skipping {case_path}/{case_name} because dest model {meta['dest_model']} not in {args.models}.")
                         continue
 
                     prompt_strategy = meta["prompt_strategy"]
                     llm_name = meta["llm_name"]
                     source_model = meta["source_model"]
-                    target_model = meta["target_model"]
+                    dest_model = meta["dest_model"]
                     output_number = meta["output_number"]
                     output_path = meta["path"]
 
@@ -107,8 +108,8 @@ def gather_code_repos(args, results):
                         prompt_strategies_found.append(prompt_strategy)
                     if llm_name not in llms_found:
                         llms_found.append(llm_name)
-                    if target_model not in target_models_found:
-                        target_models_found.append(target_model)
+                    if dest_model not in dest_models_found:
+                        dest_models_found.append(dest_model)
                     if source_model not in source_models_found:
                         source_models_found.append(source_model)
 
@@ -130,7 +131,7 @@ def gather_code_repos(args, results):
     logging.info(f"Found apps: {apps_found}")
     logging.info(f"Found prompt strategies: {prompt_strategies_found}")
     logging.info(f"Found llms: {llms_found}")
-    logging.info(f"Found target models: {target_models_found}")
+    logging.info(f"Found dest models: {dest_models_found}")
     logging.info(f"Found source models: {source_models_found}")
     logging.debug("Code repositories:")
     logging.debug("\n" + json.dumps(code_repos, indent=4))
@@ -178,18 +179,17 @@ def main():
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
 
-    '''
     # Build each code repository
     for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
         logging.debug(f"Building code repository: {code_repo['path']}")
         hashcode = hash(json.dumps(code_repo, sort_keys=True))
-        build_repo(code_repo, build_configs, results[hashcode], args)
+        build_repo(code_repo, system_config, results[hashcode], args)
 
     # Run each code repository
     for code_repo in tqdm(code_repos, desc="Running code repositories", disable=args.hide_progress):
         logging.debug(f"Running code repository: {code_repo['path']}")
         hashcode = hash(json.dumps(code_repo, sort_keys=True))
-        run_repo(code_repo, run_configs, results[hashcode], args)
+        run_repo(code_repo, system_config, results[hashcode], args)
 
     # Filter out results that are already in the output
     if args.output and os.path.exists(args.output):
@@ -205,7 +205,6 @@ def main():
     if args.output:
         with open(args.output, "w") as f:
             json.dump(results, f, indent=4)
-    '''
 
 if __name__ == "__main__":
     main()

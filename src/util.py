@@ -25,9 +25,9 @@ def run_bash(cmd, cwd=None, timeout=None, dry=False):
         #cmd = shlex.split(cmd)
         return subprocess.run(cmd, capture_output=True, text=True, shell=True, timeout=timeout, cwd=cwd)
 
-def find_config(configs, app, model):
+def find_config(app, model, target_path):
     """ Find the config for the given app and model """
-    logging.debug(f"Looking for config for {app} with model {model}.")
+    logging.debug(f"Looking for config for {app} with model {model} in {target_path}.")
     for config in configs:
         if config["app"] == app.lower() and config["model"] == model.lower():
             return config

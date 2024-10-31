@@ -3,7 +3,7 @@
     "prompt_strategy": "naive",
     "llm_name": "gemini",
     "source_model": "cuda",
-    "target_model": "omp",
     "output_number": "4",
-    "path": "data/microXOR/naive-gemini-cuda-to-omp/output-4/repo"
+    "path": "data/microXOR/naive-gemini-cuda-to-omp/output-4/repo",
+    "dest_model": "omp"
 }
