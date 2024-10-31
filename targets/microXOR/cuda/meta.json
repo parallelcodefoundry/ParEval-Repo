@@ -5,6 +5,7 @@
     "build_commands_debug": "make CUDA_ARCH=sm_80 DEBUG=yes",
     "build_commands_perf": "make CUDA_ARCH=sm_80",
     "exe_file": "microXOR.exe",
+    "debug_type": "match",
     "run_commands_debug": [
         "./microXOR.exe 4 2",
         "./microXOR.exe 1024 32",
