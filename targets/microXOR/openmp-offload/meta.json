@@ -1,0 +1,24 @@
+{
+    "app": "microxor",
+    "model": "omp",
+    "required_modules": ["llvm", "cuda"],
+    "build_commands_debug": "make SM_VERSION=sm_80 DEBUG=yes",
+    "build_commands_perf": "make SM_VERSION=sm_80",
+    "exe_file": "microXOR.exe",
+    "run_commands_debug": [
+        "./microXOR.exe 4 2",
+        "./microXOR.exe 1024 32",
+        "./microXOR.exe 4096 16"
+    ],
+    "debug_outputs": [
+        "Validation passed.",
+        "Validation passed.",
+        "Validation passed."
+    ],
+    "run_commands_perf": [
+        "./microXOR.exe 4096 16"
+    ],
+    "perf_outputs": [
+        "Validation passed."
+    ]
+}
