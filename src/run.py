@@ -1,7 +1,7 @@
 import logging
 from subprocess import CompletedProcess
 
-from util import run_bash, find_config
+from util import run_bash, find_config, list_dep_cmds
 
 def check_output(repo_data, target_config, run_result, i):
     # Check the run output against the expected output
@@ -16,8 +16,9 @@ def check_output(repo_data, target_config, run_result, i):
 def check_exec(repo_data, target_config, system_config, i, args):
     # Check that binary executes as expected for this input
     if system_config["exec_check"] != "":
-        exec_check_command = system_config["exec_check"] + " " + target_config["run_commands_perf"][i]
-        exec_check_result = run_bash(exec_check_command, cwd=repo_data['path'], timeout=args.run_timeout, dry=args.dry)
+        cmds = list_dep_cmds(system_config, target_config)
+        exc_cmd = [system_config["exec_check"] + " " + target_config["run_commands_perf"][0]]
+        exec_check_result = run_bash(cmds + exc_cmd, cwd=repo_data['path'], timeout=args.run_timeout, dry=args.dry)
         fail_text = system_config["exec_check_fail_text"]
         if fail_text == "":
             logging.error(f"exec_check_fail_text not specified in {args.system_config}.")
@@ -33,19 +34,19 @@ def run_repo(repo_data, system_config, result, args):
     # Find the target config for this repo per dest model and app name
     target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
 
-    # Get dep commands from system, target config
-    commands = list_dep_commands(system_config, target_config)
+    # Get dep cmds from system, target config
+    cmds = list_dep_cmds(system_config, target_config)
 
-    # Loop over the run commands
+    # Loop over the run cmds
     run_results = []
     run_exec_checks = []
     run_stdouts = []
     run_stderrs = []
     for i in range(0, len(target_config["run_commands_debug"])):
-        run_command = list(target_config["run_commands_debug"][i])
+        run_cmd = [target_config["run_commands_debug"][i]]
 
         # Run the repo
-        run_result = run_bash(commands + run_command, cwd=repo_data['path'],
+        run_result = run_bash(cmds + run_cmd, cwd=repo_data['path'],
                               timeout=args.run_timeout, dry=args.dry)
 
         # Check the run output against the expected output
