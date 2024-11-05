@@ -1,17 +1,18 @@
 import logging
 from subprocess import CompletedProcess
 
-from util import run_bash, find_config
+from util import run_bash, find_config, list_dep_commands
 
-def build_repo(repo_data, configs, result, args):
-    # Find the build config for this repo
-    build_config = find_config(configs, repo_data["app"], repo_data["dest_model"])
+def build_repo(repo_data, system_config, result, args):
+    # Find the target config for this repo per dest model and app name
+    target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
+
+    # Get commands from system, target config
+    commands = list_dep_commands(system_config, target_config)
+    commands.append(target_config["build_commands_debug"])
 
     # Build the repo
-    pre_build_command = build_config["pre_build_commands"]
-    build_command = build_config["build_commands_debug"]
-    build_result = run_bash(pre_build_command + ' && ' + build_command,
-                            cwd=repo_data['path'], timeout=args.build_timeout, dry=args.dry)
+    build_result = run_bash(commands, cwd=repo_data['path'], timeout=args.build_timeout, dry=args.dry)
 
     # Log the build result
     if build_result.returncode != 0:

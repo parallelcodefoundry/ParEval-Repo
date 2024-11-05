@@ -32,7 +32,7 @@ def get_args():
     parser.add_argument("--hide-progress", action="store_true", help="If provided, do not show progress bar.")
     parser.add_argument("--build-only", action="store_true", help="If provided, only build the code repositories, do not run.")
     parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
-    parser.add_argument("--target-path", type=str, default="targets", help="Path to the target repos including ground truths for destination models and configuration files per repo.")
+    parser.add_argument("-t", "--target-path", type=str, default="targets", help="Path to the target repos including ground truths for destination models and configuration files per repo.")
     parser.add_argument("--system-config", type=str, default="config/perlmutter-config.json", help="Config for system-specific options like CUDA architecture and module load commands.")
     parser.add_argument("--build-timeout", type=int, default=30, help="Timeout in seconds for building a program.")
     parser.add_argument("--run-timeout", type=int, default=120, help="Timeout in seconds for running a program.")
