@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(
-    XSBench_OpenMP
+    XSBench_OpenMP_Offload
     VERSION 1.0
     LANGUAGES CXX
 )
@@ -14,12 +14,11 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(CMAKE_CXX_COMPILER_FLAGS "-fopenmp -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -foffload=device=nvptx -foffload=backend=cuda")
 
 set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
-set(SOURCE_CXX ${SOURCE:.cu=.cpp})
 
-add_executable(XSBench ${SOURCE_CXX})
+add_executable(XSBench ${SOURCE})
 
 target_link_libraries(XSBench Threads::Threads)
 

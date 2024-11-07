@@ -2,7 +2,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= g++
+COMPILER    ?= gcc
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -28,15 +28,17 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -lstdc++ -I./
+CFLAGS := 
 
 # Linker Flags
 LDFLAGS = -lm
 
-# NVIDIA Compiler
-ifeq ($(COMPILER),g++)
+# GCC Compiler
+ifeq ($(COMPILER),gcc)
   CC = g++
-  CFLAGS += -Wall -Wextra -O3 -fopenmp -foffload=device=nvptx -march=sm_80
+  CFLAGS += -Wall -Wextra -fopenmp -foffload=nvptx-nvidia-cuda
+  # The -foffload flag is used to tell the compiler to generate code for offloading to a device.
+  # The nvptx-nvidia-cuda target specifies that the code should be offloaded to an NVIDIA GPU.
 endif
 
 # Debug Flags

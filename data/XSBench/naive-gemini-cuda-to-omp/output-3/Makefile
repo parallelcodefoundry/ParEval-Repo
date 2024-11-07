@@ -2,11 +2,11 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= gcc
+COMPILER    ?= g++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
-OFFLOAD     ?= yes
+OFFLOAD_FLAGS  ?= -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp
 
 #===============================================================================
 # Program name & source code list
@@ -15,14 +15,14 @@ OFFLOAD     ?= yes
 program = XSBench
 
 source = \
-Main.cu \
-io.cu \
-Simulation.cu \
-GridInit.cu \
-XSutils.cu \
-Materials.cu
+Main.cpp \
+io.cpp \
+Simulation.cpp \
+GridInit.cpp \
+XSutils.cpp \
+Materials.cpp
 
-obj = $(source:.cu=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
@@ -34,13 +34,10 @@ CFLAGS :=
 # Linker Flags
 LDFLAGS = -lm
 
-# GCC Compiler
-ifeq ($(COMPILER),gcc)
+# Compiler Flags
+ifeq ($(COMPILER),g++)
   CC = g++
-  CFLAGS += -Wall -Wextra -fopenmp -std=c++14
-  ifeq ($(OFFLOAD),yes)
-    CFLAGS += -foffload=nvptx-none
-  endif
+  CFLAGS += -Wall -Wextra -std=c++14
 endif
 
 # Debug Flags
@@ -64,17 +61,17 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.cuh Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+$(program): $(obj) XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS) $(OFFLOAD_FLAGS)
 
-%.o: %.cu XSbench_header.cuh Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+%.o: %.cpp XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@ $(OFFLOAD_FLAGS)
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.cuh
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)

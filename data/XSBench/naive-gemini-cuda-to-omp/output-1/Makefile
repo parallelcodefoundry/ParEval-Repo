@@ -6,7 +6,7 @@ COMPILER    ?= g++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
-TARGET      ?= -fopenmp-targets=nvptx64-nvidia-cuda
+TARGET      ?= offload
 
 #===============================================================================
 # Program name & source code list
@@ -37,13 +37,13 @@ LDFLAGS = -lm
 # GCC Compiler
 ifeq ($(COMPILER),g++)
   CC = g++
-  CFLAGS += -Wall -Wextra -std=c++14
+  CFLAGS += -Wall -Wextra -fopenmp -march=native -std=c++14
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
-  LDFLAGS  += -g
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
 endif
 
 # Profiling Flags
@@ -57,15 +57,21 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+# Offload Flags
+ifeq ($(TARGET),offload)
+  CFLAGS += -fopenmp-targets=nvptx-nvidia-cuda
+  LDFLAGS += -fopenmp-targets=nvptx-nvidia-cuda
+endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
 $(program): $(obj) XSbench_header.cuh Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS) $(TARGET)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cu XSbench_header.cuh Makefile
-	$(CC) $(CFLAGS) -c $< -o $@ $(TARGET)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

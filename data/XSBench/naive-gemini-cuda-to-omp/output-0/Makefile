@@ -6,6 +6,7 @@ COMPILER    ?= g++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
+SM_VERSION  ?= 80
 
 #===============================================================================
 # Program name & source code list
@@ -36,11 +37,7 @@ LDFLAGS = -lm
 # GCC Compiler
 ifeq ($(COMPILER),g++)
   CC = g++
-  CFLAGS += -Wall -Wextra -fopenmp -foffload=nvptx-none
-  # Optimization Flags
-  ifeq ($(OPTIMIZE),yes)
-    CFLAGS += -O3
-  endif
+  CFLAGS += -Wall -Wextra -fopenmp -foffload=nvptx-none -std=c++14
 endif
 
 # Debug Flags
@@ -55,21 +52,26 @@ ifeq ($(PROFILE),yes)
   LDFLAGS  += -pg
 endif
 
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.h Makefile
+$(program): $(obj) XSbench_header.cuh Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp XSbench_header.h Makefile
+%.o: %.cpp XSbench_header.cuh Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.h
+	vim -p $(source) XSbench_header.cuh
 
 run:
 	./$(program)

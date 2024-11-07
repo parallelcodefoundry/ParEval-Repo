@@ -120,14 +120,20 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP offload\n");
-	#ifdef __NVPTX__
+	printf("Programming Model:            OpenMP Offload\n");
+  #ifdef __HIP__
+  hipDeviceProp_t prop;
+  int device;
+  hipGetDevice(&device);
+  hipGetDeviceProperties ( &prop, device );
+		printf("HIP Device:                  %s\n", prop.name);
+  #elif defined(__CUDA__)
 	cudaDeviceProp prop;
 	int device;
 	cudaGetDevice(&device);
 	cudaGetDeviceProperties ( &prop, device );
 		printf("CUDA Device:                  %s\n", prop.name);
-	#endif
+  #endif
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else

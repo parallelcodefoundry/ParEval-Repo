@@ -1,4 +1,3 @@
-```c++
 #include "XSbench_header.cuh"
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -32,17 +31,18 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 	start = 0.0;
 	for (int i = 0; i < in.num_iterations + nwarmups; i++) {
 		if (i == nwarmups) {
-			gpuErrchk( cudaDeviceSynchronize() );
+			#pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+			for (int j = 0; j < in.lookups; j++) {
+				xs_lookup_kernel_baseline(in, GSD, j);
+			}
 			start = get_time();
-		}
-		#pragma omp target teams num_teams(nblocks) thread_limit(nthreads)
-		#pragma omp distribute parallel for
-		for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < in.lookups; j += nblocks * nthreads) {
-			xs_lookup_kernel_baseline(in, GSD, j);
+		} else {
+			#pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+			for (int j = 0; j < in.lookups; j++) {
+				xs_lookup_kernel_baseline(in, GSD, j);
+			}
 		}
 	}
-	gpuErrchk( cudaPeekAtLastError() );
-	gpuErrchk( cudaDeviceSynchronize() );
 	profile->kernel_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +51,10 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
         if( mype == 0)	printf("Reducing verification results...\n");
 	start = get_time();
-        gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost) );
+        #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+        for (int i = 0; i < in.lookups; i++) {
+                SD.verification[i] = GSD.verification[i];
+        }
 	profile->device_to_host_time = get_time() - start;
 
         unsigned long verification_scalar = 0;
@@ -443,18 +446,16 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
         int nthreads = 32;
         int nblocks = ceil( (double) in.lookups / 32.0);
 
-        #pragma omp target teams num_teams(nblocks) thread_limit(nthreads)
-		#pragma omp distribute parallel for
-        for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < in.lookups; j += nblocks * nthreads) {
-                sampling_kernel(in, GSD, j);
+        #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+        for (int i = 0; i < in.lookups; i++) {
+                sampling_kernel(in, GSD, i);
         }
         gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
 
-        #pragma omp target teams num_teams(nblocks) thread_limit(nthreads)
-		#pragma omp distribute parallel for
-        for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < in.lookups; j += nblocks * nthreads) {
-                xs_lookup_kernel_optimization_1(in, GSD, j);
+        #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+        for (int i = 0; i < in.lookups; i++) {
+                xs_lookup_kernel_optimization_1(in, GSD, i);
         }
         gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
@@ -584,23 +585,22 @@ unsigned long long run_event_based_simulation_optimization_2(Inputs in, Simulati
         int nthreads = 32;
         int nblocks = ceil( (double) in.lookups / 32.0);
 
-        #pragma omp target teams num_teams(nblocks) thread_limit(nthreads)
-		#pragma omp distribute parallel for
-        for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < in.lookups; j += nblocks * nthreads) {
-                sampling_kernel(in, GSD, j);
+        #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+        for (int i = 0; i < in.lookups; i++) {
+                sampling_kernel(in, GSD, i);
         }
         gpuErrchk( cudaPeekAtLastError() );
         gpuErrchk( cudaDeviceSynchronize() );
 
         // Launch all material kernels individually
-        for( int m = 0; m < 12; m++ ) {
-        	#pragma omp target teams num_teams(nblocks) thread_limit(nthreads)
-			#pragma omp distribute parallel for
-            for (int j = blockIdx.x * blockDim.x + threadIdx.x; j < in.lookups; j += nblocks * nthreads) {
-                xs_lookup_kernel_optimization_2(in, GSD, m, j);
-            }
-        	gpuErrchk( cudaPeekAtLastError() );
-        	gpuErrchk( cudaDeviceSynchronize() );
+        for( int m = 0; m < 12; m++ )
+        {
+                #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+                for (int i = 0; i < in.lookups; i++) {
+                        xs_lookup_kernel_optimization_2(in, GSD, m, i);
+                }
+                gpuErrchk( cudaPeekAtLastError() );
+                gpuErrchk( cudaDeviceSynchronize() );
         }
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -699,4 +699,8 @@ unsigned long long run_event_based_simulation_optimization_3(Inputs in, Simulati
         total_sz += sz;
         GSD.length_mat_samples = in.lookups;
 
-        if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n
+        if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+
+        ////////////////////////////////////////////////////////////////////////////////
+        // Configure & Launch Simulation Kernel
+        ////////////////////////////////////////////////////////////////////////////////

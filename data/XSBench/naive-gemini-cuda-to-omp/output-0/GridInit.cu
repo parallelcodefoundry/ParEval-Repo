@@ -1,4 +1,3 @@
-```c++
 #include "XSbench_header.cuh"
 
 // Moves all required data structures to the GPU's memory space
@@ -36,7 +35,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
         #pragma omp target data map(to: SD.num_nucs[0:GSD.length_num_nucs])
         #pragma omp target teams distribute parallel for
         for (int i = 0; i < GSD.length_num_nucs; i++) {
-                GSD.num_nucs[i] = SD.num_nucs[i];
+            GSD.num_nucs[i] = SD.num_nucs[i];
         }
         total_sz += sz;
 
@@ -45,7 +44,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
         #pragma omp target data map(to: SD.concs[0:GSD.length_concs])
         #pragma omp target teams distribute parallel for
         for (int i = 0; i < GSD.length_concs; i++) {
-                GSD.concs[i] = SD.concs[i];
+            GSD.concs[i] = SD.concs[i];
         }
         total_sz += sz;
 
@@ -54,7 +53,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
         #pragma omp target data map(to: SD.mats[0:GSD.length_mats])
         #pragma omp target teams distribute parallel for
         for (int i = 0; i < GSD.length_mats; i++) {
-                GSD.mats[i] = SD.mats[i];
+            GSD.mats[i] = SD.mats[i];
         }
         total_sz += sz;
 
@@ -64,7 +63,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
                 #pragma omp target data map(to: SD.unionized_energy_array[0:GSD.length_unionized_energy_array])
                 #pragma omp target teams distribute parallel for
                 for (int i = 0; i < GSD.length_unionized_energy_array; i++) {
-                        GSD.unionized_energy_array[i] = SD.unionized_energy_array[i];
+                    GSD.unionized_energy_array[i] = SD.unionized_energy_array[i];
                 }
                 total_sz += sz;
         }
@@ -75,7 +74,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
                 #pragma omp target data map(to: SD.index_grid[0:GSD.length_index_grid])
                 #pragma omp target teams distribute parallel for
                 for (int i = 0; i < GSD.length_index_grid; i++) {
-                        GSD.index_grid[i] = SD.index_grid[i];
+                    GSD.index_grid[i] = SD.index_grid[i];
                 }
                 total_sz += sz;
         }
@@ -85,7 +84,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
         #pragma omp target data map(to: SD.nuclide_grid[0:GSD.length_nuclide_grid])
         #pragma omp target teams distribute parallel for
         for (int i = 0; i < GSD.length_nuclide_grid; i++) {
-                GSD.nuclide_grid[i] = SD.nuclide_grid[i];
+            GSD.nuclide_grid[i] = SD.nuclide_grid[i];
         }
         total_sz += sz;
 
@@ -104,13 +103,13 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
 
 // Release device memory
 void release_device_memory(SimulationData GSD) {
-        #pragma omp target exit data map(delete: GSD.num_nucs[0:GSD.length_num_nucs])
-        #pragma omp target exit data map(delete: GSD.concs[0:GSD.length_concs])
-        #pragma omp target exit data map(delete: GSD.mats[0:GSD.length_mats])
-        if (GSD.length_unionized_energy_array > 0)
-                #pragma omp target exit data map(delete: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
-        #pragma omp target exit data map(delete: GSD.nuclide_grid[0:GSD.length_nuclide_grid])
-        #pragma omp target exit data map(delete: GSD.verification[0:in.lookups])
+        #pragma omp target exit data map(delete: GSD.num_nucs)
+        #pragma omp target exit data map(delete: GSD.concs)
+        #pragma omp target exit data map(delete: GSD.mats)
+        if (GSD.length_unionized_energy_array > 0) 
+            #pragma omp target exit data map(delete: GSD.unionized_energy_array)
+        #pragma omp target exit data map(delete: GSD.nuclide_grid)
+        #pragma omp target exit data map(delete: GSD.verification)
 }
 
 void release_memory(SimulationData SD) {
@@ -302,4 +301,3 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
 
         return SD;
 }
-```

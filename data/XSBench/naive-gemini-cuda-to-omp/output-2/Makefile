@@ -6,7 +6,7 @@ COMPILER    ?= g++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
-TARGET      ?= x86_64-unknown-linux-gnu
+OMP_TARGET  ?= nvptx-none
 
 #===============================================================================
 # Program name & source code list
@@ -15,14 +15,14 @@ TARGET      ?= x86_64-unknown-linux-gnu
 program = XSBench
 
 source = \
-Main.cpp \
-io.cpp \
-Simulation.cpp \
-GridInit.cpp \
-XSutils.cpp \
-Materials.cpp
+Main.cu \
+io.cu \
+Simulation.cu \
+GridInit.cu \
+XSutils.cu \
+Materials.cu
 
-obj = $(source:.cpp=.o)
+obj = $(source:.cu=.o)
 
 #===============================================================================
 # Sets Flags
@@ -34,10 +34,10 @@ CFLAGS :=
 # Linker Flags
 LDFLAGS = -lm
 
-# G++ Compiler
+# GCC Compiler
 ifeq ($(COMPILER),g++)
   CC = g++
-  CFLAGS += -Wall -Wextra -fopenmp -foffload=$(TARGET) -std=c++11
+  CFLAGS += -Wall -Wextra -fopenmp -foffload=$(OMP_TARGET) -std=c++14
 endif
 
 # Debug Flags
@@ -61,17 +61,17 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.h Makefile
+$(program): $(obj) XSbench_header.cuh Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp XSbench_header.h Makefile
+%.o: %.cu XSbench_header.cuh Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.h
+	vim -p $(source) XSbench_header.cuh
 
 run:
 	./$(program)

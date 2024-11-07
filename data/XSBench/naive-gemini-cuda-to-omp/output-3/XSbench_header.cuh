@@ -1,4 +1,3 @@
-```c++
 #ifndef __XSBENCH_HEADER_H__
 #define __XSBENCH_HEADER_H__
 
@@ -6,8 +5,10 @@
 #include<stdlib.h>
 #include<math.h>
 #include<assert.h>
-#include <omp.h>
-#include <stdint.h>
+#include<omp.h>
+#include <thrust/reduce.h>
+#include <thrust/partition.h>
+#include<stdint.h>
 #include <chrono>
 #include "../XSbench_shared_header.h"
 
@@ -129,4 +130,3 @@ int * load_num_nucs(long n_isotopes);
 int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs );
 double * load_concs( int * num_nucs, int max_num_nucs );
 #endif
-```

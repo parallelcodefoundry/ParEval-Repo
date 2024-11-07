@@ -120,13 +120,14 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP-Offload\n");
-	// TODO: Add device name for OpenMP-Offload
-	// cudaDeviceProp prop;
-	// int device;
-	// cudaGetDevice(&device);
-	// cudaGetDeviceProperties ( &prop, device );
-	// 	printf("CUDA Device:                  %s\n", prop.name);
+	printf("Programming Model:            OpenMP Offload\n");
+	#ifdef __cplusplus
+	// If using C++, we can do this:
+	std::cout << "OpenMP Device:                  " << omp_get_target_device() << std::endl;
+	#else
+	printf("OpenMP Device:                  %s\n", omp_get_target_device() );
+	#endif
+
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else

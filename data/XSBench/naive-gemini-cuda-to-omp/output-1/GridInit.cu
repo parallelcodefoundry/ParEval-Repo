@@ -106,8 +106,7 @@ void release_device_memory(SimulationData GSD) {
         #pragma omp target exit data map(delete: GSD.num_nucs[0:GSD.length_num_nucs])
         #pragma omp target exit data map(delete: GSD.concs[0:GSD.length_concs])
         #pragma omp target exit data map(delete: GSD.mats[0:GSD.length_mats])
-        if (GSD.length_unionized_energy_array > 0) 
-                #pragma omp target exit data map(delete: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
+        if (GSD.length_unionized_energy_array > 0) #pragma omp target exit data map(delete: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
         #pragma omp target exit data map(delete: GSD.nuclide_grid[0:GSD.length_nuclide_grid])
         #pragma omp target exit data map(delete: GSD.verification[0:in.lookups])
 }

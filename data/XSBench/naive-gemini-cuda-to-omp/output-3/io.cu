@@ -1,4 +1,3 @@
-```c++
 #include "XSbench_header.cuh"
 
 // Prints program logo
@@ -128,7 +127,16 @@ void print_inputs(Inputs in, int nprocs, int version )
 	cudaGetDevice(&device);
 	cudaGetDeviceProperties ( &prop, device );
 		printf("CUDA Device:                  %s\n", prop.name);
+	#else
+	#ifdef __HIPCC__
+	hipDeviceProp_t prop;
+	int device;
+	hipGetDevice(&device);
+	hipDeviceGetProperties ( &prop, device );
+		printf("HIP Device:                   %s\n", prop.name);
 	#endif
+	#endif
+
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -541,4 +549,3 @@ SimulationData binary_read( Inputs in )
 
 	return SD;
 }
-```

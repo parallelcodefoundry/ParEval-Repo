@@ -1,4 +1,3 @@
-```c++
 #ifndef __XSBENCH_HEADER_H__
 #define __XSBENCH_HEADER_H__
 
@@ -76,46 +75,40 @@ SimulationData binary_read( Inputs in );
 
 // Simulation.cu
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile);
-#pragma omp declare target
-__device__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD );
-__device__ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
+void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD );
+void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                                    long n_gridpoints,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
                                    long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins );
-__device__ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
+void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                                    long n_gridpoints, int * __restrict__ num_nucs,
                                    double * __restrict__ concs,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
                                    int * __restrict__ mats,
                                    double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs );
-__device__ long grid_search( long n, double quarry, double * __restrict__ A);
-__host__ __device__ long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high);
-__device__ int pick_mat( uint64_t * seed );
-__host__ __device__ double LCG_random_double(uint64_t * seed);
-__device__ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
+long grid_search( long n, double quarry, double * __restrict__ A);
+long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high);
+int pick_mat( uint64_t * seed );
+double LCG_random_double(uint64_t * seed);
+uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
 
 unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData GSD, int mype);
-#pragma omp declare target
-__device__ void sampling_kernel(Inputs in, SimulationData GSD );
-__device__ void xs_lookup_kernel_optimization_1(Inputs in, SimulationData GSD );
+void sampling_kernel(Inputs in, SimulationData GSD );
+void xs_lookup_kernel_optimization_1(Inputs in, SimulationData GSD );
 
 unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData GSD, int mype);
-#pragma omp declare target
-__device__ void xs_lookup_kernel_optimization_2(Inputs in, SimulationData GSD, int m );
+void xs_lookup_kernel_optimization_2(Inputs in, SimulationData GSD, int m );
 
 unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData GSD, int mype);
-#pragma omp declare target
-__device__ void xs_lookup_kernel_optimization_3(Inputs in, SimulationData GSD, int m );
+void xs_lookup_kernel_optimization_3(Inputs in, SimulationData GSD, int m );
 
 unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData GSD, int mype);
-#pragma omp declare target
-__device__ void xs_lookup_kernel_optimization_4(Inputs in, SimulationData GSD, int m, int n_lookups, int offset );
+void xs_lookup_kernel_optimization_4(Inputs in, SimulationData GSD, int m, int n_lookups, int offset );
 
 unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData GSD, int mype);
-#pragma omp declare target
-__device__ void xs_lookup_kernel_optimization_5(Inputs in, SimulationData GSD, int n_lookups, int offset );
+void xs_lookup_kernel_optimization_5(Inputs in, SimulationData GSD, int n_lookups, int offset );
 
 unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData GSD, int mype);
 
@@ -136,6 +129,4 @@ double get_time(void);
 int * load_num_nucs(long n_isotopes);
 int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs );
 double * load_concs( int * num_nucs, int max_num_nucs );
-#pragma omp end declare target
 #endif
-```

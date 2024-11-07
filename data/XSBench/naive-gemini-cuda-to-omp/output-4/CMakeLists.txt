@@ -12,14 +12,13 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -fopenmp")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
+set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
 
-set_source_files_properties(${SOURCE} PROPERTIES LANGUAGE CXX)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -Xpreprocessor -fopenmp")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp")
 
 add_executable(XSBench ${SOURCE})
-
-target_link_libraries(XSBench  ${OpenMP_CXX_FLAGS})
 
 install(TARGETS XSBench DESTINATION bin)

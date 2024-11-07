@@ -31,79 +31,73 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
 
         // Move data to GPU memory space
         sz = GSD.length_num_nucs * sizeof(int);
-        #pragma omp target enter data map(alloc: GSD.num_nucs[0:GSD.length_num_nucs])
-        #pragma omp target data map(to: SD.num_nucs[0:GSD.length_num_nucs])
+        #pragma omp target enter data map(alloc:GSD.num_nucs[0:GSD.length_num_nucs])
+        #pragma omp target data map(to:SD.num_nucs[0:GSD.length_num_nucs])
         #pragma omp target teams distribute parallel for
-        for( int i = 0; i < GSD.length_num_nucs; i++ )
-        {
-                GSD.num_nucs[i] = SD.num_nucs[i];
+        for (int i = 0; i < GSD.length_num_nucs; i++) {
+          GSD.num_nucs[i] = SD.num_nucs[i];
         }
         total_sz += sz;
 
         sz = GSD.length_concs * sizeof(double);
-        #pragma omp target enter data map(alloc: GSD.concs[0:GSD.length_concs])
-        #pragma omp target data map(to: SD.concs[0:GSD.length_concs])
+        #pragma omp target enter data map(alloc:GSD.concs[0:GSD.length_concs])
+        #pragma omp target data map(to:SD.concs[0:GSD.length_concs])
         #pragma omp target teams distribute parallel for
-        for( int i = 0; i < GSD.length_concs; i++ )
-        {
-                GSD.concs[i] = SD.concs[i];
+        for (int i = 0; i < GSD.length_concs; i++) {
+          GSD.concs[i] = SD.concs[i];
         }
         total_sz += sz;
 
         sz = GSD.length_mats * sizeof(int);
-        #pragma omp target enter data map(alloc: GSD.mats[0:GSD.length_mats])
-        #pragma omp target data map(to: SD.mats[0:GSD.length_mats])
+        #pragma omp target enter data map(alloc:GSD.mats[0:GSD.length_mats])
+        #pragma omp target data map(to:SD.mats[0:GSD.length_mats])
         #pragma omp target teams distribute parallel for
-        for( int i = 0; i < GSD.length_mats; i++ )
-        {
-                GSD.mats[i] = SD.mats[i];
+        for (int i = 0; i < GSD.length_mats; i++) {
+          GSD.mats[i] = SD.mats[i];
         }
         total_sz += sz;
 
         if (SD.length_unionized_energy_array != 0) {
                 sz = GSD.length_unionized_energy_array * sizeof(double);
-                #pragma omp target enter data map(alloc: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
-                #pragma omp target data map(to: SD.unionized_energy_array[0:GSD.length_unionized_energy_array])
+                #pragma omp target enter data map(alloc:GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
+                #pragma omp target data map(to:SD.unionized_energy_array[0:GSD.length_unionized_energy_array])
                 #pragma omp target teams distribute parallel for
-                for( int i = 0; i < GSD.length_unionized_energy_array; i++ )
-                {
-                        GSD.unionized_energy_array[i] = SD.unionized_energy_array[i];
+                for (int i = 0; i < GSD.length_unionized_energy_array; i++) {
+                  GSD.unionized_energy_array[i] = SD.unionized_energy_array[i];
                 }
                 total_sz += sz;
         }
 
         if (SD.length_index_grid != 0) {
                 sz = GSD.length_index_grid * sizeof(int);
-                #pragma omp target enter data map(alloc: GSD.index_grid[0:GSD.length_index_grid])
-                #pragma omp target data map(to: SD.index_grid[0:GSD.length_index_grid])
+                #pragma omp target enter data map(alloc:GSD.index_grid[0:GSD.length_index_grid])
+                #pragma omp target data map(to:SD.index_grid[0:GSD.length_index_grid])
                 #pragma omp target teams distribute parallel for
-                for( int i = 0; i < GSD.length_index_grid; i++ )
-                {
-                        GSD.index_grid[i] = SD.index_grid[i];
+                for (int i = 0; i < GSD.length_index_grid; i++) {
+                  GSD.index_grid[i] = SD.index_grid[i];
                 }
                 total_sz += sz;
         }
 
         sz = GSD.length_nuclide_grid * sizeof(NuclideGridPoint);
-        #pragma omp target enter data map(alloc: GSD.nuclide_grid[0:GSD.length_nuclide_grid])
-        #pragma omp target data map(to: SD.nuclide_grid[0:GSD.length_nuclide_grid])
+        #pragma omp target enter data map(alloc:GSD.nuclide_grid[0:GSD.length_nuclide_grid])
+        #pragma omp target data map(to:SD.nuclide_grid[0:GSD.length_nuclide_grid])
         #pragma omp target teams distribute parallel for
-        for( int i = 0; i < GSD.length_nuclide_grid; i++ )
-        {
-                GSD.nuclide_grid[i] = SD.nuclide_grid[i];
+        for (int i = 0; i < GSD.length_nuclide_grid; i++) {
+          GSD.nuclide_grid[i] = SD.nuclide_grid[i];
         }
         total_sz += sz;
 
         // Allocate verification array on device. This structure is not needed on CPU, so we don't
         // have to copy anything over.
         sz = in.lookups * sizeof(unsigned long);
-        #pragma omp target enter data map(alloc: GSD.verification[0:in.lookups])
+        #pragma omp target enter data map(alloc:GSD.verification[0:in.lookups])
         total_sz += sz;
         GSD.length_verification = in.lookups;
 
         // Synchronize
-        #pragma omp target update to(GSD.num_nucs[0:GSD.length_num_nucs], GSD.concs[0:GSD.length_concs], GSD.mats[0:GSD.length_mats], GSD.unionized_energy_array[0:GSD.length_unionized_energy_array], GSD.index_grid[0:GSD.length_index_grid], GSD.nuclide_grid[0:GSD.length_nuclide_grid])
-        #pragma omp target update to(GSD.verification[0:in.lookups])
+        // gpuErrchk( cudaPeekAtLastError() );
+        // gpuErrchk( cudaDeviceSynchronize() );
 
         if(mype == 0 ) printf("GPU Intialization complete. Allocated %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0 );
 
@@ -113,7 +107,14 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
 
 // Release device memory
 void release_device_memory(SimulationData GSD) {
-        #pragma omp target exit data map(delete: GSD.num_nucs, GSD.concs, GSD.mats, GSD.unionized_energy_array, GSD.nuclide_grid, GSD.verification)
+        #pragma omp target exit data map(delete:GSD.num_nucs)
+        #pragma omp target exit data map(delete:GSD.concs)
+        #pragma omp target exit data map(delete:GSD.mats)
+        if (GSD.length_unionized_energy_array > 0) {
+          #pragma omp target exit data map(delete:GSD.unionized_energy_array)
+        }
+        #pragma omp target exit data map(delete:GSD.nuclide_grid)
+        #pragma omp target exit data map(delete:GSD.verification)
 }
 
 void release_memory(SimulationData SD) {

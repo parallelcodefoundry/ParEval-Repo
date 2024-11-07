@@ -1,4 +1,3 @@
-```c++
 #include "XSbench_header.cuh"
 
 // Prints program logo
@@ -121,14 +120,14 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP-Offload\n");
-	#ifdef __CUDACC__
+	printf("Programming Model:            OpenMP Offload\n");
+#ifdef __CUDA_ARCH__
 	cudaDeviceProp prop;
 	int device;
 	cudaGetDevice(&device);
 	cudaGetDeviceProperties ( &prop, device );
 		printf("CUDA Device:                  %s\n", prop.name);
-	#endif
+#endif
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -541,4 +540,3 @@ SimulationData binary_read( Inputs in )
 
 	return SD;
 }
-```

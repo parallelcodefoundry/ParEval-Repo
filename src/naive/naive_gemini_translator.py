@@ -1,24 +1,3 @@
-# """ Naively translates a repository file-by-file from one execution model to another execution model using Gemini
-# """
-
-#     original_prompt = """
-#     Below is a stencil computation benchmark computing an XOR operation over a 2D grid of cells, called microXOR. 
-#     This version of microXOR is written in CUDA for GPU execution.
-#     We are translating microXOR to OpenMP Offload.
-#     Here is the code for microXOR:
-
-#     {microXOR_code}
-
-#     Translate all three CUDA files to OpenMP Offload and update the Makefile if necessary. 
-#     The new files should be in C++ (.cpp or .hpp files), and any CUDA content should be substituted with OpenMP Offload. 
-#     Lastly, output all four newly-translated files as follows for each file:
-
-#     File: file_name
-
-#     # File's Code
-
-#     """
-
 import os
 import re
 import sys
@@ -89,6 +68,9 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             output = response.text
             if self._postprocess(output) != None:
                 output = self._postprocess(output)
+            else:
+                output_lines = (output.splitlines())[1:-1]
+                output = "\n".join(output_lines)
 
             output_fpath = os.path.join(self._output_fpath, fpath)
 

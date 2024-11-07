@@ -1,4 +1,3 @@
-```c++
 #ifndef __XSBENCH_HEADER_H__
 #define __XSBENCH_HEADER_H__
 
@@ -29,16 +28,6 @@
 
 // Starting Seed
 #define STARTING_SEED 1070
-
-#define ompErrchk(ans) { ompAssert((ans), __FILE__, __LINE__); }
-inline void ompAssert(int code, const char *file, int line, bool abort=true)
-{
-        if (code != 0)
-        {
-                fprintf(stderr,"OMPassert: %s %s %d\n", omp_get_error(), file, line);
-                if (abort) exit(code);
-        }
-}
 
 // Structures
 typedef struct{
@@ -141,4 +130,3 @@ int * load_num_nucs(long n_isotopes);
 int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs );
 double * load_concs( int * num_nucs, int max_num_nucs );
 #endif
-```

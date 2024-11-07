@@ -120,15 +120,13 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP-Offload\n");
-	#ifdef __NVCC__
+	printf("Programming Model:            OpenMP Offload\n");
+	#ifdef __CUDACC__
 	cudaDeviceProp prop;
 	int device;
 	cudaGetDevice(&device);
 	cudaGetDeviceProperties ( &prop, device );
 		printf("CUDA Device:                  %s\n", prop.name);
-	#else
-	printf("Offload Target:               %s\n", (in.target == 1)? "GPU" : "CPU");
 	#endif
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
@@ -225,9 +223,8 @@ void print_CLI_error(void)
 	printf("  -k <kernel ID>           Specifies which kernel to run. 0 is baseline, 1, 2, etc are optimized variants. (0 is default.)\n");
 	printf("  -n <num iterations>      Specifies how many kernel iterations to run. (1 is default.)\n");
 	printf("  -w <num warmups>         Specifies how many warmup iterations to run. (0 is default.)\n");
-	printf("  -t <offload target>       Specifies which offload target to use (CPU: 0, GPU: 1). (GPU is default.)\n");
 	printf("  --csv <file path>        Save output to csv file. (Default is stdout)\n");
-	printf("Default is equivalent to: -m history -s large -l 34 -p 500000 -G unionized -k 0 -n 1 -t 1\n");
+	printf("Default is equivalent to: -m history -s large -l 34 -p 500000 -G unionized -k 0 -n 1\n");
 	printf("See readme for full description of default run values\n");
 	exit(4);
 }
@@ -271,9 +268,6 @@ Inputs read_CLI( int argc, char * argv[] )
 
 	// default to zero warmup iterations
 	input.num_warmups = 1;
-
-	// default to GPU
-	input.target = 1;
 
   // default to stdout
   input.filename = NULL;
@@ -439,17 +433,6 @@ Inputs read_CLI( int argc, char * argv[] )
 			if( ++i < argc)
 			{
 				input.num_warmups = atoi(argv[i]);
-			}
-			else
-				print_CLI_error();
-		}
-		else if( strcmp(arg, "-t") == 0 )
-		{
-			if( ++i < argc)
-			{
-				input.target = atoi(argv[i]);
-				if( input.target != 0 && input.target != 1 )
-					print_CLI_error();
 			}
 			else
 				print_CLI_error();

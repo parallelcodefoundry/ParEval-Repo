@@ -1,4 +1,3 @@
-```c++
 // Material data is hard coded into the functions in this file.
 // Note that there are 12 materials present in H-M (large or small)
 
@@ -115,4 +114,3 @@ double * load_concs( int * num_nucs, int max_num_nucs )
 
         return concs;
 }
-```
