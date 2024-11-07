@@ -2,4 +2,3 @@ python: '3.10'
 pre_install:
   - apt-get update
   - apt-get install -y g++ libomp-dev
-install: 'pip install -e .'
