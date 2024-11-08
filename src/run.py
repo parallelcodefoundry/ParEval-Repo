@@ -30,7 +30,7 @@ def check_exec(repo_data, target_config, system_config, i, args):
         logging.debug(f"No execution check specified in {args.system_config}.")
     return 0
 
-def run_repo(repo_data, system_config, result, args):
+def run_repo(repo_data, system_config, args):
     # Find the target config for this repo per dest model and app name
     target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
 
@@ -72,7 +72,12 @@ def run_repo(repo_data, system_config, result, args):
         run_stdouts.append(run_result.stdout)
         run_stderrs.append(run_result.stderr)
 
-    result["debug_results"]["run_results_debug"] = run_results
-    result["debug_results"]["run_exec_checks_debug"] = run_exec_checks
-    result["debug_results"]["run_stdouts_debug"] = run_stdouts
-    result["debug_results"]["run_stderrs_debug"] = run_stderrs
+    # Create run result dict to return
+    result = {}
+    result["path"] = repo_data['path']
+    result["run_results_debug"] = run_results
+    result["run_exec_checks_debug"] = run_exec_checks
+    result["run_stdouts_debug"] = run_stdouts
+    result["run_stderrs_debug"] = run_stderrs
+
+    return result

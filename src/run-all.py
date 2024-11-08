@@ -13,6 +13,8 @@ import copy
 
 # tpl imports
 from tqdm import tqdm
+import pandas as pd
+import numpy as np
 
 # local imports
 from util import await_input
@@ -42,6 +44,34 @@ def get_args():
     parser.add_argument("--log-run-errors", action="store_true", help="On run error, display the stderr of the run process.")
     parser.add_argument("--log", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", type=str.upper, help="Logging level.")
     return parser.parse_args()
+
+'''
+Convert a metadata dictionary to an array for the results DataFrame.
+'''
+def meta_to_arr(meta):
+    return np.array([meta["app"],
+                     meta["prompt_strategy"],
+                     meta["llm_name"],
+                     meta["source_model"],
+                     meta["dest_model"],
+                     meta["output_number"],
+                     meta["path"],
+                     None,
+                     None,
+                     None,
+                     None,
+                     None,
+                     None,
+                     None])
+
+'''
+Update the results DataFrame with a results dictionary.
+'''
+def update_results(results, results_dict):
+    for key, value in results_dict.items():
+        if (key in results.columns
+            and results.loc[results["path"] == results_dict["path"], key].isnull().any()):
+            results.loc[results["path"] == results_dict["path"], key] = str(value) if isinstance(value, list) else value
 
 '''
 Gather all the generated code repositories. Root directory format is:
@@ -115,16 +145,11 @@ def gather_code_repos(args, results):
 
                     code_repos.append(meta)
 
-                    # Hash the metadata to use as a key in the results dict
-                    hashcode = hash(json.dumps(meta, sort_keys=True))
-
-                    if hashcode in results:
+                    # Check if there is an entry in the results dataframe matching the current repo path
+                    if output_path in results["path"].values:
                         logging.warning(f"Skipping duplicate code repository: {output_path}")
                     else:
-                        results[hashcode] = copy.deepcopy(meta)
-                        results[hashcode]["build_results"] = {}
-                        results[hashcode]["debug_results"] = {}
-                        results[hashcode]["perf_results"] = {}
+                        results.loc[len(results)] = meta_to_arr(meta)
                         logging.debug(f"Found code repository: {output_path}")
 
     logging.info(f"Found {len(code_repos)} code repositories.")
@@ -173,8 +198,21 @@ def main():
         system_config = json.load(f)
     logging.debug(f"Loaded system config: {system_config}")
 
-    # Create empty dict of (hashcode,dict) pairs for results dicts
-    results = {}
+    # Create empty dataframe to store results with columns for each metadata field
+    results = pd.DataFrame(columns=["app",
+                                    "prompt_strategy",
+                                    "llm_name",
+                                    "source_model",
+                                    "dest_model",
+                                    "output_number",
+                                    "path",
+                                    "build_result_debug",
+                                    "build_stdout_debug",
+                                    "build_stderr_debug",
+                                    "run_results_debug",
+                                    "run_exec_checks_debug",
+                                    "run_stdouts_debug",
+                                    "run_stderrs_debug"])
 
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
@@ -182,14 +220,14 @@ def main():
     # Build each code repository
     for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
         logging.debug(f"Building code repository: {code_repo['path']}")
-        hashcode = hash(json.dumps(code_repo, sort_keys=True))
-        build_repo(code_repo, system_config, results[hashcode], args)
+        loc_results = build_repo(code_repo, system_config, args)
+        update_results(results, loc_results)
 
     # Run each code repository
     for code_repo in tqdm(code_repos, desc="Running code repositories", disable=args.hide_progress):
         logging.debug(f"Running code repository: {code_repo['path']}")
-        hashcode = hash(json.dumps(code_repo, sort_keys=True))
-        run_repo(code_repo, system_config, results[hashcode], args)
+        loc_results = run_repo(code_repo, system_config, args)
+        update_results(results, loc_results)
 
     # Filter out results that are already in the output
     if args.output and os.path.exists(args.output):
@@ -201,10 +239,11 @@ def main():
                 existing_results = json.load(f)
             results = {k: v for k, v in results.items() if k not in existing_results}
 
-    # Write the results to the output filename
+    # Write the results DataFrame to the output filename
     if args.output:
+        logging.info(f"Writing results to {args.output}.")
         with open(args.output, "w") as f:
-            json.dump(results, f, indent=4)
+            json.dump(json.loads(results.to_json(orient="index")), f, indent=4)
 
 if __name__ == "__main__":
     main()

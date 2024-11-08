@@ -3,7 +3,7 @@ from subprocess import CompletedProcess
 
 from util import run_bash, find_config, list_dep_cmds
 
-def build_repo(repo_data, system_config, result, args):
+def build_repo(repo_data, system_config, args):
     # Find the target config for this repo per dest model and app name
     target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
 
@@ -24,7 +24,11 @@ def build_repo(repo_data, system_config, result, args):
     else:
         logging.debug(f"Build succeeded for {repo_data['app']} with model {repo_data['dest_model']}.")
 
-    # Save the build result
-    result["build_results"]["build_result_debug"] = build_result.returncode
-    result["build_results"]["build_stdout_debug"] = build_result.stdout
-    result["build_results"]["build_stderr_debug"] = build_result.stderr
+    # Create build result dict to return
+    result = {}
+    result["path"] = repo_data['path']
+    result["build_result_debug"] = build_result.returncode
+    result["build_stdout_debug"] = build_result.stdout
+    result["build_stderr_debug"] = build_result.stderr
+
+    return result
