@@ -198,7 +198,8 @@ def main():
     code_repos = gather_code_repos(args, results)
 
     # Build and run each code repository
-    for code_repo in tqdm(code_repos, desc="Building and running code repositories", disable=args.hide_progress):
+    pbar = tqdm(total=len(code_repos)*2, desc="Building and running code repositories", disable=args.hide_progress)
+    for code_repo in code_repos:
         # Want temporary directory to not be cleaned up if user requests it, but
         # delete option in TemporaryDirectory is only available in Python 3.12+
         with (contextlib.nullcontext(tempfile.mkdtemp(dir=scratch))
@@ -211,10 +212,13 @@ def main():
             logging.debug(f"Building code repository: {code_repo['path']}")
             loc_results = build_repo(code_repo, system_config, args, tempdir)
             update_results(results, loc_results)
+            pbar.update(1)
 
             logging.debug(f"Running code repository: {code_repo['path']}")
             loc_results = run_repo(code_repo, system_config, args, tempdir)
             update_results(results, loc_results)
+            pbar.update(1)
+    pbar.close()
 
     # Filter out results that are already in the output
     if args.output and os.path.exists(args.output):
