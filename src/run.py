@@ -18,7 +18,7 @@ def check_exec(repo_data, target_config, system_config, i, args, tempdir):
     if system_config["exec_check"] != "":
         cmds = list_dep_cmds(system_config, target_config)
         exc_cmd = [system_config["exec_check"] + " " + target_config["run_commands_perf"][0]]
-        exec_check_result = run_bash(cmds + exc_cmd, cwd=tempdir, timeout=args.run_timeout, dry=args.dry)
+        exec_check_result = run_bash(cmds + exc_cmd, cwd=tempdir, timeout=target_config["run_timeout"], dry=args.dry)
         fail_text = system_config["exec_check_fail_text"]
         if fail_text == "":
             logging.error(f"exec_check_fail_text not specified in {args.system_config}.")
@@ -47,7 +47,7 @@ def run_repo(repo_data, system_config, args, tempdir):
 
         # Run the repo
         run_result = run_bash(cmds + run_cmd, cwd=tempdir,
-                              timeout=args.run_timeout, dry=args.dry)
+                              timeout=target_config["run_timeout"], dry=args.dry)
 
         # Check the run output against the expected output
         run_result.returncode = check_output(repo_data, target_config, run_result, i)

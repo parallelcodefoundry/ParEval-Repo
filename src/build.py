@@ -12,13 +12,14 @@ def build_repo(repo_data, system_config, args, tempdir):
     cmds.append(target_config["build_commands_debug"])
 
     # Build the repo
-    build_result = run_bash(cmds, cwd=tempdir, timeout=args.build_timeout, dry=args.dry)
+    build_result = run_bash(cmds, cwd=tempdir, timeout=target_config["build_timeout"], dry=args.dry)
+
+    if args.log_build_output:
+        logging.info(f"Build output: {build_result.stdout}")
 
     # Log the build result
     if build_result.returncode != 0:
         logging.debug(f"Build failed for {repo_data['app']} with model {repo_data['dest_model']}.")
-        if args.log_build_output:
-            logging.info(f"Build output: {build_result.stdout}")
         if args.log_build_errors:
             logging.info(f"Build error: {build_result.stderr}")
     else:

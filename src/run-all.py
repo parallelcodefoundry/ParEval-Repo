@@ -38,8 +38,6 @@ def get_args():
     parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
     parser.add_argument("-t", "--target-path", type=str, default="targets", help="Path to the target repos including ground truths for destination models and configuration files per repo.")
     parser.add_argument("--system-config", type=str, default="config/perlmutter-config.json", help="Config for system-specific options like CUDA architecture and module load commands.")
-    parser.add_argument("--build-timeout", type=int, default=30, help="Timeout in seconds for building a program.")
-    parser.add_argument("--run-timeout", type=int, default=120, help="Timeout in seconds for running a program.")
     parser.add_argument("--log-build-output", action="store_true", help="On all builds, display the stdout of the build process.")
     parser.add_argument("--log-build-errors", action="store_true", help="On build error, display the stderr of the build process.")
     parser.add_argument("--log-run-output", action="store_true", help="On all runs, display the stdout of the run process.")
