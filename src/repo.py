@@ -14,13 +14,21 @@ class Repo:
 
     _path: os.PathLike
     _file_tree: dict
+    _meta: dict
 
-    def __init__(self, path: os.PathLike):
+    def __init__(self, path: os.PathLike, meta: dict):
         self._path = os.path.abspath(path)
         self._file_tree = self._get_file_tree_dict(path)
         self._file_tree = self._file_tree['contents']
         if len(self._file_tree) == 1:
             self._file_tree = self._file_tree[0]['contents']
+        self._meta = meta
+
+    @classmethod
+    def from_json(self, meta: os.PathLike):
+        with open(meta, 'r') as f:
+            self._meta = json.load(f)
+        return self(self._meta['path'], self._meta)
 
     def get_file_tree_dict(self) -> str:
         return self._file_tree

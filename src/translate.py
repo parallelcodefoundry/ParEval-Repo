@@ -54,7 +54,7 @@ def main():
         os.mkdir(args.output)
 
     # create a Repo object for the input directory
-    input_repo = Repo(args.input)
+    input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method)
