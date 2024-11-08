@@ -41,9 +41,9 @@ def run_bash(cmds, cwd=None, timeout=None, dry=False):
         logging.info(f"Skipping commands because --dry was specified.")
         return CompletedProcess(args=cmds, returncode=0, stdout="", stderr="")
     else:
-        full_cmd = f"bash {script_path}"
+        full_cmd = shlex.split(f"bash {script_path}")
         return subprocess.run(full_cmd, capture_output=True, text=True,
-                              timeout=timeout, cwd=tempdir)
+                              timeout=timeout, cwd=cwd)
 
 def find_config(app, model, target_path):
     """ Find the target config for the given app and model """
