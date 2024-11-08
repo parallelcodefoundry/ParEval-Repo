@@ -10,14 +10,15 @@ import json
 import os
 import logging
 import copy
+import contextlib
 
 # tpl imports
 from tqdm import tqdm
 import pandas as pd
-import numpy as np
+import tempfile
 
 # local imports
-from util import await_input
+from util import await_input, setup_tempdir, meta_to_arr, update_results
 from build import build_repo
 from run import run_repo
 
@@ -25,7 +26,8 @@ def get_args():
     parser = ArgumentParser(description="Compile and run all the generated code repositories.")
     parser.add_argument("translations_root", type=str, help="Root directory of the generated code repositories.")
     parser.add_argument("-o", "--output", type=str, help="Output JSON file containing the results.")
-    parser.add_argument("--scratch-dir", type=str, help="If provided, put scratch files here.")
+    parser.add_argument("--scratch-dir", type=str, default="scratch", help="If provided, put scratch files here.")
+    parser.add_argument("--save-temps", action="store_true", help="If provided, save temporary files.")
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
     parser.add_argument("-m", "--models", nargs="+", type=str, help="List of dest execution models to run, case-insensitive.", choices=["omp"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
@@ -44,34 +46,6 @@ def get_args():
     parser.add_argument("--log-run-errors", action="store_true", help="On run error, display the stderr of the run process.")
     parser.add_argument("--log", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", type=str.upper, help="Logging level.")
     return parser.parse_args()
-
-'''
-Convert a metadata dictionary to an array for the results DataFrame.
-'''
-def meta_to_arr(meta):
-    return np.array([meta["app"],
-                     meta["prompt_strategy"],
-                     meta["llm_name"],
-                     meta["source_model"],
-                     meta["dest_model"],
-                     meta["output_number"],
-                     meta["path"],
-                     None,
-                     None,
-                     None,
-                     None,
-                     None,
-                     None,
-                     None])
-
-'''
-Update the results DataFrame with a results dictionary.
-'''
-def update_results(results, results_dict):
-    for key, value in results_dict.items():
-        if (key in results.columns
-            and results.loc[results["path"] == results_dict["path"], key].isnull().any()):
-            results.loc[results["path"] == results_dict["path"], key] = str(value) if isinstance(value, list) else value
 
 '''
 Gather all the generated code repositories. Root directory format is:
@@ -193,6 +167,12 @@ def main():
             logging.warning("Exiting.")
             return
 
+    # Check that the scratch directory exists
+    scratch = os.path.abspath(args.scratch_dir)
+    if not os.path.exists(scratch):
+        logging.info(f"Creating scratch directory: {scratch}")
+        os.makedirs(scratch)
+
     # Load system config
     with open(args.system_config, "r") as f:
         system_config = json.load(f)
@@ -217,17 +197,24 @@ def main():
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
 
-    # Build each code repository
-    for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
-        logging.debug(f"Building code repository: {code_repo['path']}")
-        loc_results = build_repo(code_repo, system_config, args)
-        update_results(results, loc_results)
+    # Build and run each code repository
+    for code_repo in tqdm(code_repos, desc="Building and running code repositories", disable=args.hide_progress):
+        # Want temporary directory to not be cleaned up if user requests it, but
+        # delete option in TemporaryDirectory is only available in Python 3.12+
+        with (contextlib.nullcontext(tempfile.mkdtemp(dir=scratch))
+              if args.save_temps
+              else tempfile.TemporaryDirectory(dir=scratch)
+              ) as tempdir:
+            logging.debug(f"Temporary directory created: {tempdir}")
+            setup_tempdir(tempdir, code_repo)
 
-    # Run each code repository
-    for code_repo in tqdm(code_repos, desc="Running code repositories", disable=args.hide_progress):
-        logging.debug(f"Running code repository: {code_repo['path']}")
-        loc_results = run_repo(code_repo, system_config, args)
-        update_results(results, loc_results)
+            logging.debug(f"Building code repository: {code_repo['path']}")
+            loc_results = build_repo(code_repo, system_config, args, tempdir)
+            update_results(results, loc_results)
+
+            logging.debug(f"Running code repository: {code_repo['path']}")
+            loc_results = run_repo(code_repo, system_config, args, tempdir)
+            update_results(results, loc_results)
 
     # Filter out results that are already in the output
     if args.output and os.path.exists(args.output):
