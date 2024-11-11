@@ -10,12 +10,15 @@ import json
 import os
 import logging
 import copy
+import contextlib
 
 # tpl imports
 from tqdm import tqdm
+import pandas as pd
+import tempfile
 
 # local imports
-from util import await_input
+from util import await_input, setup_tempdir, meta_to_arr, update_results
 from build import build_repo
 from run import run_repo
 
@@ -23,7 +26,8 @@ def get_args():
     parser = ArgumentParser(description="Compile and run all the generated code repositories.")
     parser.add_argument("translations_root", type=str, help="Root directory of the generated code repositories.")
     parser.add_argument("-o", "--output", type=str, help="Output JSON file containing the results.")
-    parser.add_argument("--scratch-dir", type=str, help="If provided, put scratch files here.")
+    parser.add_argument("--scratch-dir", type=str, default="scratch", help="If provided, put scratch files here.")
+    parser.add_argument("--save-temps", action="store_true", help="If provided, save temporary files.")
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
     parser.add_argument("-m", "--models", nargs="+", type=str, help="List of dest execution models to run, case-insensitive.", choices=["omp"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
@@ -34,8 +38,6 @@ def get_args():
     parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
     parser.add_argument("-t", "--target-path", type=str, default="targets", help="Path to the target repos including ground truths for destination models and configuration files per repo.")
     parser.add_argument("--system-config", type=str, default="config/perlmutter-config.json", help="Config for system-specific options like CUDA architecture and module load commands.")
-    parser.add_argument("--build-timeout", type=int, default=30, help="Timeout in seconds for building a program.")
-    parser.add_argument("--run-timeout", type=int, default=120, help="Timeout in seconds for running a program.")
     parser.add_argument("--log-build-output", action="store_true", help="On all builds, display the stdout of the build process.")
     parser.add_argument("--log-build-errors", action="store_true", help="On build error, display the stderr of the build process.")
     parser.add_argument("--log-run-output", action="store_true", help="On all runs, display the stdout of the run process.")
@@ -115,16 +117,11 @@ def gather_code_repos(args, results):
 
                     code_repos.append(meta)
 
-                    # Hash the metadata to use as a key in the results dict
-                    hashcode = hash(json.dumps(meta, sort_keys=True))
-
-                    if hashcode in results:
+                    # Check if there is an entry in the results dataframe matching the current repo path
+                    if output_path in results["path"].values:
                         logging.warning(f"Skipping duplicate code repository: {output_path}")
                     else:
-                        results[hashcode] = copy.deepcopy(meta)
-                        results[hashcode]["build_results"] = {}
-                        results[hashcode]["debug_results"] = {}
-                        results[hashcode]["perf_results"] = {}
+                        results.loc[len(results)] = meta_to_arr(meta)
                         logging.debug(f"Found code repository: {output_path}")
 
     logging.info(f"Found {len(code_repos)} code repositories.")
@@ -168,28 +165,58 @@ def main():
             logging.warning("Exiting.")
             return
 
+    # Check that the scratch directory exists
+    scratch = os.path.abspath(args.scratch_dir)
+    if not os.path.exists(scratch):
+        logging.info(f"Creating scratch directory: {scratch}")
+        os.makedirs(scratch)
+
     # Load system config
     with open(args.system_config, "r") as f:
         system_config = json.load(f)
     logging.debug(f"Loaded system config: {system_config}")
 
-    # Create empty dict of (hashcode,dict) pairs for results dicts
-    results = {}
+    # Create empty dataframe to store results with columns for each metadata field
+    results = pd.DataFrame(columns=["app",
+                                    "prompt_strategy",
+                                    "llm_name",
+                                    "source_model",
+                                    "dest_model",
+                                    "output_number",
+                                    "path",
+                                    "build_result_debug",
+                                    "build_stdout_debug",
+                                    "build_stderr_debug",
+                                    "run_results_debug",
+                                    "run_exec_checks_debug",
+                                    "run_stdouts_debug",
+                                    "run_stderrs_debug"])
 
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
 
-    # Build each code repository
-    for code_repo in tqdm(code_repos, desc="Building code repositories", disable=args.hide_progress):
-        logging.debug(f"Building code repository: {code_repo['path']}")
-        hashcode = hash(json.dumps(code_repo, sort_keys=True))
-        build_repo(code_repo, system_config, results[hashcode], args)
+    # Build and run each code repository
+    pbar = tqdm(total=len(code_repos)*2, desc="Building and running code repositories", disable=args.hide_progress)
+    for code_repo in code_repos:
+        # Want temporary directory to not be cleaned up if user requests it, but
+        # delete option in TemporaryDirectory is only available in Python 3.12+
+        with (contextlib.nullcontext(tempfile.mkdtemp(dir=scratch))
+              if args.save_temps
+              else tempfile.TemporaryDirectory(dir=scratch)
+              ) as tempdir:
+            logging.debug(f"Temporary directory created: {tempdir}")
+            setup_tempdir(tempdir, code_repo)
 
-    # Run each code repository
-    for code_repo in tqdm(code_repos, desc="Running code repositories", disable=args.hide_progress):
-        logging.debug(f"Running code repository: {code_repo['path']}")
-        hashcode = hash(json.dumps(code_repo, sort_keys=True))
-        run_repo(code_repo, system_config, results[hashcode], args)
+            logging.debug(f"Building code repository: {code_repo['path']}")
+            loc_results = build_repo(code_repo, system_config, args, tempdir)
+            update_results(results, loc_results)
+            pbar.update(1)
+
+            logging.debug(f"Running code repository: {code_repo['path']}")
+            loc_results = run_repo(code_repo, system_config, args, tempdir)
+            update_results(results, loc_results)
+            pbar.update(1)
+    pbar.close()
 
     # Filter out results that are already in the output
     if args.output and os.path.exists(args.output):
@@ -201,10 +228,11 @@ def main():
                 existing_results = json.load(f)
             results = {k: v for k, v in results.items() if k not in existing_results}
 
-    # Write the results to the output filename
+    # Write the results DataFrame to the output filename
     if args.output:
+        logging.info(f"Writing results to {args.output}.")
         with open(args.output, "w") as f:
-            json.dump(results, f, indent=4)
+            json.dump(json.loads(results.to_json(orient="index")), f, indent=4)
 
 if __name__ == "__main__":
     main()
