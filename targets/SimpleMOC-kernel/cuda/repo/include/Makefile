@@ -33,7 +33,7 @@ ifeq ($(COMPILER),nvcc)
 endif
 
 # Standard Flags
-CFLAGS := -arch sm_$(SM_VERSION) -I/usr/local/cuda/include
+override CFLAGS += -arch sm_$(SM_VERSION) -I/usr/local/cuda/include
 
 # Linker Flags
 LDFLAGS = -lm -lcurand
