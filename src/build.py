@@ -7,6 +7,15 @@ def build_repo(repo_data, system_config, args, tempdir):
     # Find the target config for this repo per dest model and app name
     target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
 
+    # Run setup commands if provided
+    if "setup_commands" in target_config:
+        logging.debug(f"Running setup commands for {repo_data['app']} with model {repo_data['dest_model']}.")
+        setup_cmds = target_config["setup_commands"]
+        setup_result = run_bash(setup_cmds, cwd=tempdir, timeout=target_config["build_timeout"], dry=args.dry)
+        if setup_result.returncode != 0:
+            logging.error(f"Setup failed for {repo_data['app']} with model {repo_data['dest_model']}.")
+            return
+
     # Get cmds from system, target config
     cmds = list_dep_cmds(system_config, target_config)
     cmds.append(target_config["build_commands_debug"])
