@@ -35,8 +35,8 @@ def main():
     print(f"Target Model: {target_model}")
 
     # validate that target_model in metadata matches target_model in directory name
-    if input_metadata["model"] != target_model:
-        raise ValueError(f"Target model in metadata file ({input_metadata['target_model']}) does not match target model in directory name ({target_model})")
+    if input_metadata["model"] != target_model and input_metadata["model"] != source_model:
+        raise ValueError(f"Target model and source model in metadata file both do not match target model in directory name ({target_model})")
 
     for repo in os.listdir(input_dir):
         repo_path = os.path.join(input_dir, repo)
