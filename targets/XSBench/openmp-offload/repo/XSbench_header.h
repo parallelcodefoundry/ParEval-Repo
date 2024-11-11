@@ -12,7 +12,7 @@
 #include<sys/time.h>
 #include<assert.h>
 #include<stdint.h>
-#include "../XSbench_shared_header.h"
+#include "XSbench_shared_header.h"
 
 // Papi Header
 #ifdef PAPI
