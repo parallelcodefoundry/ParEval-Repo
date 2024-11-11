@@ -34,8 +34,6 @@ def get_args():
     parser.add_argument("-d", "--dry", action="store_true", help="Dry run. Do not actually compile or run the code repositories.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="If outputs are already in DB for a given prompt, then overwrite them. Default behavior is to skip existing results.")
     parser.add_argument("--hide-progress", action="store_true", help="If provided, do not show progress bar.")
-    parser.add_argument("--build-only", action="store_true", help="If provided, only build the code repositories, do not run.")
-    parser.add_argument("--run-only", action="store_true", help="If provided, only run the code repositories, do not build.")
     parser.add_argument("-t", "--target-path", type=str, default="targets", help="Path to the target repos including ground truths for destination models and configuration files per repo.")
     parser.add_argument("--system-config", type=str, default="config/perlmutter-config.json", help="Config for system-specific options like CUDA architecture and module load commands.")
     parser.add_argument("--log-build-output", action="store_true", help="On all builds, display the stdout of the build process.")

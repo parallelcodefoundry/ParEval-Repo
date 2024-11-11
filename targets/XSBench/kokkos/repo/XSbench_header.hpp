@@ -11,7 +11,7 @@
 #include<chrono>
 #include<assert.h>
 #include<stdint.h>
-#include "../XSbench_shared_header.h"
+#include "XSbench_shared_header.h"
 
 #include <Kokkos_Core.hpp>
 

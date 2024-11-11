@@ -1,0 +1,25 @@
+{
+    "app": "llm.c",
+    "model": "cuda",
+    "path": "targets/llm.c/cuda/repo",
+    "dependencies": ["cuda", "llvm"],
+    "setup_commands": ["chmod u+x ./dev/download_starter_pack.sh", "./dev/download_starter_pack.sh"],
+    "build_commands_debug": "make test_gpt2fp32cu FORCE_NVCC_O=0",
+    "build_commands_perf": "make test_gpt2fp32cu",
+    "build_timeout": 30,
+    "exe_file": "test_gpt2fp32cu",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "./test_gpt2fp32cu"
+    ],
+    "debug_outputs": [
+        "overall okay: 1"
+    ],
+    "run_commands_perf": [
+        "./test_gpt2fp32cu"
+    ],
+    "perf_outputs": [
+        "overall okay: 1"
+    ],
+    "run_timeout": 120
+}
