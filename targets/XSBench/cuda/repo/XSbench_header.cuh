@@ -10,7 +10,7 @@
 #include <thrust/partition.h>
 #include<stdint.h>
 #include <chrono>
-#include "../XSbench_shared_header.h"
+#include "XSbench_shared_header.h"
 
 // Grid types
 #define UNIONIZED 0
