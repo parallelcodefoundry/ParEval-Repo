@@ -100,6 +100,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
 
         # Write meta.json
         meta_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "meta.json")
+        os.makedirs(os.path.dirname(meta_fpath), exist_ok=True)
         with open(meta_fpath, 'w') as f:
             meta_dict = {
                 "app": self._app_name,
