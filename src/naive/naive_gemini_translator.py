@@ -1,23 +1,6 @@
-# """ Naively translates a repository file-by-file from one execution model to another execution model using Gemini
-# """
-
-#     original_prompt = """
-#     Below is a stencil computation benchmark computing an XOR operation over a 2D grid of cells, called microXOR. 
-#     This version of microXOR is written in CUDA for GPU execution.
-#     We are translating microXOR to OpenMP Offload.
-#     Here is the code for microXOR:
-
-#     {microXOR_code}
-
-#     Translate all three CUDA files to OpenMP Offload and update the Makefile if necessary. 
-#     The new files should be in C++ (.cpp or .hpp files), and any CUDA content should be substituted with OpenMP Offload. 
-#     Lastly, output all four newly-translated files as follows for each file:
-
-#     File: file_name
-
-#     # File's Code
-
-#     """
+"""Naively translates a repository file-by-file from one execution model to
+   another execution model using Gemini
+"""
 
 import os
 import re
@@ -43,8 +26,8 @@ Here is the code for each file in the codebase:
 Translate the {filename} file to the {dst_model} execution model. Output each translated code file (source files, header files, and Makefiles) in one code block.
 """
 
-    def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str):
-        super().__init__(input_repo, output_repo, src_model, dst_model)
+    def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str, output_id: int, app_name: str):
+        super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name)
         genai.configure(api_key=os.environ["API_KEY"])
         self._model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -76,10 +59,11 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
     def translate(self, dry: bool = False):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
+        repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
 
         for fpath in all_files:
             prompt = self.get_prompt(fpath)
-            
+
             if dry:
                 print(prompt)
                 continue
@@ -88,11 +72,26 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
             output = response.text
             output = self._postprocess(output)
 
-            output_fpath = os.path.join(self._output_fpath, fpath)
+            output_fpath = os.path.join(repo_fpath, fpath)
 
+            # make parent dirs if necessary
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
 
             with open(output_fpath, 'w') as f:
                 f.write(output)
-
             print(f"Translated {fpath} to {output_fpath}")
+
+        # Write meta.json
+        meta_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "meta.json")
+        with open(meta_fpath, 'w') as f:
+            meta_dict = {
+                "app": self._app_name,
+                "prompt_strategy": "naive",
+                "llm_name": "gpt-4-turbo",
+                "source_model": self._src_model,
+                "dest_model": self._dst_model,
+                "output_number": self._output_id,
+                "path": repo_fpath
+            }
+            json.dump(meta_dict, f, indent=4)
+        print(f"Wrote translation metadata to {meta_fpath}")

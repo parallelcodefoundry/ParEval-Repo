@@ -32,8 +32,8 @@ Here is the code for each file in the codebase:
 Translate the {filename} file to the {dst_model} execution model. Output the translated code in one code block.
 """
 
-    def __init__(self, input_repo, output_repo, src_model, dst_model):
-        super().__init__(input_repo, output_repo, src_model, dst_model)
+    def __init__(self, input_repo, output_repo, src_model, dst_model, output_id, app_name):
+        super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name)
 
         self._api_client = OpenAI()
 
@@ -45,9 +45,9 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         all_fpaths = self._input_repo.get_all_filenames(relpaths=True)
         all_files_str = "\n\n".join(map(lambda fpath: fpath + ":\n" + self._input_repo.get_file_contents(rel_path=fpath), all_fpaths))
         return self.PROMPT_TEMPLATE.format(
-            src_model=self._src_model, 
-            dst_model=self._dst_model, 
-            file_tree=file_tree, 
+            src_model=self._src_model,
+            dst_model=self._dst_model,
+            file_tree=file_tree,
             all_files=all_files_str,
             filename=fname
         )
@@ -64,10 +64,11 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     def translate(self, dry: bool = False):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
+        repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
 
         for fpath in alive_it(all_files, title="Translating files"):
             prompt = self.get_prompt(fpath)
-            
+
             if dry:
                 print(prompt)
                 continue
@@ -86,8 +87,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             )
             output = completion.choices[0].message.content
             output = self._postprocess(output)
-            
-            output_fpath = os.path.join(self._output_fpath, fpath)
+
+            output_fpath = os.path.join(repo_fpath, fpath)
 
             # make parent dirs if necessary
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
@@ -96,3 +97,17 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 f.write(output)
             print(f"Translated {fpath} to {output_fpath}")
 
+        # Write meta.json
+        meta_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "meta.json")
+        with open(meta_fpath, 'w') as f:
+            meta_dict = {
+                "app": self._app_name,
+                "prompt_strategy": "naive",
+                "llm_name": "gpt-4-turbo",
+                "source_model": self._src_model,
+                "dest_model": self._dst_model,
+                "output_number": self._output_id,
+                "path": repo_fpath
+            }
+            json.dump(meta_dict, f, indent=4)
+        print(f"Wrote translation metadata to {meta_fpath}")

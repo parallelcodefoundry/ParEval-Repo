@@ -19,9 +19,11 @@ def get_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to the input source code repository.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
-    parser.add_argument("--method", choices=["naive", "gemini"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
+    parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
+    parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", action="store_true", help="Dry run the translation.")
 
     # subgroup of arguments for the naive translation method
@@ -30,10 +32,10 @@ def get_args():
     return parser.parse_args()
 
 
-def get_translator_cls(method: str):
-    if method == "naive":
+def get_translator_cls(method: str, naive_llm: str):
+    if method == "naive" and naive_llm != "gemini":
         return NaiveTranslator
-    elif method == "gemini":
+    elif method == "gemini" and naive_llm == "gemini":
         return NaiveGeminiTranslator
     else:
         raise ValueError(f"Translation method {method} not recognized.")
@@ -57,8 +59,8 @@ def main():
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
     # create a Translator object and translate the input repository
-    translator_cls = get_translator_cls(args.method)
-    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model)
+    translator_cls = get_translator_cls(args.method, args.naive_llm)
+    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name)
     translator.translate(dry=args.dry)
 
 
