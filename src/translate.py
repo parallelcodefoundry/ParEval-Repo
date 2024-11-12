@@ -35,7 +35,7 @@ def get_args():
 def get_translator_cls(method: str, naive_llm: str):
     if method == "naive" and naive_llm != "gemini":
         return NaiveTranslator
-    elif method == "gemini" and naive_llm == "gemini":
+    elif method == "naive" and naive_llm == "gemini":
         return NaiveGeminiTranslator
     else:
         raise ValueError(f"Translation method {method} not recognized.")

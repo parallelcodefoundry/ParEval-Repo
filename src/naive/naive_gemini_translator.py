@@ -1,14 +1,20 @@
 """Naively translates a repository file-by-file from one execution model to
    another execution model using Gemini
 """
-
+# std imports
 import os
 import re
 import sys
+import json
+
+# tpl imports
 import google.generativeai as genai
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+# local imports
 from translator import Translator
 from repo import Repo
+
 
 class NaiveGeminiTranslator(Translator):
     SYSTEM_TEMPLATE: str = """You are a helpful coding assistant.

@@ -7,7 +7,7 @@
 # std imports
 import os
 from typing import Optional, List
-
+import json
 
 
 class Repo:
@@ -28,7 +28,11 @@ class Repo:
     def from_json(self, meta: os.PathLike):
         with open(meta, 'r') as f:
             self._meta = json.load(f)
-        return self(self._meta['path'], self._meta)
+        implicit_path = os.path.abspath(os.path.join(os.path.dirname(meta), "repo"))
+        explicit_path_steps = self._meta['path'].split(os.path.sep)
+        if self._meta['path'] != os.path.sep.join(implicit_path.split(os.path.sep)[-len(explicit_path_steps):]):
+            raise ValueError("The provided path in the meta file does not match the path of the meta file.")
+        return self(implicit_path, self._meta)
 
     def get_file_tree_dict(self) -> str:
         return self._file_tree
@@ -52,7 +56,7 @@ class Repo:
         if full_path is not None:
             if os.path.commonpath([self._path, full_path]) != self._path:
                 raise ValueError("The provided path is not in the repository.")
-        
+
         # get the full path
         full_path = full_path or os.path.join(self._path, rel_path)
 
@@ -75,7 +79,7 @@ class Repo:
         else:
             # If the given path is a file, record it in the tree
             tree["type"] = "file"
-        
+
         return tree
 
     def _get_file_tree_str(self, root: List[dict], prefix: str = "", ascii: bool = False, depth: int = 0, max_depth: Optional[int] = None):
