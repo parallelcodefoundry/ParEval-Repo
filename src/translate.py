@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Translating repositories from one execution model to another using LLMs.
     For example, this script can take a CUDA application as input and 
     translate it to an OpenMP version of the same application.
