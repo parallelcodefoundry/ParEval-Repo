@@ -6,14 +6,15 @@ import os
 import sys
 import re
 import json
+from abc import ABC, abstractmethod
 
 # tpl imports
 from alive_progress import alive_it
-from openai import OpenAI
 
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
+from repo import Repo
 
 
 class NaiveTranslator(Translator):
@@ -30,13 +31,8 @@ Here is the code for each file in the codebase:
 
 {all_files}
 
-Translate the {filename} file to the {dst_model} execution model. Output the translated code in one code block.
+Translate the {filename} file to the {dst_model} execution model. Output each translated code file (source files, header files, and Makefiles) in one code block.
 """
-
-    def __init__(self, input_repo, output_repo, src_model, dst_model, output_id, app_name):
-        super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name)
-
-        self._api_client = OpenAI()
 
     def get_system_prompt(self):
         return self.SYSTEM_TEMPLATE.format(src_model=self._src_model, dst_model=self._dst_model)
@@ -54,6 +50,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         )
 
     CODE_BLOCK_PATTERN = re.compile(r"```(?:\w+)?\n(.*?)\n```", re.DOTALL)
+
     def _postprocess(self, output: str) -> str:
         # make sure there's only one codeblock and extract it
         match = self.CODE_BLOCK_PATTERN.search(output)
@@ -61,6 +58,9 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             raise ValueError("No code block found in output.")
         return match.group(1)
 
+    @abstractmethod
+    def _get_translation(self, system_prompt: str, prompt: str) -> str:
+        pass
 
     def translate(self, dry: bool = False):
         system_prompt = self.get_system_prompt()
@@ -74,19 +74,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 print(prompt)
                 continue
 
-            completion = self._api_client.chat.completions.create(
-                model="gpt-4-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=4096,
-                temperature=0.2,
-                top_p=0.96,
-                stream=False,
-                n=1
-            )
-            output = completion.choices[0].message.content
+            output = self._get_translation(system_prompt, prompt)
+
             output = self._postprocess(output)
 
             output_fpath = os.path.join(repo_fpath, fpath)
@@ -105,7 +94,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             meta_dict = {
                 "app": self._app_name,
                 "prompt_strategy": "naive",
-                "llm_name": "gpt-4-turbo",
+                "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
                 "output_number": self._output_id,

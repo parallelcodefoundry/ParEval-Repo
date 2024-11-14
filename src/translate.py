@@ -13,7 +13,7 @@ import os
 # local imports
 from repo import Repo
 from translator import Translator
-from naive.naive_translator import NaiveTranslator
+from naive.naive_openai_translator import NaiveOpenAITranslator
 from naive.naive_gemini_translator import NaiveGeminiTranslator
 
 def get_args():
@@ -35,7 +35,7 @@ def get_args():
 
 def get_translator_cls(method: str, naive_llm: str):
     if method == "naive" and naive_llm != "gemini":
-        return NaiveTranslator
+        return NaiveOpenAITranslator
     elif method == "naive" and naive_llm == "gemini":
         return NaiveGeminiTranslator
     else:
@@ -61,7 +61,7 @@ def main():
 
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method, args.naive_llm)
-    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name)
+    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name, args.naive_llm)
     translator.translate(dry=args.dry)
 
 
