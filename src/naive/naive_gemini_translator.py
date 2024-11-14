@@ -34,7 +34,7 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
 
     def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str, output_id: int, app_name: str):
         super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name)
-        genai.configure(api_key=os.environ["API_KEY"])
+        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
         self._model = genai.GenerativeModel("gemini-1.5-flash")
 
     def get_system_prompt(self):
