@@ -4,7 +4,7 @@ import subprocess
 import time
 
 REPO_PATH = "/tmp/microXOR_cuda_repo"
-OUTPUT_BASE_DIR = "/Users/ishan/pssg/code-translation/data/SWE-agent-cuda-to-omp"
+OUTPUT_BASE_DIR = "/Users/ishan/pssg/code-translation/data/microXOR/SWE-agent-cuda-to-omp"
 SWE_AGENT_IMAGE = "sweagent/swe-agent-run:latest"
 KEYS_CFG = "/Users/ishan/pssg/SWE-agent/keys.cfg"
 CONFIG_FILE = "/Users/ishan/pssg/SWE-agent/config/default.yaml"
@@ -30,6 +30,7 @@ def initialize_temp_repo():
 def run_swe_agent(iteration):
     output_dir = os.path.join(OUTPUT_BASE_DIR, f"output-{iteration}")
     
+    # Deletes the output directory if it exists to avoid overwriting issues
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
@@ -103,13 +104,13 @@ def run_swe_agent(iteration):
 def reset_repo():
     subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=REPO_PATH, check=True)
 
-def test():
+def main():
     # Initialize the temporary Git repository
     print("Initializing temporary Git repository...")
     initialize_temp_repo()
 
-    # Run SWE-agent 5 times
-    for i in range(0, 5):
+    # Run SWE-agent 1 time
+    for i in range(0, 1):
         try:
             run_swe_agent(i)
         except subprocess.CalledProcessError as e:
@@ -117,6 +118,6 @@ def test():
         finally: # Reset the repository after each iteration
             print(f"Resetting repository for iteration {i + 1}...")
             reset_repo()
-            time.sleep(15)
+            time.sleep(30)
 
     print("All iterations complete.")
