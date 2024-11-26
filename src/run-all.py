@@ -18,7 +18,7 @@ import pandas as pd
 import tempfile
 
 # local imports
-from util import await_input, setup_tempdir, meta_to_arr, update_results
+from util import await_input, setup_tempdir, dict_merge, update_results
 from build import build_repo
 from run import run_repo
 
@@ -115,11 +115,11 @@ def gather_code_repos(args, results):
 
                     code_repos.append(meta)
 
-                    # Check if there is an entry in the results dataframe matching the current repo path
-                    if output_path in results["path"].values:
+                    # Check if there is an entry in the results dict matching the current repo path
+                    if output_path in results["path"]:
                         logging.warning(f"Skipping duplicate code repository: {output_path}")
                     else:
-                        results.loc[len(results)] = meta_to_arr(meta)
+                        dict_merge(results, meta)
                         logging.debug(f"Found code repository: {output_path}")
 
     logging.info(f"Found {len(code_repos)} code repositories.")
@@ -163,6 +163,11 @@ def main():
             logging.warning("Exiting.")
             return
 
+    # Check that force overwrite is set if output file already exists
+    if args.output and os.path.exists(args.output) and not args.force_overwrite:
+        logging.error(f"Output file {args.output} already exists. Use --force-overwrite to overwrite.")
+        raise FileExistsError(f"Output file {args.output} already exists. Use --force-overwrite to overwrite.")
+
     # Check that the scratch directory exists
     scratch = os.path.abspath(args.scratch_dir)
     if not os.path.exists(scratch):
@@ -174,21 +179,23 @@ def main():
         system_config = json.load(f)
     logging.debug(f"Loaded system config: {system_config}")
 
-    # Create empty dataframe to store results with columns for each metadata field
-    results = pd.DataFrame(columns=["app",
-                                    "prompt_strategy",
-                                    "llm_name",
-                                    "source_model",
-                                    "dest_model",
-                                    "output_number",
-                                    "path",
-                                    "build_result_debug",
-                                    "build_stdout_debug",
-                                    "build_stderr_debug",
-                                    "run_results_debug",
-                                    "run_exec_checks_debug",
-                                    "run_stdouts_debug",
-                                    "run_stderrs_debug"])
+    # Create dict of empty lists to store results with columns for each metadata field
+    results = {
+        "app": [],
+        "prompt_strategy": [],
+        "llm_name": [],
+        "source_model": [],
+        "dest_model": [],
+        "output_number": [],
+        "path": [],
+        "build_result_debug": [],
+        "build_stdout_debug": [],
+        "build_stderr_debug": [],
+        "run_results_debug": [],
+        "run_exec_checks_debug": [],
+        "run_stdouts_debug": [],
+        "run_stderrs_debug": []
+    }
 
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
@@ -201,13 +208,13 @@ def main():
             setup_tempdir(tempdir, code_repo)
 
             logging.debug(f"Building code repository: {code_repo['path']}")
-            loc_results = build_repo(code_repo, system_config, args, tempdir)
-            update_results(results, loc_results)
+            results_row = build_repo(code_repo, system_config, args, tempdir)
+            update_results(results, results_row)
             pbar.update(1)
 
             logging.debug(f"Running code repository: {code_repo['path']}")
-            loc_results = run_repo(code_repo, system_config, args, tempdir)
-            update_results(results, loc_results)
+            results_row = run_repo(code_repo, system_config, args, tempdir)
+            update_results(results, results_row)
 
             # Copy temporary directory to save_temps if provided
             if args.save_temps:
@@ -219,21 +226,14 @@ def main():
             pbar.update(1)
     pbar.close()
 
-    # Filter out results that are already in the output
-    if args.output and os.path.exists(args.output):
-        if args.force_overwrite:
-            logging.info("Overwriting existing results.")
-        else:
-            logging.info("Filtering out results that are already in the output.")
-            with open(args.output, "r") as f:
-                existing_results = json.load(f)
-            results = {k: v for k, v in results.items() if k not in existing_results}
+    # Convert results dict to dataframe
+    results_df = pd.DataFrame.from_dict(results)
 
-    # Write the results DataFrame to the output filename
+    # Write the results dataframe to the output filename
     if args.output:
         logging.info(f"Writing results to {args.output}.")
         with open(args.output, "w") as f:
-            json.dump(json.loads(results.to_json(orient="index")), f, indent=4)
+            json.dump(json.loads(results_df.to_json(orient="index")), f, indent=4)
 
 if __name__ == "__main__":
     main()

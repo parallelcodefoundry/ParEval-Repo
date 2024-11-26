@@ -68,26 +68,45 @@ def setup_tempdir(tempdir, code_repo):
     repo_path = os.path.abspath(code_repo['path'])
     shutil.copytree(repo_path, tempdir, dirs_exist_ok=True)
 
-def meta_to_arr(meta):
-    """ Convert a metadata dictionary to an array for the results DataFrame. """
-    return np.array([meta["app"],
-                     meta["prompt_strategy"],
-                     meta["llm_name"],
-                     meta["source_model"],
-                     meta["dest_model"],
-                     meta["output_number"],
-                     meta["path"],
-                     None,
-                     None,
-                     None,
-                     None,
-                     None,
-                     None,
-                     None])
+def dict_merge(dct, merge_dct):
+    """ Merge elements of merge_dct into dct by key, appending merge_dct values
+        to dct values, which are lists. Log an error if merge_dct has a key that
+        dct does not have. For any key in dct that is not in merge_dct, add a
+        None """
 
-def update_results(results, results_dict):
-    """ Update the results DataFrame with a results dictionary. """
-    for key, value in results_dict.items():
-        if (key in results.columns
-            and results.loc[results["path"] == results_dict["path"], key].isnull().any()):
-            results.loc[results["path"] == results_dict["path"], key] = str(value) if isinstance(value, list) else value
+    # Add the merge_dct values to the dct values
+    for k, v in merge_dct.items():
+        if k in dct:
+            dct[k].append(v)
+        else:
+            logging.error(f"Key {k} not found in dictionary.")
+            raise ValueError(f"Key {k} not found in dictionary.")
+
+    # Add None to any keys in dct that are not in merge_dct
+    for k in dct.keys():
+        if k not in merge_dct:
+            dct[k].append(None)
+
+def update_results(results, results_row):
+    """ Update the results dict of lists with an individual results dictionary,
+        matching based on path """
+
+    # Find the row in the results dict that matches the path
+    path = results_row["path"]
+    if path not in results["path"]:
+        logging.error(f"Path {path} not found in results.")
+        raise ValueError(f"Path {path} not found in results.")
+    else:
+        row_idx = results["path"].index(path)
+
+    # Update the results dict with the results row
+    for key, value in results_row.items():
+        if key in results:
+            if results[key][row_idx] is None:
+                results[key][row_idx] = value
+            elif results[key][row_idx] != value:
+                logging.error(f"Key already has a non-matching value in results, {results[key][row_idx]} != {value}.")
+                raise ValueError(f"Key already has a non-matching value in results, {results[key][row_idx]} != {value}.")
+        else:
+            logging.error(f"Key {key} not found in results.")
+            raise ValueError(f"Key {key} not found in results.")
