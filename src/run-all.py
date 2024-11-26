@@ -45,9 +45,10 @@ def get_args():
 
 def gather_code_repos(args, results):
     ''' Gather all the generated code repositories. Root directory format is:
-        translations_root/app/case-name/output-number/, including meta.json and
-        repo/ under each output-number directory. repo/ contains the generated
-        code. Want to create list of dictionaries of the form:
+        translations_root/app/case-name/output-number/, including
+        experiment_metadata.json and repo/ under each output-number directory.
+        repo/ contains the generated code. Want to create list of dictionaries
+        of the form:
         {
             "app": app,
             "prompt_strategy": prompt_strategy,
@@ -57,7 +58,7 @@ def gather_code_repos(args, results):
             "output_number": output_number,
             "path": path
         }
-        where all entries are read in from the meta.json file. '''
+        where all entries are read in from the experiment_metadata.json file. '''
     code_repos = []
 
     # For logging what we find
@@ -79,28 +80,28 @@ def gather_code_repos(args, results):
         for case_set_name in os.listdir(app_path):
             for case_name in os.listdir(os.path.join(app_path, case_set_name)):
                 case_path = os.path.join(app_path, case_set_name, case_name)
-                meta_path = os.path.join(case_path, "meta.json")
+                exp_meta_path = os.path.join(case_path, "experiment_metadata.json")
                 repo_path = os.path.join(case_path, "repo")
-                if not os.path.isfile(meta_path):
-                    logging.error(f"Could not find meta.json for {case_name} under {case_path}.")
-                    raise FileNotFoundError(f"Could not find meta.json for {case_name} under {case_path}.")
+                if not os.path.isfile(exp_meta_path):
+                    logging.error(f"Could not find experiment_metadata.json for {case_name} under {case_path}.")
+                    raise FileNotFoundError(f"Could not find experiment_metadata.json for {case_name} under {case_path}.")
                 if not os.path.isdir(repo_path):
                     logging.error(f"Could not find repo for {case_name} under {case_path}.")
                     raise FileNotFoundError(f"Could not find repo for {case_name} under {case_path}.")
 
-                with open(meta_path, "r") as f:
-                    meta = json.load(f)
+                with open(exp_meta_path, "r") as f:
+                    exp_meta = json.load(f)
 
-                    if args.models and meta["dest_model"].lower() not in [s.lower() for s in args.models]:
-                        logging.debug(f"Skipping {case_path}/{case_name} because dest model {meta['dest_model']} not in {args.models}.")
+                    if args.models and exp_meta["dest_model"].lower() not in [s.lower() for s in args.models]:
+                        logging.debug(f"Skipping {case_path}/{case_name} because dest model {exp_meta['dest_model']} not in {args.models}.")
                         continue
 
-                    prompt_strategy = meta["prompt_strategy"]
-                    llm_name = meta["llm_name"]
-                    source_model = meta["source_model"]
-                    dest_model = meta["dest_model"]
-                    output_number = meta["output_number"]
-                    output_path = meta["path"]
+                    prompt_strategy = exp_meta["prompt_strategy"]
+                    llm_name = exp_meta["llm_name"]
+                    source_model = exp_meta["source_model"]
+                    dest_model = exp_meta["dest_model"]
+                    output_number = exp_meta["output_number"]
+                    output_path = exp_meta["path"]
 
                     if prompt_strategy not in prompt_strategies_found:
                         prompt_strategies_found.append(prompt_strategy)
@@ -111,13 +112,13 @@ def gather_code_repos(args, results):
                     if source_model not in source_models_found:
                         source_models_found.append(source_model)
 
-                    code_repos.append(meta)
+                    code_repos.append(exp_meta)
 
                     # Check if there is an entry in the results dict matching the current repo path
                     if output_path in results["path"]:
                         logging.warning(f"Skipping duplicate code repository: {output_path}")
                     else:
-                        dict_merge(results, meta)
+                        dict_merge(results, exp_meta)
                         logging.debug(f"Found code repository: {output_path}")
 
     logging.info(f"Found {len(code_repos)} code repositories.")
