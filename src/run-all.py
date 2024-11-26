@@ -9,8 +9,8 @@ from argparse import ArgumentParser
 import json
 import os
 import logging
-import copy
 import contextlib
+import shutil
 
 # tpl imports
 from tqdm import tqdm
@@ -27,7 +27,7 @@ def get_args():
     parser.add_argument("translations_root", type=str, help="Root directory of the generated code repositories.")
     parser.add_argument("-o", "--output", type=str, help="Output JSON file containing the results.")
     parser.add_argument("--scratch-dir", type=str, default="scratch", help="If provided, put scratch files here.")
-    parser.add_argument("--save-temps", action="store_true", help="If provided, save temporary files.")
+    parser.add_argument("--save-temps", type=str, help="If provided, save temporary files to the provided directory.")
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
     parser.add_argument("-m", "--models", nargs="+", type=str, help="List of dest execution models to run, case-insensitive.", choices=["omp"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
@@ -70,7 +70,7 @@ def gather_code_repos(args, results):
     prompt_strategies_found = []
 
     for app in os.listdir(args.translations_root):
-        if args.apps and app.lower() not in args.apps:
+        if args.apps and app.lower() not in [s.lower() for s in args.apps]:
             logging.debug(f"Skipping {app} because it is not in {args.apps}.")
             continue
         if app not in apps_found:
@@ -93,7 +93,7 @@ def gather_code_repos(args, results):
                 with open(meta_path, "r") as f:
                     meta = json.load(f)
 
-                    if args.models and meta["dest_model"] not in args.models:
+                    if args.models and meta["dest_model"].lower() not in [s.lower() for s in args.models]:
                         logging.debug(f"Skipping {case_path}/{case_name} because dest model {meta['dest_model']} not in {args.models}.")
                         continue
 
@@ -196,12 +196,7 @@ def main():
     # Build and run each code repository
     pbar = tqdm(total=len(code_repos)*2, desc="Building and running code repositories", disable=args.hide_progress)
     for code_repo in code_repos:
-        # Want temporary directory to not be cleaned up if user requests it, but
-        # delete option in TemporaryDirectory is only available in Python 3.12+
-        with (contextlib.nullcontext(tempfile.mkdtemp(dir=scratch))
-              if args.save_temps
-              else tempfile.TemporaryDirectory(dir=scratch)
-              ) as tempdir:
+        with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
             logging.debug(f"Temporary directory created: {tempdir}")
             setup_tempdir(tempdir, code_repo)
 
@@ -213,6 +208,14 @@ def main():
             logging.debug(f"Running code repository: {code_repo['path']}")
             loc_results = run_repo(code_repo, system_config, args, tempdir)
             update_results(results, loc_results)
+
+            # Copy temporary directory to save_temps if provided
+            if args.save_temps:
+                tempdir_name = os.path.basename(tempdir)
+                tempdir_path = os.path.join(args.save_temps, tempdir_name)
+                logging.info(f"Saving temporary directory to {tempdir_path}.")
+                shutil.copytree(tempdir, tempdir_path)
+
             pbar.update(1)
     pbar.close()
 
