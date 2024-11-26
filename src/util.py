@@ -73,7 +73,6 @@ def dict_merge(dct, merge_dct):
         to dct values, which are lists. Log an error if merge_dct has a key that
         dct does not have. For any key in dct that is not in merge_dct, add a
         None """
-
     # Add the merge_dct values to the dct values
     for k, v in merge_dct.items():
         if k in dct:
@@ -90,7 +89,6 @@ def dict_merge(dct, merge_dct):
 def update_results(results, results_row):
     """ Update the results dict of lists with an individual results dictionary,
         matching based on path """
-
     # Find the row in the results dict that matches the path
     path = results_row["path"]
     if path not in results["path"]:

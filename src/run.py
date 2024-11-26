@@ -4,7 +4,7 @@ from subprocess import CompletedProcess
 from util import run_bash, find_config, list_dep_cmds
 
 def check_output(repo_data, target_config, run_result, i):
-    # Check the run output against the expected output
+    ''' Check the run output against the expected output '''
     if target_config["debug_type"] == "match":
         if target_config["debug_outputs"][i] not in run_result.stdout:
             logging.debug(f"Output mismatch for {repo_data['app']} with model {repo_data['dest_model']} test {i}.")
@@ -14,7 +14,7 @@ def check_output(repo_data, target_config, run_result, i):
     return 0
 
 def check_exec(repo_data, target_config, system_config, i, args, tempdir):
-    # Check that binary executes as expected for this input
+    ''' Check that binary executes as expected for this input '''
     if system_config["exec_check"] != "":
         cmds = list_dep_cmds(system_config, target_config)
         exc_cmd = [system_config["exec_check"] + " " + target_config["run_commands_perf"][0]]

@@ -43,23 +43,21 @@ def get_args():
     parser.add_argument("--log", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], default="INFO", type=str.upper, help="Logging level.")
     return parser.parse_args()
 
-'''
-Gather all the generated code repositories. Root directory format is:
-translations_root/app/case-name/output-number/, including meta.json and repo/
-under each output-number directory. repo/ contains the generated code. Want to
-create list of dictionaries of the form:
-{
-    "app": app,
-    "prompt_strategy": prompt_strategy,
-    "llm_name": llm_name,
-    "source_model": source_model,
-    "dest_model": dest_model,
-    "output_number": output_number,
-    "path": path
-}
-where all entries are read in from the meta.json file.
-'''
 def gather_code_repos(args, results):
+    ''' Gather all the generated code repositories. Root directory format is:
+        translations_root/app/case-name/output-number/, including meta.json and
+        repo/ under each output-number directory. repo/ contains the generated
+        code. Want to create list of dictionaries of the form:
+        {
+            "app": app,
+            "prompt_strategy": prompt_strategy,
+            "llm_name": llm_name,
+            "source_model": source_model,
+            "dest_model": dest_model,
+            "output_number": output_number,
+            "path": path
+        }
+        where all entries are read in from the meta.json file. '''
     code_repos = []
 
     # For logging what we find
