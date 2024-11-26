@@ -5,6 +5,7 @@ import os
 import json
 import sys
 import shutil
+import glob
 from subprocess import CompletedProcess
 import numpy as np
 
@@ -48,13 +49,8 @@ def run_bash(cmds, cwd=None, timeout=None, dry=False):
 def find_config(app, model, target_path):
     """ Find the target config for the given app and model """
     logging.debug(f"Looking for target config for {app} with model {model} in {target_path}.")
-    configs = []
-    for root, dirs, files in os.walk(target_path):
-        for file in files:
-            if file == "target.json":
-                with open(os.path.join(root, file), "r") as f:
-                    config = json.load(f)
-                    configs.append(config)
+    configs = glob.glob(os.path.join(target_path, "**/target.json"), recursive=True)
+    configs = [json.load(open(config, "r")) for config in configs]
     logging.debug(f"Found {len(configs)} total target configs.")
     for config in configs:
         if config["app"].lower() == app.lower() and config["model"].lower() == model.lower():
