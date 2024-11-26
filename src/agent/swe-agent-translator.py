@@ -2,72 +2,60 @@ import os
 import shutil
 import subprocess
 import time
+from argparse import ArgumentParser
 
-REPO_PATH = "/Users/ishan/tmp/microXOR_cuda_repo"
-OUTPUT_BASE_DIR = "/Users/ishan/pssg/code-translation/data/microXOR/SWE-agent-cuda-to-omp"
-SWE_AGENT_IMAGE = "sweagent/swe-agent-run:latest"
-KEYS_CFG = "/Users/ishan/pssg/SWE-agent/keys.cfg"
-CONFIG_FILE = "/Users/ishan/pssg/SWE-agent/config/default.yaml"
-DATA_PATH = "/Users/ishan/pssg/code-translation/targets/microXOR/translation_task.md"
-MODEL_NAME = "gpt4omini"
-PER_INSTANCE_COST_LIMIT = 0.50
+def get_args():
+    parser = ArgumentParser(description="Run SWE-agent for CUDA to OpenMP translation")
+    parser.add_argument("--repo_path", type=str, required=True, help="Path to the temporary repository")
+    parser.add_argument("--output_base_dir", type=str, required=True, help="Base directory for the output")
+    parser.add_argument("--keys_cfg", type=str, required=True, help="Path to the keys.cfg file")
+    parser.add_argument("--config_file", type=str, required=True, help="Path to the config.yaml file")
+    parser.add_argument("--data_path", type=str, required=True, help="Path to the data file")
+    parser.add_argument("--model_name", type=str, required=True, help="Name of the model to use")
+    parser.add_argument("--per_instance_cost_limit", type=float, required=True, help="Cost limit per instance")
+    parser.add_argument("--input_directory", type=str, required=True, help="Path to the input source directory")
+    return parser.parse_args()
 
 """Sets up a temporary Git repository with the contents of the CUDA directory"""
-def initialize_temp_repo():
-    if os.path.exists(REPO_PATH):
-        shutil.rmtree(REPO_PATH)
-    os.makedirs(REPO_PATH)
+def initialize_temp_repo(repo_path, input_directory):
+    if os.path.exists(repo_path):
+        shutil.rmtree(repo_path)
+    os.makedirs(repo_path)
 
-    # Copy contents of microXOR/cuda directory to the temporary repo
-    shutil.copytree("/Users/ishan/pssg/code-translation/targets/microXOR/cuda", REPO_PATH, dirs_exist_ok=True)
+    # Copy contents of the input directory to the temporary repo
+    shutil.copytree(input_directory, repo_path, dirs_exist_ok=True)
 
     # Initialize Git repository
-    subprocess.run(["git", "init"], cwd=REPO_PATH, check=True)
-    subprocess.run(["git", "add", "."], cwd=REPO_PATH, check=True)
-    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=REPO_PATH, check=True)
+    subprocess.run(["git", "init"], cwd=repo_path, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo_path, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo_path, check=True)
 
 """Runs SWE-agent for a single iteration, and stores log outputs and file modifications"""
-def run_swe_agent(iteration):
-    output_dir = os.path.join(OUTPUT_BASE_DIR, f"output-{iteration}")
+def run_swe_agent(iteration, args):
+    output_dir = os.path.join(args.output_base_dir, f"output-{iteration}")
     
     # Deletes the output directory if it exists to avoid overwriting issues
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    log_file_path = os.path.join(OUTPUT_BASE_DIR, f"output-{iteration}/output-{iteration}-swe-agent-comments.txt")
-
-    """
-    Sample SWE-agent command that will execute:
-
-    docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock \
-    -v /Users/ishan/pssg/SWE-agent/keys.cfg:/app/keys.cfg \
-    -v /tmp/microXOR_cuda_repo:/tmp/microXOR_cuda_repo \
-    sweagent/swe-agent-run:latest \
-    python /Users/ishan/pssg/SWE-agent/run.py --image_name=sweagent/swe-agent:latest \
-    --model_name gpt4omini \ 
-    --data_path /Users/ishan/pssg/code-translation/targets/microXOR/translation_task.md \
-    --repo_path /tmp/microXOR_cuda_repo \
-    --config_file /Users/ishan/pssg/SWE-agent/config/default.yaml \
-    --apply_patch_locally \
-    --per_instance_cost_limit 0.50
-
-    """
+    log_file_path = os.path.join(output_dir, f"output-{iteration}-swe-agent-comments.txt")
 
     command = [
         "docker", "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock",
-        "-v", f"{KEYS_CFG}:/app/keys.cfg",
-        "-v", f"{REPO_PATH}:{REPO_PATH}",
+        "-v", f"{args.keys_cfg}:/app/keys.cfg",
+        "-v", f"{args.repo_path}:{args.repo_path}",
         "-v", "/Users/ishan/pssg/SWE-agent:/Users/ishan/pssg/SWE-agent",
         "-v", "/Users/ishan/pssg/code-translation:/Users/ishan/pssg/code-translation",
-        SWE_AGENT_IMAGE,
-        "python", "/Users/ishan/pssg/SWE-agent/run.py", "--image_name=sweagent/swe-agent:latest",
-        f"--model_name={MODEL_NAME}",
-        f"--data_path={DATA_PATH}",
-        f"--repo_path={REPO_PATH}",
-        f"--config_file={CONFIG_FILE}",
+        "sweagent/swe-agent-run:latest",
+        "python", "/Users/ishan/pssg/SWE-agent/run.py",
+        "--image_name=sweagent/swe-agent:latest",
+        f"--model_name={args.model_name}",
+        f"--data_path={args.data_path}",
+        f"--repo_path={args.repo_path}",
+        f"--config_file={args.config_file}",
         "--apply_patch_locally",
-        f"--per_instance_cost_limit={PER_INSTANCE_COST_LIMIT}"
+        f"--per_instance_cost_limit={args.per_instance_cost_limit}"
     ]
 
     print(f"Running iteration {iteration}...")
@@ -80,8 +68,6 @@ def run_swe_agent(iteration):
             stderr=subprocess.PIPE,
             text=True
         )
-
-        print('done with command')
 
         # Log output after the command completes
         with open(log_file_path, "w") as log_file:
@@ -102,23 +88,22 @@ def run_swe_agent(iteration):
         print(f"Exception occurred during iteration {iteration}. Check {log_file_path} for details.")
 
     # Copy the modified repo to the output directory
-    shutil.copytree(REPO_PATH, output_dir, dirs_exist_ok=True)
+    shutil.copytree(args.repo_path, output_dir, dirs_exist_ok=True)
 
 """Resets the Git repository to its original state"""
-def reset_repo():
-    subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=REPO_PATH, check=True)
+def reset_repo(repo_path):
+    subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=repo_path, check=True)
 
-# Initialize the temporary Git repository
-print("Initializing temporary Git repository...")
-initialize_temp_repo()
+if __name__ == "__main__":
+    args = get_args()
 
-try:
-    run_swe_agent(0)
-except subprocess.CalledProcessError as e:
-    print(f"Error during iteration {0}: {e}")
-finally: # Reset the repository after each iteration
-    print(f"Resetting repository for iteration {0 + 1}...")
-    reset_repo()
-    time.sleep(30)
+    print("Initializing temporary Git repository...")
+    initialize_temp_repo(args.repo_path, args.input_directory)
 
-print("All iterations complete.")
+    try:
+        run_swe_agent(0, args)
+    except subprocess.CalledProcessError as e:
+        print(f"Error during iteration 0: {e}")
+    finally:
+        print("Resetting repository...")
+        reset_repo(args.repo_path)
