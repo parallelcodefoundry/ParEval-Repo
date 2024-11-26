@@ -3,8 +3,10 @@ import shutil
 import subprocess
 import time
 
-REPO_PATH = "/tmp/microXOR_cuda_repo"
+REPO_PATH = "/Users/ishan/tmp/microXOR_cuda_repo"
 OUTPUT_BASE_DIR = "/Users/ishan/pssg/code-translation/data/microXOR/SWE-agent-cuda-to-omp"
+SWE_AGENT_IMAGE = "sweagent/swe-agent-run:latest"
+KEYS_CFG = "/Users/ishan/pssg/SWE-agent/keys.cfg"
 CONFIG_FILE = "/Users/ishan/pssg/SWE-agent/config/default.yaml"
 DATA_PATH = "/Users/ishan/pssg/code-translation/targets/microXOR/translation_task.md"
 MODEL_NAME = "gpt4omini"
@@ -33,17 +35,39 @@ def run_swe_agent(iteration):
         shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    log_file_path = os.path.join(OUTPUT_BASE_DIR, f"output-{iteration}-swe-agent-comments.txt")
+    log_file_path = os.path.join(OUTPUT_BASE_DIR, f"output-{iteration}/output-{iteration}-swe-agent-comments.txt")
+
+    """
+    Sample SWE-agent command that will execute:
+
+    docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /Users/ishan/pssg/SWE-agent/keys.cfg:/app/keys.cfg \
+    -v /tmp/microXOR_cuda_repo:/tmp/microXOR_cuda_repo \
+    sweagent/swe-agent-run:latest \
+    python /Users/ishan/pssg/SWE-agent/run.py --image_name=sweagent/swe-agent:latest \
+    --model_name gpt4omini \ 
+    --data_path /Users/ishan/pssg/code-translation/targets/microXOR/translation_task.md \
+    --repo_path /tmp/microXOR_cuda_repo \
+    --config_file /Users/ishan/pssg/SWE-agent/config/default.yaml \
+    --apply_patch_locally \
+    --per_instance_cost_limit 0.50
+
+    """
 
     command = [
-    "/usr/local/bin/python3.11", "/Users/ishan/pssg/SWE-agent/run.py", 
-    "--image_name=sweagent/swe-agent:latest",
-    f"--model_name={MODEL_NAME}",
-    f"--data_path={DATA_PATH}",
-    f"--repo_path={REPO_PATH}",
-    f"--config_file={CONFIG_FILE}",
-    "--apply_patch_locally",
-    f"--per_instance_cost_limit={PER_INSTANCE_COST_LIMIT}"
+        "docker", "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "-v", f"{KEYS_CFG}:/app/keys.cfg",
+        "-v", f"{REPO_PATH}:{REPO_PATH}",
+        "-v", "/Users/ishan/pssg/SWE-agent:/Users/ishan/pssg/SWE-agent",
+        "-v", "/Users/ishan/pssg/code-translation:/Users/ishan/pssg/code-translation",
+        SWE_AGENT_IMAGE,
+        "python", "/Users/ishan/pssg/SWE-agent/run.py", "--image_name=sweagent/swe-agent:latest",
+        f"--model_name={MODEL_NAME}",
+        f"--data_path={DATA_PATH}",
+        f"--repo_path={REPO_PATH}",
+        f"--config_file={CONFIG_FILE}",
+        "--apply_patch_locally",
+        f"--per_instance_cost_limit={PER_INSTANCE_COST_LIMIT}"
     ]
 
     print(f"Running iteration {iteration}...")
@@ -56,6 +80,8 @@ def run_swe_agent(iteration):
             stderr=subprocess.PIPE,
             text=True
         )
+
+        print('done with command')
 
         # Log output after the command completes
         with open(log_file_path, "w") as log_file:
