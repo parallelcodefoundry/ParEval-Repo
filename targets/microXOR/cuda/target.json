@@ -1,0 +1,28 @@
+{
+    "app": "microxor",
+    "model": "cuda",
+    "path": "targets/microXOR/cuda/repo",
+    "dependencies": ["cuda"],
+    "build_commands_debug": "make CUDA_ARCH=sm_80 DEBUG=yes",
+    "build_commands_perf": "make CUDA_ARCH=sm_80",
+    "build_timeout": 30,
+    "exe_file": "microXOR.exe",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "./microXOR.exe 4 2",
+        "./microXOR.exe 1024 32",
+        "./microXOR.exe 4096 16"
+    ],
+    "debug_outputs": [
+        "Validation passed.",
+        "Validation passed.",
+        "Validation passed."
+    ],
+    "run_commands_perf": [
+        "./microXOR.exe 4096 16"
+    ],
+    "perf_outputs": [
+        "Validation passed."
+    ],
+    "run_timeout": 120
+}

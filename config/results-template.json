@@ -1,0 +1,18 @@
+{
+    "0": {
+        "app": "microxor",
+        "prompt_strategy": "naive",
+        "llm_name": "gpt_3.5",
+        "source_model": "cuda",
+        "dest_model": "omp",
+        "output_number": "4",
+        "path": "data/microXOR/naive-gpt_3.5-cuda-to-omp/output-4/repo",
+        "build_result_debug": 0,
+        "build_stdout_debug": "",
+        "build_stderr_debug": "",
+        "run_results_debug": "[1, 1, 1]",
+        "run_exec_checks_debug": "[0, 0, 0]",
+        "run_stdouts_debug": "['', '', '']",
+        "run_stderrs_debug": "['', '', '']"
+    }
+}
