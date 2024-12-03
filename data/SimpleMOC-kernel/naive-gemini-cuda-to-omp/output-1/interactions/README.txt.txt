@@ -1,3 +1,4 @@
+```
 ===============================================================================
 
               _____ _                 _      __  __  ____   _____ 
@@ -57,7 +58,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g.,  Intel Xeon Phi, AMD GPUs).
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with
+OpenMP offloading capabilities (e.g.,  Intel Xeon Phi, AMD GPUs).
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +85,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler like g++ with OpenMP 5.0+ support and the necessary target device setup):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compiler supporting OpenMP offloading):
 
 	>$ make
 
@@ -101,7 +103,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per OpenMP offload task
+	  -p <segs per thread>  Number of segments per offload region
 
 
 	If no options are specified, then a default set of parameters will
@@ -119,22 +121,20 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = g++ # Or your preferred compiler supporting OpenMP offloading
+COMPILER    = <Your OpenMP offloading compiler>
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
-TABLE       ?= no
-
 
 Explanation of Flags:
 
-COMPILER <g++> - This selects your compiler (must support OpenMP offloading).
+COMPILER <Your OpenMP offloading compiler> - This selects your compiler (e.g., icc, clang).
 
-OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
+OPTIMIZE - Adds compiler optimization flags.
 
-DEBUG - Adds the compiler flag "-g".
+DEBUG - Adds compiler debugging flags.
 
-PROFILE - Adds the compiler flag "-pg".
+PROFILE - Adds compiler profiling flags.
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion
@@ -172,3 +172,4 @@ author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Beno
 }
 
 ===============================================================================
+```

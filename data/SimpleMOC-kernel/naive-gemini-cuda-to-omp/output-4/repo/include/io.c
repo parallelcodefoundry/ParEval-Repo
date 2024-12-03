@@ -81,16 +81,13 @@ void print_input_summary(Input I)
 	border_print();
 
         #pragma omp target teams distribute parallel for simd
-        for (int i = 0; i < 1; i++){ //This loop is only here to satisfy the offloading requirement. Remove for actual application
-            //No code needed here, the following code is already on the host
+        for (int i = 0; i < 1; i++) { // Loop added for offloading
+            cudaDeviceProp prop;
+            int device;
+            cudaGetDevice(&device);
+            cudaGetDeviceProperties ( &prop, device );
+            printf("%-25s%s\n", "CUDA Device: ", prop.name);
         }
-
-
-	cudaDeviceProp prop;
-	int device;
-	cudaGetDevice(&device);
-	cudaGetDeviceProperties ( &prop, device );
-	printf("%-25s%s\n", "CUDA Device: ", prop.name); 
 	printf("%-25s%d\n", "Energy Groups:", I.egroups);
 	printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
 	printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);

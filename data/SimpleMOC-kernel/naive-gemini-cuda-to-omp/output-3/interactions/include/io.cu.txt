@@ -1,3 +1,4 @@
+```cpp
 #include "SimpleMOC-kernel_header.h"
 
 // Prints program logo
@@ -180,3 +181,4 @@ void print_CLI_error(void)
 	printf("See readme for full description of default run values\n");
 	exit(1);
 }
+```

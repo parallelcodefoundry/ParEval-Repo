@@ -1,3 +1,4 @@
+```cpp
 #include "SimpleMOC-kernel_header.h"
 
 /* My parallelization scheme here is to basically have a single
@@ -9,13 +10,13 @@
  * 		- A set of __shared__ SIMD vectors, each thread id being its idx
  */
 
-#pragma omp target teams distribute parallel for private(localState, blockId, g, q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4, state_flux, FSR_flux) \
-    map(tofrom: SA.fine_flux_arr[0:SA.n_fine_flux], SA.fine_source_arr[0:SA.n_fine_source], SA.sigT_arr[0:SA.n_sigT], state[0:I.streams], state_fluxes[0:N_state_fluxes*I.egroups], S[0:I.source_3D_regions]) \
-    map(to: I, table)
+#pragma omp target teams distribute parallel for \
+    shared(shm)
 void run_kernel(Input I, Source *S,
-                 Source_Arrays SA, Table *table, curandState *state,
-                 float *state_fluxes, int N_state_fluxes) {
-    int blockId = omp_get_team_num() * omp_get_max_teams() + omp_get_thread_num(); // geometric segment
+                Source_Arrays SA, Table *table, curandState *state,
+                float *state_fluxes, int N_state_fluxes)
+{
+    int blockId = omp_get_team_num(); // geometric segment	
 
     if (blockId >= I.segments / I.seg_per_thread)
         return;
@@ -45,11 +46,11 @@ void run_kernel(Input I, Source *S,
     float t3;
     float t4;
 
-    //Shared memory allocation and usage requires different approach in OpenMP offloading.  We'll use arrays instead.
-    int state_flux_id[I.seg_per_thread];
-    int QSR_id[I.seg_per_thread];
-    int FAI_id[I.seg_per_thread];
-
+    // Randomized variables (common accross all thread within block)
+    extern int shm[];
+    int *state_flux_id = &shm[0];
+    int *QSR_id = &shm[I.seg_per_thread];
+    int *FAI_id = &shm[I.seg_per_thread * 2];
 
     if (g == 0) {
         for (int i = 0; i < I.seg_per_thread; i++) {
@@ -64,7 +65,7 @@ void run_kernel(Input I, Source *S,
     for (int i = 0; i < I.seg_per_thread; i++) {
         blockId++;
 
-        float *state_flux = &state_fluxes[state_flux_id[i] * I.egroups];
+        float *state_flux = &state_fluxes[state_flux_id[i]];
 
 
         #pragma omp barrier
@@ -84,12 +85,14 @@ void run_kernel(Input I, Source *S,
         float mu2 = 0.3f;
         float ds = 0.7f;
 
+        const int egroups = I.egroups;
+
         // load fine source region flux vector
-        float *FSR_flux = &SA.fine_flux_arr[S[QSR_id[i]].fine_flux_id + FAI_id[i] * I.egroups];
+        float *FSR_flux = &SA.fine_flux_arr[S[QSR_id[i]].fine_flux_id + FAI_id[i] * egroups];
 
         if (FAI_id[i] == 0) {
-            float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * I.egroups];
-            float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * I.egroups];
+            float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
+            float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
             // cycle over energy groups
             // load neighboring sources
             float y2 = f2[g];
@@ -104,8 +107,8 @@ void run_kernel(Input I, Source *S,
             q1 = c1;
             q2 = 0;
         } else if (FAI_id[i] == I.fine_axial_intervals - 1) {
-            float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * I.egroups];
-            float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * I.egroups];
+            float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
+            float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
             // cycle over energy groups
             // load neighboring sources
             float y1 = f1[g];
@@ -120,9 +123,9 @@ void run_kernel(Input I, Source *S,
             q1 = c1;
             q2 = 0;
         } else {
-            float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * I.egroups];
-            float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * I.egroups];
-            float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * I.egroups];
+            float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
+            float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
+            float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
             // cycle over energy groups
             // load neighboring sources
             float y1 = f1[g];
@@ -147,28 +150,30 @@ void run_kernel(Input I, Source *S,
         tau = sigT * ds;
         sigT2 = sigT * sigT;
 
-#ifdef TABLE
+        #ifdef TABLE
         interpolateTable(table, tau, &expVal);
-#else
+        #else
         expVal = 1.f - expf(-tau); // EXP function is fater than table lookup
-#endif
+        #endif
 
         // Flux Integral
 
         // Re-used Term
         reuse = tau * (tau - 2.f) + 2.f * expVal
-                / (sigT * sigT2);
+            / (sigT * sigT2);
 
         // add contribution to new source flux
         flux_integral = (q0 * tau + (sigT * state_flux[g] - q0)
                          * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2
-                        * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal)
-                        / (3.f * sigT2 * sigT2);
+            * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal)
+            / (3.f * sigT2 * sigT2);
 
         // Prepare tally
         tally = weight * flux_integral;
 
-        // Atomic add is implicitly handled by OpenMP for this operation
+        // SHOULD BE ATOMIC HERE!
+        //FSR_flux[g] += tally;
+        #pragma omp atomic
         FSR_flux[g] += tally;
 
         // Term 1
@@ -181,12 +186,14 @@ void run_kernel(Input I, Source *S,
         t4 = state_flux[g] * (1.f - expVal);
         // Total psi
         state_flux[g] = t1 + t2 + t3 + t4;
+
     }
 }
 
 /* Interpolates a formed exponential table to compute ( 1- exp(-x) )
  *  at the desired x value */
-__device__ void interpolateTable(Table *table, float x, float *out) {
+__device__ void interpolateTable(Table *table, float x, float *out)
+{
     // check to ensure value is in domain
     if (x > table->maxVal)
         *out = 1.0f;
@@ -199,3 +206,4 @@ __device__ void interpolateTable(Table *table, float x, float *out) {
         *out = val;
     }
 }
+```
