@@ -18,6 +18,6 @@ set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp
 
 add_executable(XSBench ${SOURCE})
 
-target_link_libraries(XSBench ${OpenMP_CXX_FLAGS})
+target_link_libraries(XSBench  Threads::Threads) # Link with OpenMP runtime
 
 install(TARGETS XSBench DESTINATION bin)

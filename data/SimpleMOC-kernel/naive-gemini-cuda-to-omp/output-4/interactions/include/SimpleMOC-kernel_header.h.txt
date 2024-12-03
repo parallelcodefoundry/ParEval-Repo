@@ -2,7 +2,6 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -10,11 +9,22 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <assert.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <malloc.h>
-#include <assert.h>
 #include <omp.h>
+
+
+#define ERROR_CHECK
+
+#ifdef ERROR_CHECK
+#define CHECK_CUDA_ERROR(x) do { \
+    cudaError_t error = x; \
+    if (error != cudaSuccess) { \
+        fprintf(stderr, "CUDA error: %s in %s at line %d\n", cudaGetErrorString(error), __FILE__, __LINE__); \
+        exit(EXIT_FAILURE); \
+    } \
+} while (0)
+#else
+#define CHECK_CUDA_ERROR(x)
+#endif
 
 // User inputs
 typedef struct{
@@ -53,18 +63,20 @@ typedef struct{
 	int N;
 } Table;
 
+// Function declarations (replace CUDA kernels with OpenMP offloading functions)
 
-// Function declarations (replace CUDA kernels with OpenMP offload functions)
-void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-void setup_kernel(unsigned int *state, Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
-Source *initialize_sources(Input I, Source_Arrays *SA);
-Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+
+
+// init.c
+double mem_estimate(Input I);
+void setup_kernel(float *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
+Source * initialize_sources(Input I, Source_Arrays *SA);
+Source * initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
-void __cudaCheckError(const char *file, const int line);
-
 
 // io.c
 void logo(int version);

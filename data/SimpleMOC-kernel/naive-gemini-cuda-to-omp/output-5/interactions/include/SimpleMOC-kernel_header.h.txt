@@ -2,7 +2,6 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
-#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -15,12 +14,13 @@
 #include <unistd.h>
 #include <malloc.h>
 #include <assert.h>
+#include <omp.h>
 
 
 #define ERROR_CHECK
 
 // Error Handling Macro
-#define ERROR_CHECK(x) do { if((x) != 0) { \
+#define ERROR_CHECK_CALL(x) do { if((x) != 0) { \
     printf("Error at %s:%d\n",__FILE__,__LINE__); \
     return EXIT_FAILURE;}} while(0)
 
@@ -62,27 +62,27 @@ typedef struct{
 	int N;
 } Table;
 
-// kernel.c  (These will become OpenMP functions)
-int run_kernel(Input I, Source * S, Source_Arrays SA, Table * table, unsigned int * state, float * state_fluxes, int N_state_fluxes);
-void interpolateTable(Table * table, float x, float * out);
+// Function declarations (Note:  These are now standard C++ functions, not CUDA kernels)
+int run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state, float *state_fluxes, int N_state_fluxes);
+void interpolateTable(Table *table, float x, float *out);
 
-// init.c
-double mem_estimate( Input I );
-int setup_kernel(unsigned int *state, Input I);
-int init_flux_states( float * flux_states, int N_flux_states, Input I, unsigned int * state);
-Source * initialize_sources( Input I, Source_Arrays * SA );
-Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
-Table buildExponentialTable( void );
-Input set_default_input( void );
+// init.c function declarations
+double mem_estimate(Input I);
+int setup_kernel(float *state, Input I);
+int init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
+Source *initialize_sources(Input I, Source_Arrays *SA);
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+Table buildExponentialTable(void);
+Input set_default_input(void);
 
 
-// io.c
+// io.c function declarations
 void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);
-void fancy_int( int a );
+void fancy_int(int a);
 void print_input_summary(Input input);
-void read_CLI( int argc, char * argv[], Input * input );
+void read_CLI(int argc, char *argv[], Input *input);
 void print_CLI_error(void);
 
 #endif

@@ -121,28 +121,9 @@ void print_inputs(Inputs in, int nprocs, int version )
 	center_print("INPUT SUMMARY", 79);
 	border_print();
 	printf("Programming Model:            OpenMP-Offload\n");
-	#ifdef __cplusplus
-	// If using C++, we can do this:
-	unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
-	double time = (double) us_since_epoch / 1.0e6;
-	#else
-	struct timeval timecheck;
-	gettimeofday(&timecheck, NULL);
-	long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
-	double time = (double) ms / 1000.0;
-	#endif
-
-	if( in.simulation_method == EVENT_BASED )
-		printf("Simulation Method:            Event Based\n");
-	else
-		printf("Simulation Method:            History Based\n");
-	if( in.grid_type == NUCLIDE )
-		printf("Grid Type:                    Nuclide Grid\n");
-	else if( in.grid_type == UNIONIZED )
-		printf("Grid Type:                    Unionized Grid\n");
-	else
-		printf("Grid Type:                    Hash\n");
-
+  #ifdef __OPENMP
+	printf("OpenMP Threads:               %d\n", omp_get_max_threads());
+  #endif
 	printf("Materials:                    %d\n", 12);
 	printf("H-M Benchmark Size:           %s\n", in.HM);
 	printf("Total Nuclides:               %ld\n", in.n_isotopes);
@@ -319,7 +300,7 @@ Inputs read_CLI( int argc, char * argv[] )
 			if( strcmp(sim_type, "history") == 0 )
 				input.simulation_method = HISTORY_BASED;
 			else if( strcmp(sim_type, "event") == 0 )
-			{
+		{
 				input.simulation_method = EVENT_BASED;
 				// Also resets default # of lookups
 				if( default_lookups && default_particles )

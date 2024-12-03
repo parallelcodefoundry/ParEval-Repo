@@ -5,9 +5,9 @@ int main(int argc, char *argv[]) {
     // Initialization & Command Line Read-In
     // =====================================================================
     int version = 20;
-    int mype = 0; //This will need to be adapted for OpenMP
+    int mype = 0;
     double omp_start, omp_end;
-    int nprocs = 1; //This will need to be adapted for OpenMP
+    int nprocs = 1;
     unsigned long long verification;
 
     // Process CLI Fields -- store in "Inputs" structure
@@ -55,22 +55,53 @@ int main(int argc, char *argv[]) {
     // Start Simulation Timer
     omp_start = get_time();
 
-    // Run simulation.  OpenMP offloading will happen here.
-    #pragma omp target data map(to: SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats], SD.nuclide_grid[0:SD.length_nuclide_grid], SD.index_grid[0:SD.length_index_grid], SD.unionized_energy_array[0:SD.length_unionized_energy_array]) map(from: profile.kernel_time, profile.device_to_host_time, profile.host_to_device_time, verification) map(alloc: profile)
-    {
-        #pragma omp target teams distribute parallel for reduction(+:verification)
-        for (long i = 0; i < in.lookups; i++) {
-            //Simulate the kernel here.  This will require significant restructuring of the code to avoid CUDA specifics.  This is just a placeholder.
-            //The kernel call needs to be replaced with a suitable OpenMP implementation.
-            // Example:  verification += my_openmp_kernel(i, in, SD);
-            // ... (Implementation of the actual OpenMP kernel)
+    // Run simulation
+    if (in.simulation_method == EVENT_BASED) {
+        #pragma omp target data map(to: in, SD) map(from: verification)
+        {
+            if (in.kernel_id == 0)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+            else if (in.kernel_id == 1)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_optimization_1(in, SD, mype);
+            else if (in.kernel_id == 2)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_optimization_2(in, SD, mype);
+            else if (in.kernel_id == 3)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_optimization_3(in, SD, mype);
+            else if (in.kernel_id == 4)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_optimization_4(in, SD, mype);
+            else if (in.kernel_id == 5)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_optimization_5(in, SD, mype);
+            else if (in.kernel_id == 6)
+                #pragma omp target teams distribute parallel for reduction(+:verification)
+                verification = run_event_based_simulation_optimization_6(in, SD, mype);
+            else {
+                printf("Error: No kernel ID %d found!\n", in.kernel_id);
+                exit(1);
+            }
         }
+    } else {
+        printf(
+                "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
+                "the event-based method with \"-m event\" argument.\n");
+        exit(1);
     }
+
+    if (mype == 0) {
+        printf("\n");
+        printf("Simulation complete.\n");
+    }
+
 
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory (This is now handled automatically with the target data construct.)
+    // Release device memory.  This is handled implicitly by `omp target data` in this example
     release_memory(SD);
 
     // Final Hash Step
@@ -78,7 +109,7 @@ int main(int argc, char *argv[]) {
 
     // Print / Save Results and Exit
     int is_invalid_result =
-        print_results(in, mype, omp_end - omp_start, nprocs, verification);
+            print_results(in, mype, omp_end - omp_start, nprocs, verification);
 
     print_profile(profile, in);
 

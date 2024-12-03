@@ -111,31 +111,31 @@ Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays
 {
 	// Allocate & Copy Fine Source Data
 	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-        SA_d->fine_source_arr = (float*) malloc(N_fine * sizeof(float));
-#pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine])
-	memcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float));
-#pragma omp target exit data map(from: SA_d->fine_source_arr[0:N_fine])
+        SA_d->fine_source_arr = (float*) omp_target_allocate(N_fine * sizeof(float), 0);
+	#pragma omp target enter data map(to:SA_h->fine_source_arr[0:N_fine])
+	#pragma omp target update to(SA_d->fine_source_arr[0:N_fine]) from(SA_h->fine_source_arr[0:N_fine])
+	#pragma omp target exit data map(release:SA_h->fine_source_arr[0:N_fine])
 
 
 	// Allocate & Copy Fine Flux Data
-        SA_d->fine_flux_arr = (float*) malloc(N_fine * sizeof(float));
-#pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine])
-	memcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float));
-#pragma omp target exit data map(from: SA_d->fine_flux_arr[0:N_fine])
+        SA_d->fine_flux_arr = (float*) omp_target_allocate(N_fine * sizeof(float), 0);
+	#pragma omp target enter data map(to:SA_h->fine_flux_arr[0:N_fine])
+	#pragma omp target update to(SA_d->fine_flux_arr[0:N_fine]) from(SA_h->fine_flux_arr[0:N_fine])
+	#pragma omp target exit data map(release:SA_h->fine_flux_arr[0:N_fine])
 
 	// Allocate & Copy SigT Data
 	long N_sigT = I.source_3D_regions * I.egroups;
-        SA_d->sigT_arr = (float*) malloc(N_sigT * sizeof(float));
-#pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT])
-	memcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float));
-#pragma omp target exit data map(from: SA_d->sigT_arr[0:N_sigT])
-
+        SA_d->sigT_arr = (float*) omp_target_allocate(N_sigT * sizeof(float), 0);
+	#pragma omp target enter data map(to:SA_h->sigT_arr[0:N_sigT])
+	#pragma omp target update to(SA_d->sigT_arr[0:N_sigT]) from(SA_h->sigT_arr[0:N_sigT])
+	#pragma omp target exit data map(release:SA_h->sigT_arr[0:N_sigT])
 
 	// Allocate & Copy Source Array Data
-	Source * sources_d = (Source*) malloc(I.source_3D_regions * sizeof(Source));
-#pragma omp target enter data map(to: sources_d[0:I.source_3D_regions])
-	memcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source));
-#pragma omp target exit data map(from: sources_d[0:I.source_3D_regions])
+	Source * sources_d;
+        sources_d = (Source*) omp_target_allocate(I.source_3D_regions * sizeof(Source), 0);
+	#pragma omp target enter data map(to:sources_h[0:I.source_3D_regions])
+	#pragma omp target update to(sources_d[0:I.source_3D_regions]) from(sources_h[0:I.source_3D_regions])
+	#pragma omp target exit data map(release:sources_h[0:I.source_3D_regions])
 
 	return sources_d;
 }

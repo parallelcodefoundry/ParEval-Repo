@@ -44,7 +44,7 @@ the code and enable more transparent analysis techniques on high performance
 architectures.
 
 The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
-attentuation of neutron fluxes across an individual geometrical segment.
+attenuation of neutron fluxes across an individual geometrical segment.
 This kernel composes approximately 92% of the walltime of the full application,
 and is therefore useful for analyzing optimization methods and performance
 implications for exascale supercomputer architectures.
@@ -57,7 +57,9 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g.,  Intel Xeon Phi, AMD GPUs).
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with
+OpenMP 5.0 offloading capabilities.  (e.g., Intel Xeon Phi, AMD CPUs with
+appropriate support).
 
 ==============================================================================
 Quick Start Guide
@@ -83,9 +85,12 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler like g++ with OpenMP 5.0+ support and the necessary target device setup):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming a compiler like g++ with OpenMP 5.0 support and a target device available):
 
-	>$ make
+	>$ g++ -fopenmp -foffload=your_target -o SimpleMOC-kernel main.cpp kernel.cpp init.cpp io.cpp
+
+	Replace `your_target` with the appropriate target specification for your
+	OpenMP offloading environment (e.g.,  `-foffload=mic` for Intel Xeon Phi).
 
 Running SimpleMOC-kernel-------------------------------------------------------
 
@@ -101,40 +106,45 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per OpenMP offload task
-
+	  -p <segs per thread>  Number of segments per offload region
 
 	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
 	work load for a full core reactor simulation (the the number of geometry
-	segments has been signficantly reduced to reduce runtime while preserving
+	segments has been significantly reduced to reduce runtime while preserving
 	the computational profile).
 
 ==============================================================================
 Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
-There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.
+Compilation flags should be adjusted in the Makefile to control optimization, 
+debugging, and profiling.  OpenMP specific flags will be used instead of CUDA flags.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = g++ # Or your preferred compiler supporting OpenMP offloading
+COMPILER    = g++
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
-TABLE       ?= no
+OFFLOAD     = yes  //New flag for OpenMP offloading
+TARGET      = your_target // Target specification for OpenMP offloading
 
 
 Explanation of Flags:
 
-COMPILER <g++> - This selects your compiler (must support OpenMP offloading).
+COMPILER <g++> - This selects your compiler (a C++ compiler with OpenMP 5.0 support).
 
-OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
+OPTIMIZE - Adds compiler optimization flags (e.g., -O3).
 
-DEBUG - Adds the compiler flag "-g".
+DEBUG - Adds compiler debug flags (e.g., -g).
 
-PROFILE - Adds the compiler flag "-pg".
+PROFILE - Adds compiler profiling flags (e.g., -pg).
+
+OFFLOAD - Enables OpenMP offloading.
+
+TARGET - Specifies the offloading target.
+
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion
@@ -142,7 +152,7 @@ SimpleMOC-kernel Strawman Reactor Defintion
 
 For the purposes of simplicity this mini-app uses a conservative "strawman"
 reactor model to represent a good target problem for full core reactor
-simualations to be run on exascale class supercomputers. Arbitrary
+simulations to be run on exascale class supercomputers. Arbitrary
 user-defined geometries are not supported.
 
 ===============================================================================

@@ -10,15 +10,12 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -fopenmp")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -fopenmp -foffload=-lm")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
 
 add_executable(XSBench ${SOURCE})
-
-target_link_libraries(XSBench)
-
 
 install(TARGETS XSBench DESTINATION bin)

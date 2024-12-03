@@ -16,7 +16,7 @@
 #include <assert.h>
 #include <omp.h>
 
-//User inputs
+// User inputs
 typedef struct{
 	int source_2D_regions;
 	int source_3D_regions;
@@ -53,15 +53,14 @@ typedef struct{
 	int N;
 } Table;
 
-// kernel.c  -  These will be translated to OpenMP target regions
-void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
+// Function declarations (replace CUDA kernels with OpenMP offload functions)
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-
 
 // init.c
 double mem_estimate(Input I);
-void setup_kernel(unsigned int *state, Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
+void setup_kernel(float *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);

@@ -3,7 +3,9 @@
 
 // Header for shared utilities across XSBench versions
 
-#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h> // Include for OpenMP
 
 typedef struct{
         int nthreads;
@@ -25,25 +27,27 @@ typedef struct{
 typedef struct{
   double device_to_host_time;
   double kernel_time;
-  double host_to_host_time; // Added for OpenMP offload, no device-to-host
+  double host_to_device_time;
 } Profile;
 
 inline void print_profile(Profile profile, Inputs in) {
   if (in.filename) {
     FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_host_ms,kernel_ms,num_iterations,num_warmups\n"); // Modified for OpenMP
-    fprintf(output, "%f,%f,%d,%d\n",
-            profile.host_to_host_time*1000,
+    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_time_ms,num_iterations,num_warmups\n");
+    fprintf(output, "%f,%f,%f,%d,%d\n",
+            profile.host_to_device_time*1000,
             profile.kernel_time*1000,
+            profile.device_to_host_time*1000,
             in.num_iterations,
             in.num_warmups);
     fclose(output);
   }
   else {
-    printf("host_to_host_ms,kernel_ms,num_iterations,num_warmups\n"); // Modified for OpenMP
-    printf("%f,%f,%d,%d\n",
-           profile.host_to_host_time*1000,
+    printf("host_to_device_ms,kernel_ms,device_to_host_time_ms,num_iterations,num_warmups\n");
+    printf("%f,%f,%f,%d,%d\n",
+           profile.host_to_device_time*1000,
            profile.kernel_time*1000,
+           profile.device_to_host_time*1000,
            in.num_iterations,
            in.num_warmups);
   }

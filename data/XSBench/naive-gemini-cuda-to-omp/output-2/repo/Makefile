@@ -2,7 +2,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= gcc
+COMPILER    ?= icc
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -15,24 +15,29 @@ SM_VERSION  ?= 80
 program = XSBench
 
 source = \
-Main.c \
-io.c \
-Simulation.c \
-GridInit.c \
-XSutils.c \
-Materials.c
+Main.cpp \
+io.cpp \
+Simulation.cpp \
+GridInit.cpp \
+XSutils.cpp \
+Materials.cpp
 
-obj = $(source:.c=.o)
+obj = $(source:.cpp=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=sm_$(SM_VERSION) -std=c99
+CFLAGS := -std=c++14 -fPIC -fopenmp -foffload=-march=sm_$(SM_VERSION)
 
 # Linker Flags
 LDFLAGS = -lm
+
+# Intel Compiler
+ifeq ($(COMPILER),icc)
+  CC = icc
+endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -56,16 +61,16 @@ endif
 #===============================================================================
 
 $(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
-	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
-	$(COMPILER) $(CFLAGS) -c $< -o $@
+%.o: %.cpp XSbench_header.h XSbench_shared_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.h XSbench_shared_header.h
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)

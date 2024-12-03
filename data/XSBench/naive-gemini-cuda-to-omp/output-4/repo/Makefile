@@ -29,10 +29,13 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=sm_$(SM_VERSION) -foffload
+CFLAGS := -fopenmp -foffload=-lm -foffload
 
 # Linker Flags
 LDFLAGS = -lm
+
+# NVIDIA Compiler Offload Flags
+CFLAGS += -foffload=-march=sm_$(SM_VERSION) -std=c99
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

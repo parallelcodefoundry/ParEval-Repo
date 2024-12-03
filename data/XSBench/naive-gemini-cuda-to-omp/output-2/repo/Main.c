@@ -57,37 +57,28 @@ int main(int argc, char *argv[]) {
 
     // Run simulation
     if (in.simulation_method == EVENT_BASED) {
-        #pragma omp target data map(to: in, SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats], \
-                                      SD.unionized_energy_array[0:SD.length_unionized_energy_array], SD.index_grid[0:SD.length_index_grid], \
-                                      SD.nuclide_grid[0:SD.length_nuclide_grid], SD.max_num_nucs) \
-                        map(alloc: profile) map(from: verification)
-        {
-            #pragma omp target teams distribute parallel for reduction(+:verification)
-            for (long i = 0; i < in.lookups; i++) {
-                uint64_t seed = STARTING_SEED;
-                seed = fast_forward_LCG(seed, 2 * i);
-                double p_energy = LCG_random_double(&seed);
-                int mat = pick_mat(&seed);
-                double macro_xs_vector[5] = {0};
-                calculate_macro_xs(p_energy, mat, in.n_isotopes, in.n_gridpoints, SD.num_nucs, SD.concs,
-                                   SD.unionized_energy_array, SD.index_grid, SD.nuclide_grid, SD.mats,
-                                   macro_xs_vector, in.grid_type, in.hash_bins, SD.max_num_nucs);
-
-                double max = -1.0;
-                int max_idx = 0;
-                for (int j = 0; j < 5; j++) {
-                    if (macro_xs_vector[j] > max) {
-                        max = macro_xs_vector[j];
-                        max_idx = j;
-                    }
-                }
-                verification += max_idx + 1;
-            }
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, mype);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, mype);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, mype);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, mype);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, mype);
+        else {
+            printf("Error: No kernel ID %d found!\n", in.kernel_id);
+            exit(1);
         }
     } else {
         printf(
-                "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
-                "the event-based method with \"-m event\" argument.\n");
+            "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
+            "the event-based method with \"-m event\" argument.\n");
         exit(1);
     }
 
@@ -100,7 +91,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory.  Not needed for OpenMP offload
+    // Release device memory.  This needs to be adapted for OpenMP offload.  We'll assume a simple free for now.
     release_memory(SD);
 
     // Final Hash Step
@@ -108,7 +99,7 @@ int main(int argc, char *argv[]) {
 
     // Print / Save Results and Exit
     int is_invalid_result =
-            print_results(in, mype, omp_end - omp_start, nprocs, verification);
+        print_results(in, mype, omp_end - omp_start, nprocs, verification);
 
     print_profile(profile, in);
 
