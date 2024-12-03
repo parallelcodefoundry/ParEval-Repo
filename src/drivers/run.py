@@ -47,7 +47,8 @@ def run_repo(repo_data, system_config, args, tempdir):
 
         # Run the repo
         run_result = run_bash(cmds + run_cmd, cwd=tempdir,
-                              timeout=target_config["run_timeout"], dry=args.dry)
+                              timeout=target_config["run_timeout"], dry=args.dry,
+                              name="run")
 
         # Check the run output against the expected output
         run_result.returncode = check_output(repo_data, target_config, run_result, i)

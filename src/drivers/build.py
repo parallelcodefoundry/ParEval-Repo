@@ -21,7 +21,9 @@ def build_repo(repo_data, system_config, args, tempdir):
     cmds.append(target_config["build_commands_debug"])
 
     # Build the repo
-    build_result = run_bash(cmds, cwd=tempdir, timeout=target_config["build_timeout"], dry=args.dry)
+    build_result = run_bash(cmds, cwd=tempdir,
+                            timeout=target_config["build_timeout"], dry=args.dry,
+                            name="build")
 
     if args.log_build_output:
         logging.info(f"Build output: {build_result.stdout}")
