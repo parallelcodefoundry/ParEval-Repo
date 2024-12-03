@@ -20,5 +20,12 @@
     "perf_outputs": [
         "Simulation Complete."
     ],
-    "run_timeout": 120
+    "run_timeout": 120,
+    "ex_build_cmd": "cd include/ && make SM_VERSION=80 CFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/",
+    "ex_build_desc": "an NVIDIA GPU with compute capability 80 and NVIDIA libraries at /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/",
+    "build_filename": "include/Makefile",
+    "ex_run_cmd": "include/SimpleMOC-kernel",
+    "ex_run_desc": "a test run of the SimpleMOC-kernel on an NVIDIA GPU",
+    "main_filename": "include/main.cu",
+    "filename_desc": "C"
 }

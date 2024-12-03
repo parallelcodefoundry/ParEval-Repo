@@ -24,5 +24,12 @@
     "perf_outputs": [
         "Validation passed."
     ],
-    "run_timeout": 120
+    "run_timeout": 120,
+    "ex_build_cmd": "make SM_VERSION=80",
+    "ex_build_desc": "a system with an NVIDIA GPU with compute capability 80",
+    "build_filename": "Makefile",
+    "ex_run_cmd": "./microXOR.exe 1024 32",
+    "ex_run_desc": "a 1024 by 1024 input matrix and a kernel with 32 times 32 threads per block",
+    "main_filename": "src/main.cu",
+    "filename_desc": "C++"
 }

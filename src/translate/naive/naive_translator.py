@@ -31,7 +31,13 @@ Here is the code for each file in the codebase:
 
 {all_files}
 
-Translate the {filename} file to the {dst_model} execution model. Output each translated code file (source files, header files, and Makefiles) in one code block.
+Translate the {filename} file to the {dst_model} execution model. Output the translated file in one code block.
+"""
+
+    MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
+"""
+
+    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume reasonable filenames for a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
 """
 
     def get_system_prompt(self):
@@ -40,8 +46,14 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
     def get_prompt(self, fname: str):
         file_tree = self._input_repo.get_file_tree_str()
         all_fpaths = self._input_repo.get_all_filenames(relpaths=True)
-        all_files_str = "\n\n".join(map(lambda fpath: fpath + ":\n" + self._input_repo.get_file_contents(rel_path=fpath), all_fpaths))
-        return self.PROMPT_TEMPLATE.format(
+        all_files_str = "\n\n".join(
+            map(lambda fpath:
+                fpath + ":\n"
+                + self._input_repo.get_file_contents(rel_path=fpath),
+                all_fpaths))
+        prompt_config = self._input_repo.get_meta_dict()
+
+        base_prompt = self.PROMPT_TEMPLATE.format(
             src_model=self._src_model,
             dst_model=self._dst_model,
             file_tree=file_tree,
@@ -49,7 +61,22 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
             filename=fname
         )
 
-    CODE_BLOCK_PATTERN = re.compile(r"```(?:\w+)?\n(.*?)\n```", re.DOTALL)
+        if fname == prompt_config["main_filename"]:
+            base_prompt += ("\n" + self.MAIN_ADDENDUM.format(
+                dst_model=self._dst_model,
+                ex_run_cmd=prompt_config["ex_run_cmd"],
+                ex_run_desc=prompt_config["ex_run_desc"]))
+
+        if fname == prompt_config["build_filename"]:
+            base_prompt += ("\n" + self.MAKEFILE_ADDENDUM.format(
+                dst_model=self._dst_model,
+                filename_desc=prompt_config["filename_desc"],
+                ex_build_cmd=prompt_config["ex_build_cmd"],
+                ex_build_desc=prompt_config["ex_build_desc"]))
+
+        return base_prompt
+
+    CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
 
     def _postprocess(self, output: str) -> str:
         # make sure there's only one codeblock and extract it
@@ -58,11 +85,47 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
             raise ValueError("No code block found in output.")
         return match.group(1)
 
+    def update_output_file_extension(self, fname: str) -> str:
+        """ Return the filename with updated extension based on the destination model """
+        # Dicts of file extension mappings
+        ext_to_type = {
+            ".cu": "code",
+            ".cuh": "header",
+            ".cpp": "code",
+            ".h": "header",
+            ".hpp": "header",
+            ".c": "code",
+            ".cc": "code",
+            ".cxx": "code",
+            ".hh": "header",
+            ".hxx": "header",
+            ".c++": "code",
+            ".h++": "header"
+        }
+        type_to_ext = {
+            "cuda": {"code": ".cu", "header": ".cuh"},
+            "C++": {"code": ".cpp", "header": ".hpp"},
+            "C": {"code": ".c", "header": ".h"}
+        }
+
+        # Check if file has an extension
+        if "." in fname:
+            name, current_ext = os.path.splitext(fname)
+
+            # Check if the extension is in the dict
+            if current_ext in ext_to_type:
+                if self._dst_model == "cuda":
+                    ext_category = self._dst_model
+                else:
+                    ext_category = self._input_repo.get_meta_dict()["filename_desc"]
+                return name + type_to_ext[ext_category][ext_to_type[current_ext]]
+        return fname
+
     @abstractmethod
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
 
-    def translate(self, dry: bool = False):
+    def translate(self, dry: bool = False, log_interactions: bool = False):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
@@ -70,15 +133,23 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
         for fpath in alive_it(all_files, title="Translating files"):
             prompt = self.get_prompt(fpath)
 
+            output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath))
+
             if dry:
                 print(prompt)
+                print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
                 continue
 
             output = self._get_translation(system_prompt, prompt)
 
-            output = self._postprocess(output)
+            if log_interactions:
+                log_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "interactions", f"{fpath}.txt")
+                os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
+                with open(log_fpath, 'w') as f:
+                    f.write(output)
+                print(f"Logged interaction to {log_fpath}")
 
-            output_fpath = os.path.join(repo_fpath, fpath)
+            output = self._postprocess(output)
 
             # make parent dirs if necessary
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)

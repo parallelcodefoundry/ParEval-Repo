@@ -21,5 +21,12 @@
     "perf_outputs": [
         "overall okay: 1"
     ],
-    "run_timeout": 120
+    "run_timeout": 120,
+    "ex_build_cmd": "make test_gpt2fp32cu",
+    "ex_build_desc": "the GPT-2 model with FP32 precision to run on an NVIDIA GPU",
+    "build_filename": "Makefile",
+    "ex_run_cmd": "./test_gpt2fp32cu",
+    "ex_run_desc": "a test run of the GPT-2 model with FP32 precision on an NVIDIA GPU",
+    "main_filename": "test_gpt2_fp32.cu",
+    "filename_desc": "C"
 }

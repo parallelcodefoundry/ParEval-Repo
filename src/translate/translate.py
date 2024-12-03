@@ -9,6 +9,7 @@
 # std imports
 from argparse import ArgumentParser
 import os
+import json
 
 # local imports
 from repo import Repo
@@ -27,10 +28,11 @@ def get_args():
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
     parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", action="store_true", help="Dry run the translation.")
+    parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4", "gemini"], default="gpt-4", help="The LLM to use for translation.")
+    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o", "gemini"], default="gemini", help="The LLM to use for translation.")
     return parser.parse_args()
 
 
@@ -64,7 +66,7 @@ def main():
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method, args.naive_llm)
     translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name, args.naive_llm)
-    translator.translate(dry=args.dry)
+    translator.translate(dry=args.dry, log_interactions=args.log_interactions)
 
 
 
