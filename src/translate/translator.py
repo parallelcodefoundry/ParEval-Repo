@@ -32,5 +32,5 @@ class Translator(ABC):
         self._llm_name = llm_name
 
     @abstractmethod
-    def translate(self, dry: bool = False):
+    def translate(self, dry: bool = False, log_interactions: bool = False):
         pass

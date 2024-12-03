@@ -116,7 +116,7 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
 
-    def translate(self, dry: bool = False):
+    def translate(self, dry: bool = False, log_interactions: bool = False):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
@@ -132,6 +132,13 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
                 continue
 
             output = self._get_translation(system_prompt, prompt)
+
+            if log_interactions:
+                log_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "interactions", f"{fpath}.txt")
+                os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
+                with open(log_fpath, 'w') as f:
+                    f.write(output)
+                print(f"Logged interaction to {log_fpath}")
 
             output = self._postprocess(output)
 
