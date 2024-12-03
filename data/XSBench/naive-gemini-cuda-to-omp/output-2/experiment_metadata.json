@@ -1,0 +1,9 @@
+{
+    "app": "xsbench",
+    "prompt_strategy": "naive",
+    "llm_name": "gemini",
+    "source_model": "cuda",
+    "dest_model": "openmp-offload",
+    "output_number": 2,
+    "path": "../../../data/XSBench/naive-gemini-cuda-to-omp/output-2/repo"
+}
