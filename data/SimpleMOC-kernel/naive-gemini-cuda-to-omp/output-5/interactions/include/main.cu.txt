@@ -1,3 +1,4 @@
+```cpp
 #include "SimpleMOC-kernel_header.h"
 
 int main( int argc, char * argv[] )
@@ -129,3 +130,4 @@ int main( int argc, char * argv[] )
         #pragma omp target exit data map(release: SA_d, sources_d[0:I.source_3D_regions], table_d, RNG_states[0:I.streams], flux_states[0:N_flux_states*I.egroups])
 	return 0;
 }
+```

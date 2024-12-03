@@ -1,3 +1,4 @@
+```cpp
 #include "SimpleMOC-kernel_header.h"
 
 int main( int argc, char * argv[] )
@@ -24,58 +25,40 @@ int main( int argc, char * argv[] )
 	printf("Building Source Data Arrays...\n");
 	Source_Arrays SA_h, SA_d;
 	Source * sources_h = initialize_sources(I, &SA_h); 
-        Source * sources_d;
-
-        //Allocate memory on the device
-        #pragma omp target enter data map(alloc: SA_h.fine_flux_arr[0:I.source_3D_regions*I.fine_axial_intervals*I.egroups], SA_h.fine_source_arr[0:I.source_3D_regions*I.fine_axial_intervals*I.egroups], SA_h.sigT_arr[0:I.source_3D_regions*I.egroups])
-        #pragma omp target enter data map(alloc: sources_h[0:I.source_3D_regions])
-
-
-	sources_d = initialize_device_sources( I, &SA_h, &SA_d, sources_h); 
-	
+        Source * sources_d = initialize_device_sources( I, &SA_h, &SA_d, sources_h); 
 
 	// Build Exponential Table
 	Table * table_d = NULL;
 	#ifdef TABLE
 	printf("Building Exponential Table...\n");
 	Table table = buildExponentialTable();
-        #pragma omp target enter data map(alloc: table)
-	#pragma omp target update to(table)
-        #pragma omp target allocate(table_d)
-        #pragma omp target update from(table)
+        #pragma omp target enter data map(alloc:table[0:1])
+        #pragma omp target update to(table[0:1])
 	#endif
 
 	// Setup OpenMP threads
-	omp_set_num_threads(I.nthreads);
-
-        //Allocate memory on the device
-        curandState * RNG_states;
-        #pragma omp target allocate(RNG_states)
-
-	// Setup CUDA RNG on Device
-	printf("Setting up CUDA RNG...\n");
-	#pragma omp target parallel for
-	for (int i = 0; i < I.streams; i++){
-            curand_init(1234, i, 0, &RNG_states[i]);
-	}
-	
+        omp_set_num_threads(I.nthreads);
 
 	// Allocate Some Flux State vectors to randomly pick from
 	printf("Setting up Flux State Vectors...\n");
 	float * flux_states;
 	int N_flux_states = 10000;
 	assert( I.segments >= N_flux_states );
-        #pragma omp target allocate(flux_states)
-	init_flux_states<<< blocks, I.egroups >>> ( flux_states, N_flux_states, I, RNG_states );
+        #pragma omp target enter data map(alloc:flux_states[0:N_flux_states*I.egroups])
+	init_flux_states<<<blocks, I.egroups >>> ( flux_states, N_flux_states, I, RNG_states );
 
 
 	printf("Initialization Complete.\n");
 	border_print();
 	center_print("SIMULATION", 79);
 	border_print();
-	
+
 	printf("Attentuating fluxes across segments...\n");
 
+	// OpenMP timer variables
+	double start_time, end_time;
+	start_time = omp_get_wtime();
+	
 	// Setup kernel call block parameters
 	assert( I.segments % I.seg_per_thread == 0 );
 	int n_blocks = sqrt(I.segments / I.seg_per_thread);
@@ -87,16 +70,16 @@ int main( int argc, char * argv[] )
 	assert( blocks_k.x * blocks_k.y >= I.segments / I.seg_per_thread );
 
 	// Run Simulation Kernel Loop
-	double start_time = omp_get_wtime();
-        #pragma omp target teams distribute parallel for
-	run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
-	double end_time = omp_get_wtime();
-	double time = end_time - start_time;
+        #pragma omp target teams distribute parallel for \
+            num_teams(blocks_k.x) thread_limit(I.egroups)
+	run_kernel <<< blocks_k, I.egroups, I.seg_per_thread * 3 *sizeof(int) >>> (I, sources_d, SA_d, table_d, 
+			RNG_states, flux_states, N_flux_states);
 
+	end_time = omp_get_wtime();
+	double time = end_time - start_time;
 
 	float * host_flux_states = (float*) malloc(N_flux_states * I.egroups * sizeof(float));
         #pragma omp target update from(flux_states[0:N_flux_states*I.egroups])
-	//CUDA_CALL( cudaMemcpy( host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost));
 
 	printf("Simulation Complete.\n");
 
@@ -110,7 +93,11 @@ int main( int argc, char * argv[] )
 	printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
 	border_print();
 
-        #pragma omp target exit data map(delete: SA_h.fine_flux_arr, SA_h.fine_source_arr, SA_h.sigT_arr, sources_h, table, RNG_states, flux_states)
+        #pragma omp target exit data map(release:flux_states[0:N_flux_states*I.egroups])
+        #ifdef TABLE
+        #pragma omp target exit data map(release:table[0:1])
+        #endif
 
 	return 0;
 }
+```

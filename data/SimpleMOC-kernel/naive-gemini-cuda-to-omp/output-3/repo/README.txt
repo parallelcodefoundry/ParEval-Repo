@@ -57,7 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with compatible offload capabilities (e.g., GPUs with OpenMP 5.0 support).
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g., Intel Xeon Phi, AMD GPUs).
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +83,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compiler supporting OpenMP offloading):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler like icc with OpenMP 5.0+ support):
 
 	>$ make
 
@@ -101,10 +101,10 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per offload region
+	  -p <segs per thread>  Number of segments per OpenMP offload task
 	
 
-	If not options are specified, then a default set of parameters will
+	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
 	work load for a full core reactor simulation (the the number of geometry
 	segments has been signficantly reduced to reduce runtime while preserving
@@ -119,14 +119,15 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = <your compiler supporting OpenMP offloading>
+COMPILER    = icc
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
+TABLE       ?= no
 
 Explanation of Flags:
 
-COMPILER <your compiler supporting OpenMP offloading> - This selects your compiler (e.g., g++, clang++ with appropriate flags).
+COMPILER <icc> - This selects your compiler (Intel is one supported compiler).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 

@@ -1,3 +1,4 @@
+```cpp
 #include "SimpleMOC-kernel_header.h"
 
 /* My parallelization scheme here is to basically have a single
@@ -199,3 +200,4 @@ __device__ void interpolateTable(Table *table, float x, float *out) {
         *out = val;
     }
 }
+```

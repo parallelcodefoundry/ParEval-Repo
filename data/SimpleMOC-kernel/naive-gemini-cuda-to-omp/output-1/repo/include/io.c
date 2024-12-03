@@ -80,14 +80,18 @@ void print_input_summary(Input I)
 	center_print("INPUT SUMMARY", 79);
 	border_print();
 
-        #pragma omp target map(from:I)
-        {
-	    cudaDeviceProp prop;
-	    int device;
-	    cudaGetDevice(&device);
-	    cudaGetDeviceProperties ( &prop, device );
-	    printf("%-25s%s\n", "CUDA Device: ", prop.name); 
-        }
+  #pragma omp target map(from: I)
+  {
+    #pragma omp parallel
+    {
+      cudaDeviceProp prop;
+      int device;
+      cudaGetDevice(&device);
+      cudaGetDeviceProperties ( &prop, device );
+      printf("%-25s%s\n", "CUDA Device: ", prop.name); 
+    }
+  }
+
 	printf("%-25s%d\n", "Energy Groups:", I.egroups);
 	printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
 	printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -154,7 +158,10 @@ void read_CLI( int argc, char * argv[], Input * input )
 			if( ++i < argc )
 			{
 				int device_id = atoi(argv[i]);
-				cudaSetDevice( device_id );
+        #pragma omp target map(tofrom: device_id)
+        {
+          cudaSetDevice( device_id );
+        }
 			}
 			else
 				print_CLI_error();

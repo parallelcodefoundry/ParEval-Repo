@@ -57,8 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code supporting OpenMP 5.0 and compatible accelerators.
-
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with compatible offload capabilities (e.g., GPUs with OpenMP 5.0 support).
 
 ==============================================================================
 Quick Start Guide
@@ -84,7 +83,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable OpenMP compiler with offload support like GCC or Clang):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compiler that supports OpenMP offloading):
 
 	>$ make
 
@@ -102,13 +101,13 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per OpenMP task
+	  -p <segs per thread>  Number of segments per offload target device (e.g., GPU)
 
 
-	If not options are specified, then a default set of parameters will
+	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
 	work load for a full core reactor simulation (the the number of geometry
-	segments has been signficantly reduced to reduce runtime while preserving
+	segments has been significantly reduced to reduce runtime while preserving
 	the computational profile).
 
 ==============================================================================
@@ -116,11 +115,11 @@ Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
 There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.
+with more advanced compilation features.  Note that the `COMPILER` variable in the Makefile should now point to a compiler supporting OpenMP offloading (e.g., `g++` with appropriate flags).
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = g++  # or clang++
+COMPILER    = g++  // or appropriate OpenMP offloading compiler
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
@@ -128,7 +127,7 @@ TABLE       = no
 
 Explanation of Flags:
 
-COMPILER <g++ or clang++> - This selects your compiler (GCC or Clang are supported).
+COMPILER <g++> - This selects your compiler (a compiler supporting OpenMP offloading).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
@@ -142,7 +141,7 @@ SimpleMOC-kernel Strawman Reactor Defintion
 
 For the purposes of simplicity this mini-app uses a conservative "strawman"
 reactor model to represent a good target problem for full core reactor
-simualations to be run on exascale class supercomputers. Arbitrary
+simulations to be run on exascale class supercomputers. Arbitrary
 user-defined geometries are not supported.
 
 ===============================================================================

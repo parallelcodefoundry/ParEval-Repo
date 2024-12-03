@@ -57,7 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offloading code and supports architectures with compatible offload capabilities (e.g.,  Intel Xeon Phi,  some AMD CPUs).
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g., Intel Xeon Phi, AMD GPUs).
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +83,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compatible compiler like icpc with OpenMP offloading support):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have an OpenMP-capable compiler with offloading support):
 
 	>$ make
 
@@ -101,8 +101,8 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per offload target workgroup
-
+	  -p <segs per thread>  Number of segments per offload task/team
+	
 
 	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -119,15 +119,14 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = icpc # or other compatible compiler
+COMPILER    = <OpenMP compiler with offloading support>
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
-TABLE       ?= no
 
 Explanation of Flags:
 
-COMPILER <icpc> - This selects your compiler (Intel is one supported example).
+COMPILER <OpenMP compiler with offloading support> - This selects your compiler (e.g., icpc, clang).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 

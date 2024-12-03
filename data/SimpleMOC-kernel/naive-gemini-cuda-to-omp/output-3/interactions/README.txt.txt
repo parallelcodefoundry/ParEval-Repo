@@ -1,3 +1,4 @@
+```
 ===============================================================================
 
               _____ _                 _      __  __  ____   _____ 
@@ -57,7 +58,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g.,  Intel Xeon Phi, AMD GPUs).
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g., Intel Xeon Phi, AMD GPUs).
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +84,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler like g++ with OpenMP 5.0+ support and the necessary target device setup):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler like icc with OpenMP 5.0+ support):
 
 	>$ make
 
@@ -102,7 +103,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per OpenMP offload task
-
+	
 
 	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -119,16 +120,15 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = g++ # Or your preferred compiler supporting OpenMP offloading
+COMPILER    = icc
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
 TABLE       ?= no
 
-
 Explanation of Flags:
 
-COMPILER <g++> - This selects your compiler (must support OpenMP offloading).
+COMPILER <icc> - This selects your compiler (Intel is one supported compiler).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
@@ -172,3 +172,4 @@ author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Beno
 }
 
 ===============================================================================
+```

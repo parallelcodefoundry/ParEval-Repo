@@ -80,17 +80,15 @@ void print_input_summary(Input I)
 	center_print("INPUT SUMMARY", 79);
 	border_print();
 
-  #pragma omp target map(tofrom: I)
-  {
-	  #pragma omp parallel
-	  {
-		  cudaDeviceProp prop;
-		  int device;
-		  cudaGetDevice(&device);
-		  cudaGetDeviceProperties ( &prop, device );
-		  printf("%-25s%s\n", "CUDA Device: ", prop.name); 
-	  }
-  }
+        #pragma omp target map(tofrom: I)
+        {
+            //This section would ideally have the cuda calls replaced with equivalent code that can execute on a target device. However, since the code uses CUDA specific functions, a direct translation isn't possible without significant changes to the codebase.  The below is a placeholder and will not compile without significant modifications.
+	    cudaDeviceProp prop;
+	    int device;
+	    cudaGetDevice(&device);
+	    cudaGetDeviceProperties ( &prop, device );
+	    printf("%-25s%s\n", "CUDA Device: ", prop.name); 
+        }
 	printf("%-25s%d\n", "Energy Groups:", I.egroups);
 	printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
 	printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -151,16 +149,15 @@ void read_CLI( int argc, char * argv[], Input * input )
 			else
 				print_CLI_error();
 		}
-		// CUDA Device Number (-d)
+		// CUDA Device Number (-d)  This option is now irrelevant for OpenMP offloading
 		else if( strcmp(arg, "-d") == 0 )
 		{
-			if( ++i < argc )
-			{
-				int device_id = atoi(argv[i]);
-				cudaSetDevice( device_id );
-			}
-			else
+			if (++i < argc) {
+				// Ignore CUDA device selection; it's handled by OpenMP offloading
+				printf("Warning: -d option ignored in OpenMP offload mode.\n");
+			} else {
 				print_CLI_error();
+			}
 		}
 		else
 			print_CLI_error();
@@ -175,8 +172,7 @@ void print_CLI_error(void)
 	printf("  -t <threads>          Number of OpenMP threads to run\n");
 	printf("  -s <segments>         Number of segments to process\n");
 	printf("  -e <energy groups>    Number of energy groups\n");
-	printf("  -p <segs per thread>  Number of segments per CUDA Block\n");
-	printf("  -d <CUDA device ID>   CUDA GPU device ID number\n");
+	printf("  -p <segs per thread>  Number of segments per OpenMP team\n");
 	printf("See readme for full description of default run values\n");
 	exit(1);
 }
