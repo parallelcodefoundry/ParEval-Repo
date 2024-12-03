@@ -31,7 +31,7 @@ Here is the code for each file in the codebase:
 
 {all_files}
 
-Translate the {filename} file to the {dst_model} execution model. Output each translated code file (source files, header files, and Makefiles) in one code block.
+Translate the {filename} file to the {dst_model} execution model. Output the translated file in one code block.
 """
 
     MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
@@ -46,7 +46,13 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
     def get_prompt(self, fname: str):
         file_tree = self._input_repo.get_file_tree_str()
         all_fpaths = self._input_repo.get_all_filenames(relpaths=True)
-        all_files_str = "\n\n".join(map(lambda fpath: fpath + ":\n" + self._input_repo.get_file_contents(rel_path=fpath), all_fpaths))
+        all_files_str = "\n\n".join(
+            map(lambda fpath:
+                fpath + ":\n"
+                + self._input_repo.get_file_contents(rel_path=fpath),
+                all_fpaths))
+        prompt_config = self._input_repo.get_meta_dict()
+
         base_prompt = self.PROMPT_TEMPLATE.format(
             src_model=self._src_model,
             dst_model=self._dst_model,
@@ -54,17 +60,20 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
             all_files=all_files_str,
             filename=fname
         )
-        if fname == self._prompt_config["main_filename"]:
-            base_prompt += ("\n" + MAIN_ADDENDUM.format(
+
+        if fname == prompt_config["main_filename"]:
+            base_prompt += ("\n" + self.MAIN_ADDENDUM.format(
                 dst_model=self._dst_model,
-                ex_run_cmd=self._prompt_config["ex_run_cmd"],
-                ex_run_desc=self._prompt_config["ex_run_desc"]))
-        if fname == self._prompt_config["build_filename"]:
-            base_prompt += ("\n" + MAKEFILE_ADDENDUM.format(
+                ex_run_cmd=prompt_config["ex_run_cmd"],
+                ex_run_desc=prompt_config["ex_run_desc"]))
+
+        if fname == prompt_config["build_filename"]:
+            base_prompt += ("\n" + self.MAKEFILE_ADDENDUM.format(
                 dst_model=self._dst_model,
-                filename_desc=self._prompt_config["filename_desc"],
-                ex_build_cmd=self._prompt_config["ex_build_cmd"],
-                ex_build_desc=self._prompt_config["ex_build_desc"]))
+                filename_desc=prompt_config["filename_desc"],
+                ex_build_cmd=prompt_config["ex_build_cmd"],
+                ex_build_desc=prompt_config["ex_build_desc"]))
+
         return base_prompt
 
     CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)

@@ -63,19 +63,6 @@ def main():
     # create a Repo object for the input directory
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
-    # set default prompt config if not provided and check that prompt config exists
-    if args.prompt_config_path:
-        prompt_config_path = args.prompt_config
-    else:
-        prompt_config_path = "data/{name}-{dst}.json".format(name=args.input.split('/')[1],
-                                                             dst=args.dst_model)
-    if not os.path.isfile(prompt_config_path):
-        raise FileExistsError(f"Prompt config {prompt_config_path} does not exist.")
-
-    # load prompt config
-    with open(prompt_config_path, "r") as f:
-        prompt_config = json.load(f)
-
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method, args.naive_llm)
     translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name, args.naive_llm)

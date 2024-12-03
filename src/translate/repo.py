@@ -34,7 +34,10 @@ class Repo:
             raise ValueError("The provided path in the exp_meta file does not match the path of the exp_meta file.")
         return self(implicit_path, self._exp_meta)
 
-    def get_file_tree_dict(self) -> str:
+    def get_meta_dict(self) -> dict:
+        return self._exp_meta
+
+    def get_file_tree_dict(self) -> dict:
         return self._file_tree
 
     def get_file_tree_str(self, ascii: bool = True, max_depth: Optional[int] = None) -> str:
