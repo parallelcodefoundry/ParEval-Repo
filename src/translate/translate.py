@@ -20,6 +20,7 @@ def get_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to the input source code repository.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
+    parser.add_argument("--force-overwrite", "-f", action="store_true", help="Force overwrite of existing output directory.")
     parser.add_argument("--method", choices=["naive"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
@@ -51,8 +52,9 @@ def main():
 
     # check if the output directory exists and is empty
     if os.path.exists(args.output):
-        if os.listdir(args.output):
-            raise FileExistsError(f"Output directory {args.output} is not empty.")
+        output_dir = os.path.join(args.output, "output-" + str(args.output_id))
+        if os.path.exists(output_dir) and not args.force_overwrite:
+            raise FileExistsError(f"Output directory {output_dir} already exists. Provide -f to force overwrite.")
     else:
         os.mkdir(args.output)
 
