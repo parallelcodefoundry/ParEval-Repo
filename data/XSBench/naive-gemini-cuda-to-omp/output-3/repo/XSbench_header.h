@@ -6,9 +6,7 @@
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
-#include <thrust/reduce.h>
-#include <thrust/partition.h>
-#include <stdint.h>
+#include <limits> // Required for numeric_limits
 #include <chrono>
 #include "XSbench_shared_header.h"
 
@@ -76,54 +74,48 @@ SimulationData binary_read(Inputs in);
 
 // Simulation.cu
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile);
-//__global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD ); //This is a kernel, needs to be replaced
-void xs_lookup_kernel_baseline(Inputs in, SimulationData SD); // OpenMP version
+void xs_lookup_kernel_baseline(Inputs in, SimulationData SD); // No longer a CUDA kernel
 void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                                    long n_gridpoints,
                                    double * egrid, int * index_data,
                                    NuclideGridPoint * nuclide_grids,
-                                   long idx, double * xs_vector, int grid_type, int hash_bins );
+                                   long idx, double * xs_vector, int grid_type, int hash_bins ); //No longer __device__
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                                    long n_gridpoints, int * num_nucs,
                                    double * concs,
                                    double * egrid, int * index_data,
                                    NuclideGridPoint * nuclide_grids,
                                    int * mats,
-                                   double * macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs );
-long grid_search( long n, double quarry, double * A);
-long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high);
-int pick_mat( uint64_t * seed );
-double LCG_random_double(uint64_t * seed);
-uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
+                                   double * macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ); //No longer __device__
+long grid_search( long n, double quarry, double * A); //No longer __device__
+long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high); //No longer __host__ __device__
+int pick_mat( uint64_t * seed ); //No longer __device__
+double LCG_random_double(uint64_t * seed); //No longer __host__ __device__
+uint64_t fast_forward_LCG(uint64_t seed, uint64_t n); //No longer __device__
 
-unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData GSD, int mype);
-//__global__ void sampling_kernel(Inputs in, SimulationData GSD ); //Kernel
-void sampling_kernel(Inputs in, SimulationData SD); //OpenMP version
-//__global__ void xs_lookup_kernel_optimization_1(Inputs in, SimulationData GSD ); //Kernel
-void xs_lookup_kernel_optimization_1(Inputs in, SimulationData SD); //OpenMP version
 
-unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData GSD, int mype);
-//__global__ void xs_lookup_kernel_optimization_2(Inputs in, SimulationData GSD, int m ); //Kernel
-void xs_lookup_kernel_optimization_2(Inputs in, SimulationData SD, int m); //OpenMP version
+unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData SD, int mype);
+void sampling_kernel(Inputs in, SimulationData SD); // No longer a CUDA kernel
+void xs_lookup_kernel_optimization_1(Inputs in, SimulationData SD); // No longer a CUDA kernel
 
-unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData GSD, int mype);
-//__global__ void xs_lookup_kernel_optimization_3(Inputs in, SimulationData GSD, int m ); //Kernel
-void xs_lookup_kernel_optimization_3(Inputs in, SimulationData SD, int m); //OpenMP version
+unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_2(Inputs in, SimulationData SD, int m ); // No longer a CUDA kernel
 
-unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData GSD, int mype);
-//__global__ void xs_lookup_kernel_optimization_4(Inputs in, SimulationData GSD, int m, int n_lookups, int offset ); //Kernel
-void xs_lookup_kernel_optimization_4(Inputs in, SimulationData SD, int m, int n_lookups, int offset); //OpenMP version
+unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_3(Inputs in, SimulationData SD, int m ); // No longer a CUDA kernel
 
-unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData GSD, int mype);
-//__global__ void xs_lookup_kernel_optimization_5(Inputs in, SimulationData GSD, int n_lookups, int offset ); //Kernel
-void xs_lookup_kernel_optimization_5(Inputs in, SimulationData SD, int n_lookups, int offset); //OpenMP version
+unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_4(Inputs in, SimulationData SD, int m, int n_lookups, int offset ); // No longer a CUDA kernel
 
-unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData GSD, int mype);
+unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_5(Inputs in, SimulationData SD, int n_lookups, int offset ); // No longer a CUDA kernel
+
+unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData SD, int mype);
 
 // GridInit.cu
 SimulationData grid_init_do_not_profile( Inputs in, int mype );
-SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD );
-void release_device_memory(SimulationData GSD);
+SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD ); //Function remains largely the same.  Implementation will change.
+void release_device_memory(SimulationData SD); //Function name remains the same but implementation will change.
 void release_memory(SimulationData SD);
 
 // XSutils.cu

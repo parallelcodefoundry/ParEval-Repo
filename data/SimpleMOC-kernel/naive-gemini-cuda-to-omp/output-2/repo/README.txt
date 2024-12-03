@@ -44,7 +44,7 @@ the code and enable more transparent analysis techniques on high performance
 architectures.
 
 The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
-attentuation of neutron fluxes across an individual geometrical segment.
+attenuation of neutron fluxes across an individual geometrical segment.
 This kernel composes approximately 92% of the walltime of the full application,
 and is therefore useful for analyzing optimization methods and performance
 implications for exascale supercomputer architectures.
@@ -57,7 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with compatible offload capabilities (e.g., GPUs with OpenMP 5.0 support).
+SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities.  (e.g., CPUs with compatible accelerators)
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +83,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compiler that supports OpenMP offloading):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming a compiler supporting OpenMP 5.0+ offloading is available):
 
 	>$ make
 
@@ -101,8 +101,8 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per offload target device (e.g., GPU)
-
+	  -p <segs per thread>  Number of segments per OpenMP task
+	
 
 	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -115,19 +115,20 @@ Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
 There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.  Note that the `COMPILER` variable in the Makefile should now point to a compiler supporting OpenMP offloading (e.g., `g++` with appropriate flags).
+with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = g++  // or appropriate OpenMP offloading compiler
+COMPILER    = <Your OpenMP-capable compiler>
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
-TABLE       = no
+TABLE       ?= no
+
 
 Explanation of Flags:
 
-COMPILER <g++> - This selects your compiler (a compiler supporting OpenMP offloading).
+COMPILER <Your OpenMP-capable compiler> - This selects your compiler (e.g., g++ with OpenMP flags).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 

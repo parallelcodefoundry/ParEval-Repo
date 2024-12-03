@@ -15,24 +15,26 @@ SM_VERSION  ?= 80
 program = XSBench
 
 source = \
-Main.cpp \
-io.cpp \
-Simulation.cpp \
-GridInit.cpp \
-XSutils.cpp \
-Materials.cpp
+Main.c \
+io.c \
+Simulation.c \
+GridInit.c \
+XSutils.c \
+Materials.c
 
-obj = $(source:.cpp=.o)
+obj = $(source:.c=.o)
 
 #===============================================================================
 # Sets Flags
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-lm,-mcmodel=medium,-m64,-O3,-arch=sm_$(SM_VERSION)
+CFLAGS := -fopenmp -foffload=-lm -foffload=-march=sm_$(SM_VERSION)
 
 # Linker Flags
 LDFLAGS = -lm
+
+# NVIDIA Compiler (No special flags needed for GCC)
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -58,7 +60,7 @@ endif
 $(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
 	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp XSbench_header.h XSbench_shared_header.h Makefile
+%.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
 	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:

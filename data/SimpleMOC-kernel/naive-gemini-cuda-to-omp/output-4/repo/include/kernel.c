@@ -9,11 +9,14 @@
  * 		- A set of __shared__ SIMD vectors, each thread id being its idx
  */
 
-#pragma omp target teams distribute parallel for private(localState, state_flux, FSR_flux, q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4, dz, zin, weight, mu, mu2, ds)
+#pragma omp target teams distribute parallel for \
+    private(localState, blockId, g, q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4, state_flux_id, QSR_id, FAI_id) \
+    map(tofrom:SA.fine_flux_arr[:N_fine], SA.fine_source_arr[:N_fine], SA.sigT_arr[:N_sigT], state[:I.streams], state_fluxes[:N_state_fluxes*I.egroups]) \
+    map(to:S[:I.source_3D_regions], table)
 void run_kernel(Input I, Source *S,
-                 Source_Arrays SA, Table *table, curandState *state,
-                 float *state_fluxes, int N_state_fluxes) {
-    int blockId = omp_get_team_num(); // geometric segment
+                Source_Arrays SA, Table *table, curandState *state,
+                float *state_fluxes, int N_state_fluxes) {
+    int blockId = omp_get_team_num() * omp_get_max_teams() + omp_get_thread_num(); // geometric segment
 
     if (blockId >= I.segments / I.seg_per_thread)
         return;
@@ -43,32 +46,24 @@ void run_kernel(Input I, Source *S,
     float t3;
     float t4;
 
-    // Allocate shared memory on the device.  The size is determined at compile time.
-    int shm_size = I.seg_per_thread * 3 * sizeof(int);
-    int *shm = (int *)malloc(shm_size);
-#pragma omp target map(tofrom: shm[0:I.seg_per_thread * 3])
-    {
-    int *state_flux_id = &shm[0];
-    int *QSR_id = &shm[I.seg_per_thread];
-    int *FAI_id = &shm[I.seg_per_thread * 2];
+    // Randomized variables (common accross all thread within block)
+    int state_flux_id[I.seg_per_thread];
+    int QSR_id[I.seg_per_thread];
+    int FAI_id[I.seg_per_thread];
 
-    if (g == 0) {
-        for (int i = 0; i < I.seg_per_thread; i++) {
-            state_flux_id[i] = curand(localState) % N_state_fluxes;
-            QSR_id[i] = curand(localState) % I.source_3D_regions;
-            FAI_id[i] = curand(localState) % I.fine_axial_intervals;
-        }
+    #pragma omp simd
+    for (int i = 0; i < I.seg_per_thread; i++) {
+        state_flux_id[i] = curand(&localState[0]) % N_state_fluxes;
+        QSR_id[i] = curand(&localState[0]) % I.source_3D_regions;
+        FAI_id[i] = curand(&localState[0]) % I.fine_axial_intervals;
     }
 
-    #pragma omp barrier
 
     for (int i = 0; i < I.seg_per_thread; i++) {
         blockId++;
 
-        float *state_flux = &state_fluxes[state_flux_id[i]];
+        float *state_flux = &state_fluxes[state_flux_id[i] * I.egroups];
 
-
-        #pragma omp barrier
 
         //////////////////////////////////////////////////////////
         // Attenuate Segment
@@ -173,7 +168,8 @@ void run_kernel(Input I, Source *S,
 
         // SHOULD BE ATOMIC HERE!
         //FSR_flux[g] += tally;
-        atomicAdd(&FSR_flux[g], (float)tally);
+        #pragma omp atomic
+        FSR_flux[g] += tally;
 
         // Term 1
         t1 = q0 * expVal / sigT;
@@ -186,8 +182,6 @@ void run_kernel(Input I, Source *S,
         // Total psi
         state_flux[g] = t1 + t2 + t3 + t4;
     }
-    } //end pragma omp target
-    free(shm);
 }
 
 /* Interpolates a formed exponential table to compute ( 1- exp(-x) )

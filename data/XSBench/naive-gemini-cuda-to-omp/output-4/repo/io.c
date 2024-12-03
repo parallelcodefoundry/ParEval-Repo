@@ -120,18 +120,20 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP offload\n");
-	#pragma omp target device(0)
+	printf("Programming Model:            OpenMP-Offload\n");
+	#pragma omp target map(from: mem_tot)
 	{
-		#ifdef __OPENMP
-			#pragma omp parallel
-			{
-				int device_id = omp_get_device_num();
-				printf("OpenMP offload Device ID: %d\n", device_id);
-			}
+		#ifdef __cplusplus
+		// If using C++, we can do this:
+		unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
+		mem_tot = (size_t)((double)us_since_epoch / 1.0e6);
+		#else
+		struct timeval timecheck;
+		gettimeofday(&timecheck, NULL);
+		long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+		mem_tot = (size_t)((double)ms / 1000.0);
 		#endif
 	}
-
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -431,7 +433,7 @@ Inputs read_CLI( int argc, char * argv[] )
       }
 			else
 				print_CLI_error();
-		}
+    }
 		else if( strcmp(arg, "-w") == 0 )
 		{
 			if( ++i < argc)

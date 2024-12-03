@@ -15,44 +15,44 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
 	double start = get_time();
-        // Move Data to Device (OpenMP offload)
+        // Move Data to Device (Offload)
         SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
 	profile->host_to_device_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Configure & Launch Simulation Kernel (OpenMP offload)
+        // Configure & Launch Simulation Kernel
         ////////////////////////////////////////////////////////////////////////////////
         if( mype == 0)	printf("Running baseline event-based simulation...\n");
 
-        int nthreads = 256; // This will need to be adjusted based on target hardware
-        int nblocks = ceil( (double) in.lookups / (double) nthreads);
+        int nthreads = 256;
+	int n_lookups = in.lookups;
 
 	int nwarmups = in.num_warmups;
 	start = 0.0;
-        #pragma omp target data map(to: in, GSD) map(from: GSD.verification)
-        {
-	    for (int i = 0; i < in.num_iterations + nwarmups; i++) {
+	for (int i = 0; i < in.num_iterations + nwarmups; i++) {
 		if (i == nwarmups) {
 			start = get_time();
 		}
-                #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
-		xs_lookup_kernel_baseline( in, GSD );
-	    }
-        }
-
+		#pragma omp target teams distribute parallel for \
+			map(to: in, GSD) map(from: GSD.verification[0:n_lookups])
+		for (long j = 0; j < n_lookups; j++) {
+			xs_lookup_kernel_baseline(in, GSD, j);
+		}
+	}
 	profile->kernel_time = get_time() - start;
 
+
         ////////////////////////////////////////////////////////////////////////////////
-        // Reduce Verification Results (OpenMP)
+        // Reduce Verification Results
         ////////////////////////////////////////////////////////////////////////////////
 
         if( mype == 0)	printf("Reducing verification results...\n");
 	start = get_time();
-        #pragma omp target update from(GSD.verification)
+        // Copy Data back from Device (Offload)
+	#pragma omp target update from(SD.verification[0:n_lookups])
 	profile->device_to_host_time = get_time() - start;
 
         unsigned long verification_scalar = 0;
-        #pragma omp parallel for reduction(+:verification_scalar)
         for( int i =0; i < in.lookups; i++ )
                 verification_scalar += SD.verification[i];
 
@@ -64,10 +64,9 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 // In this kernel, we perform a single lookup with each thread. Threads within a warp
 // do not really have any relation to each other, and divergence due to high nuclide count fuel
 // material lookups are costly. This kernel constitutes baseline performance.
-void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
+void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
 {
         // The lookup ID. Used to set the seed, and to store the verification value
-        const int i = omp_get_team_num() * omp_get_thread_num_limit() + omp_get_thread_num();
 
         if( i >= in.lookups )
                 return;
@@ -386,7 +385,4 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
         return (a_new * seed + c_new) % m;
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-// Optimization 1 -- Basic kernel splitting of sampling & lookup routines
-// ... (rest of the optimized kernels remain largely unchanged, requiring similar adaptations for OpenMP offloading)
-////////////////////////////////////////////////////////////////////////////////////
+// ... rest of the optimized kernel functions remain largely the same,  requiring similar offloading strategies ...

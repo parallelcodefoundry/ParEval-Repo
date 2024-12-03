@@ -34,8 +34,9 @@ CFLAGS := -fopenmp -foffload=-lm
 # Linker Flags
 LDFLAGS = -lm
 
-# NVIDIA Compiler Offload flags
-CFLAGS += -foffload=-march=sm_$(SM_VERSION) -foffload
+# NVIDIA Compiler flags for offloading
+NVCCFLAGS = -foffload=-march=sm_$(SM_VERSION)
+
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -59,10 +60,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
-	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(NVCCFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp XSbench_header.h XSbench_shared_header.h Makefile
-	$(COMPILER) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) $(NVCCFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

@@ -2,7 +2,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= gcc
+COMPILER    ?= clang
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -29,10 +29,19 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=sm_$(SM_VERSION) -std=c11
+CFLAGS := -fopenmp -foffload=-lm=-m64
 
 # Linker Flags
 LDFLAGS = -lm
+
+# Clang Compiler with OpenMP offloading
+ifeq ($(COMPILER),clang)
+  CC = clang
+  CFLAGS += -Wall -Wextra -O3 -march=native -fopenmp -foffload=${CFLAGS}
+  # Add architecture specific flags if needed for target offloading, e.g., -foffload=-march=sm_$(SM_VERSION) for NVidia GPUs
+  LDFLAGS += -fopenmp
+endif
+
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -56,10 +65,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
-	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
-	$(COMPILER) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

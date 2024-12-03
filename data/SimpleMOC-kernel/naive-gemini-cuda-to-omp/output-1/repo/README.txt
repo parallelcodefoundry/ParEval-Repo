@@ -57,8 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with
-OpenMP offloading capabilities (e.g.,  Intel Xeon Phi, AMD GPUs).
+SimpleMOC-kernel is now an OpenMP offload code supporting architectures with
+compatible accelerators.
 
 ==============================================================================
 Quick Start Guide
@@ -84,7 +84,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compiler supporting OpenMP offloading):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler like g++ with OpenMP and offloading support):
 
 	>$ make
 
@@ -116,24 +116,27 @@ Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
 There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.
+with more advanced compilation features.  You will need to adjust the Makefile
+to reflect your compiler and target architecture.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = <Your OpenMP offloading compiler>
-OPTIMIZE    = yes
-DEBUG       = no
-PROFILE     = no
+COMPILER    = g++
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+TABLE       ?= no
+
 
 Explanation of Flags:
 
-COMPILER <Your OpenMP offloading compiler> - This selects your compiler (e.g., icc, clang).
+COMPILER <g++> - This selects your compiler (g++ is now supported).
 
-OPTIMIZE - Adds compiler optimization flags.
+OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
-DEBUG - Adds compiler debugging flags.
+DEBUG - Adds the compiler flag "-g".
 
-PROFILE - Adds compiler profiling flags.
+PROFILE - Adds the compiler flag "-pg".
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion

@@ -43,12 +43,13 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		lookups = in.lookups;
 	long lookups_per_sec = (long) ((double) lookups / runtime);
 
-	// If running in MPI, reduce timing statistics and calculate average
-	#ifdef MPI
+	// If running in OpenMP, reduce timing statistics and calculate average
+	#ifdef _OPENMP
 	long total_lookups = 0;
-	MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_LONG,
-		   MPI_SUM, 0, MPI_COMM_WORLD);
+	#pragma omp parallel reduction(+:total_lookups)
+	{
+		total_lookups += lookups_per_sec;
+	}
 	#endif
 
 	int is_invalid_result = 1;
@@ -62,14 +63,14 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 
 		// Print the results
 		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-		#ifdef MPI
-		printf("MPI ranks:   %d\n", nprocs);
+		#ifdef _OPENMP
+		printf("OpenMP threads:   %d\n", omp_get_max_threads());
 		#endif
-		#ifdef MPI
+		#ifdef _OPENMP
 		printf("Total Lookups/s:            ");
 		fancy_int(total_lookups);
-		printf("Avg Lookups/s per MPI rank: ");
-		fancy_int(total_lookups / nprocs);
+		printf("Avg Lookups/s per thread: ");
+		fancy_int(total_lookups / omp_get_max_threads());
 		#else
 		printf("Runtime:     %.3lf seconds\n", runtime);
 		printf("Lookups:     "); fancy_int(lookups);
@@ -116,26 +117,14 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 void print_inputs(Inputs in, int nprocs, int version )
 {
 	// Calculate Estimate of Memory Usage
-	size_t mem_tot = estimate_mem_usage( in );
+	long mem_tot = estimate_mem_usage( in );
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP-Offload\n");
-	#pragma omp target map(tofrom: mem_tot)
-	{
-	#ifdef __cplusplus
-	  unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
-	  double time = (double) us_since_epoch / 1.0e6;
-	#else
-	struct timeval timecheck;
-
-	gettimeofday(&timecheck, NULL);
-	long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
-
-	double time = (double) ms / 1000.0;
+	printf("Programming Model:            OpenMP\n");
+	#ifdef _OPENMP
+	printf("OpenMP Threads:               %d\n", omp_get_max_threads());
 	#endif
-	}
-
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -169,9 +158,9 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-	#ifdef MPI
-	printf("MPI Ranks:                    %d\n", nprocs);
-	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
+	#ifdef _OPENMP
+	printf("OpenMP Threads:               %d\n", omp_get_max_threads());
+	printf("Mem Usage per thread (MB):  "); fancy_int(mem_tot);
 	#else
 	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
 	#endif

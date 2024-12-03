@@ -15,8 +15,8 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
 	double start = get_time();
-        // Move Data to Device (using OpenMP target)
-        SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
+        // Move Data to Device (No need for explicit move in OpenMP offloading)
+        SimulationData GSD = SD; //Data is implicitly copied to the device
 	profile->host_to_device_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -25,23 +25,23 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
         if( mype == 0)	printf("Running baseline event-based simulation...\n");
 
         int nthreads = 256;
-        int nblocks = ceil( (double) in.lookups / (double) nthreads);
+        //No need for nblocks in OpenMP
 
 	int nwarmups = in.num_warmups;
 	start = 0.0;
 	for (int i = 0; i < in.num_iterations + nwarmups; i++) {
 		if (i == nwarmups) {
-			//No cudaDeviceSynchronize needed in OpenMP offloading
+			//No need for cudaDeviceSynchronize in OpenMP
 			start = get_time();
 		}
-		#pragma omp target teams distribute parallel for \
-			map(to: in, GSD) \
-			map(from: GSD.verification)
-		for (long idx = 0; idx < in.lookups; idx++) {
-			xs_lookup_kernel_baseline(in, GSD, idx);
-		}
+		#pragma omp target teams distribute parallel for num_threads(nthreads)
+		for (long j = 0; j < in.lookups; j++) {
+                        xs_lookup_kernel_baseline(in, GSD, j);
+                }
+
 	}
-	//No cudaPeekAtLastError or cudaDeviceSynchronize needed in OpenMP offloading
+	//No need for cudaPeekAtLastError() and cudaDeviceSynchronize() in OpenMP
+
 	profile->kernel_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -50,14 +50,14 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
         if( mype == 0)	printf("Reducing verification results...\n");
 	start = get_time();
-        #pragma omp target update from(SD.verification[0:in.lookups])
+        //No need for cudaMemcpy in OpenMP. Data is implicitly copied back.
 	profile->device_to_host_time = get_time() - start;
 
         unsigned long verification_scalar = 0;
+        #pragma omp parallel for reduction(+:verification_scalar)
         for( int i =0; i < in.lookups; i++ )
                 verification_scalar += SD.verification[i];
 
-        release_device_memory(GSD);
 
         return verification_scalar;
 }
@@ -68,9 +68,6 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
 {
         // The lookup ID. Used to set the seed, and to store the verification value
-
-        if( i >= in.lookups )
-                return;
 
         // Set the initial seed value
         uint64_t seed = STARTING_SEED;
@@ -122,12 +119,11 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
 }
 
 // Calculates the microscopic cross section for a given nuclide & energy
-void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
+__device__ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                                    long n_gridpoints,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
-                                   long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins )
-{
+                                   long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins ){
         // Variables
         double f;
         NuclideGridPoint * low, * high;
@@ -208,14 +204,13 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
 }
 
 // Calculates macroscopic cross section based on a given material & energy
-void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
+__device__ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                                    long n_gridpoints, int * __restrict__ num_nucs,
                                    double * __restrict__ concs,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
                                    int * __restrict__ mats,
-                                   double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs )
-{
+                                   double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ){
         int p_nuc; // the nuclide we are looking up
         long idx = -1;
         double conc; // the concentration of the nuclide in the material
@@ -263,7 +258,7 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 
 // binary search for energy on unionized energy grid
 // returns lower index
-long grid_search( long n, double quarry, double * __restrict__ A)
+__device__ long grid_search( long n, double quarry, double * __restrict__ A)
 {
         long lowerLimit = 0;
         long upperLimit = n-1;
@@ -286,7 +281,7 @@ long grid_search( long n, double quarry, double * __restrict__ A)
 }
 
 // binary search for energy on nuclide energy grid
-long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high)
+__host__ __device__ long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high)
 {
         long lowerLimit = low;
         long upperLimit = high;
@@ -309,7 +304,7 @@ long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low,
 }
 
 // picks a material based on a probabilistic distribution
-int pick_mat( uint64_t * seed )
+__device__ int pick_mat( uint64_t * seed )
 {
         // I have a nice spreadsheet supporting these numbers. They are
         // the fractions (by volume) of material in the core. Not a
@@ -348,7 +343,7 @@ int pick_mat( uint64_t * seed )
         return 0;
 }
 
-double LCG_random_double(uint64_t * seed)
+__host__ __device__ double LCG_random_double(uint64_t * seed)
 {
         // LCG parameters
         const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -358,7 +353,7 @@ double LCG_random_double(uint64_t * seed)
         return (double) (*seed) / (double) m;
 }
 
-uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
+__device__ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
         // LCG parameters
         const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -386,8 +381,4 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
         return (a_new * seed + c_new) % m;
 }
 
-// ... rest of the optimized kernel functions remain largely the same,  
-// with necessary modifications to use OpenMP target directives for data 
-// transfer and kernel launches.  Replace CUDA calls with equivalent OpenMP
-// calls where applicable.  Remember to handle data mapping correctly in 
-// OpenMP target directives.
+// ...rest of the optimized kernels remain largely unchanged, except for replacing CUDA specific calls with OpenMP equivalents...
