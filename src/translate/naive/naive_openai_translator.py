@@ -22,7 +22,7 @@ class NaiveOpenAITranslator(NaiveTranslator):
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         if self._llm_name == "gpt-3.5":
             model = "gpt-3.5-turbo"
-        elif self._llm_name == "gpt-4":
+        elif self._llm_name == "gpt-4o":
             model = "gpt-4o"
         completion = self._model.chat.completions.create(
             model=model,

@@ -32,7 +32,7 @@ def get_args():
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4", "gemini"], default="gpt-4", help="The LLM to use for translation.")
+    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o", "gemini"], default="gemini", help="The LLM to use for translation.")
     return parser.parse_args()
 
 

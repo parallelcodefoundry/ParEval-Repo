@@ -76,6 +76,42 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
             raise ValueError("No code block found in output.")
         return match.group(1)
 
+    def update_output_file_extension(self, fname: str) -> str:
+        """ Return the filename with updated extension based on the destination model """
+        # Dicts of file extension mappings
+        ext_to_type = {
+            ".cu": "code",
+            ".cuh": "header",
+            ".cpp": "code",
+            ".h": "header",
+            ".hpp": "header",
+            ".c": "code",
+            ".cc": "code",
+            ".cxx": "code",
+            ".hh": "header",
+            ".hxx": "header",
+            ".c++": "code",
+            ".h++": "header"
+        }
+        type_to_ext = {
+            "cuda": {"code": ".cu", "header": ".cuh"},
+            "C++": {"code": ".cpp", "header": ".hpp"},
+            "C": {"code": ".c", "header": ".h"}
+        }
+
+        # Check if file has an extension
+        if "." in fname:
+            name, current_ext = os.path.splitext(fname)
+
+            # Check if the extension is in the dict
+            if current_ext in ext_to_type:
+                if self._dst_model == "cuda":
+                    ext_category = self._dst_model
+                else:
+                    ext_category = self._input_repo.get_meta_dict()["filename_desc"]
+                return name + type_to_ext[ext_category][ext_to_type[current_ext]]
+        return fname
+
     @abstractmethod
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
@@ -88,15 +124,16 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
         for fpath in alive_it(all_files, title="Translating files"):
             prompt = self.get_prompt(fpath)
 
+            output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath))
+
             if dry:
                 print(prompt)
+                print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
                 continue
 
             output = self._get_translation(system_prompt, prompt)
 
             output = self._postprocess(output)
-
-            output_fpath = os.path.join(repo_fpath, fpath)
 
             # make parent dirs if necessary
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
