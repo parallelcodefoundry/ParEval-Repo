@@ -67,7 +67,7 @@ Translate the {filename} file to the {dst_model} execution model. Output each tr
                 ex_build_desc=self._prompt_config["ex_build_desc"]))
         return base_prompt
 
-    CODE_BLOCK_PATTERN = re.compile(r"```(?:\w+)?\n(.*?)\n```", re.DOTALL)
+    CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
 
     def _postprocess(self, output: str) -> str:
         # make sure there's only one codeblock and extract it
