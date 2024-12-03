@@ -7,20 +7,32 @@
 # std imports
 import os
 from typing import Optional, List
-
+import json
 
 
 class Repo:
 
     _path: os.PathLike
     _file_tree: dict
+    _exp_meta: dict
 
-    def __init__(self, path: os.PathLike):
+    def __init__(self, path: os.PathLike, exp_meta: dict):
         self._path = os.path.abspath(path)
         self._file_tree = self._get_file_tree_dict(path)
         self._file_tree = self._file_tree['contents']
         if len(self._file_tree) == 1:
             self._file_tree = self._file_tree[0]['contents']
+        self._exp_meta = exp_meta
+
+    @classmethod
+    def from_json(self, exp_meta: os.PathLike):
+        with open(exp_meta, 'r') as f:
+            self._exp_meta = json.load(f)
+        implicit_path = os.path.abspath(os.path.join(os.path.dirname(exp_meta), "repo"))
+        explicit_path_steps = self._exp_meta['path'].split(os.path.sep)
+        if self._exp_meta['path'] != os.path.sep.join(implicit_path.split(os.path.sep)[-len(explicit_path_steps):]):
+            raise ValueError("The provided path in the exp_meta file does not match the path of the exp_meta file.")
+        return self(implicit_path, self._exp_meta)
 
     def get_file_tree_dict(self) -> str:
         return self._file_tree
@@ -44,7 +56,7 @@ class Repo:
         if full_path is not None:
             if os.path.commonpath([self._path, full_path]) != self._path:
                 raise ValueError("The provided path is not in the repository.")
-        
+
         # get the full path
         full_path = full_path or os.path.join(self._path, rel_path)
 
@@ -67,7 +79,7 @@ class Repo:
         else:
             # If the given path is a file, record it in the tree
             tree["type"] = "file"
-        
+
         return tree
 
     def _get_file_tree_str(self, root: List[dict], prefix: str = "", ascii: bool = False, depth: int = 0, max_depth: Optional[int] = None):

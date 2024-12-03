@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Translating repositories from one execution model to another using LLMs.
     For example, this script can take a CUDA application as input and 
     translate it to an OpenMP version of the same application.
@@ -12,16 +13,19 @@ import os
 # local imports
 from repo import Repo
 from translator import Translator
-from naive.naive_translator import NaiveTranslator
+from naive.naive_openai_translator import NaiveOpenAITranslator
 from naive.naive_gemini_translator import NaiveGeminiTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to the input source code repository.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
-    parser.add_argument("--method", choices=["naive", "gemini"], required=True, help="The translation method to use.")
+    parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
+    parser.add_argument("--method", choices=["naive"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
+    parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
+    parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", action="store_true", help="Dry run the translation.")
 
     # subgroup of arguments for the naive translation method
@@ -30,10 +34,10 @@ def get_args():
     return parser.parse_args()
 
 
-def get_translator_cls(method: str):
-    if method == "naive":
-        return NaiveTranslator
-    elif method == "gemini":
+def get_translator_cls(method: str, naive_llm: str):
+    if method == "naive" and naive_llm != "gemini":
+        return NaiveOpenAITranslator
+    elif method == "naive" and naive_llm == "gemini":
         return NaiveGeminiTranslator
     else:
         raise ValueError(f"Translation method {method} not recognized.")
@@ -48,17 +52,18 @@ def main():
 
     # check if the output directory exists and is empty
     if os.path.exists(args.output):
-        if os.listdir(args.output):
-            raise FileExistsError(f"Output directory {args.output} is not empty.")
+        output_dir = os.path.join(args.output, "output-" + str(args.output_id))
+        if os.path.exists(output_dir) and not args.force_overwrite:
+            raise FileExistsError(f"Output directory {output_dir} already exists. Provide --force-overwrite to overwrite.")
     else:
         os.mkdir(args.output)
 
     # create a Repo object for the input directory
-    input_repo = Repo(args.input)
+    input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
     # create a Translator object and translate the input repository
-    translator_cls = get_translator_cls(args.method)
-    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model)
+    translator_cls = get_translator_cls(args.method, args.naive_llm)
+    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name, args.naive_llm)
     translator.translate(dry=args.dry)
 
 

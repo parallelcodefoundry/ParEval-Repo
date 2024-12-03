@@ -3,6 +3,7 @@ import subprocess
 import shlex
 import os
 import json
+import sys
 import shutil
 import glob
 from subprocess import CompletedProcess
@@ -26,11 +27,11 @@ def list_dep_cmds(system_config, target_config):
             raise ValueError(f"Dependency {dep} not found in system config.")
     return cmds
 
-def run_bash(cmds, cwd=None, timeout=None, dry=False, name=None):
+def run_bash(cmds, cwd=None, timeout=None, dry=False):
     """ Run the given Bash cmds on the system and return the result """
     if cwd is None:
         cwd = os.getcwd()
-    script_name = f"{name}.sh" if name is not None else "temp.sh"
+    script_name = sys._getframe(1).f_code.co_name + "_script.sh"
     script_path = os.path.join(cwd, script_name)
     with open(script_path, "w") as f:
         f.write("\n".join(cmds))
