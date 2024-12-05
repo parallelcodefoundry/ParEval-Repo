@@ -1,0 +1,38 @@
+Here is the translated `CMakeLists.txt` file for the OpenMP Offload execution model:
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+
+project(
+    XSBench_OpenMP
+    VERSION 1.0
+    LANGUAGES CXX
+)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
+
+# Enable OpenMP support
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    target_compile_options(XSBench PRIVATE ${OpenMP_CXX_FLAGS})
+endif()
+
+add_executable(XSBench ${SOURCE})
+
+install(TARGETS XSBench DESTINATION bin)
+```
+
+### Changes Made:
+1. Changed the project name to `XSBench_OpenMP` to reflect the new execution model.
+2. Removed CUDA-specific settings and replaced them with OpenMP settings.
+3. Added a check for OpenMP support and included the necessary compile options for OpenMP. 
+
+Make sure to adjust the source files and any other necessary configurations to ensure compatibility with OpenMP Offload, as the code itself will also need to be modified to use OpenMP directives instead of CUDA kernels.

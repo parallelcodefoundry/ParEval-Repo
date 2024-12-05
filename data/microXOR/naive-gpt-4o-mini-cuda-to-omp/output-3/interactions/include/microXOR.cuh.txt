@@ -1,0 +1,18 @@
+Here is the translated `include/microXOR.cuh` file for the OpenMP offload execution model:
+
+```cpp
+// microXOR header file
+
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+#include <omp.h>
+
+void cellsXOR(const int *input, int *output, size_t N);
+
+#endif
+```
+
+In this translation, the CUDA kernel `__global__ void cellsXOR(...)` has been replaced with a regular function declaration `void cellsXOR(...)`, as OpenMP offload will handle the parallel execution on the device without the need for kernel qualifiers. The implementation of the `cellsXOR` function will need to be modified accordingly in the `microXOR.cu` file to use OpenMP directives for offloading.
