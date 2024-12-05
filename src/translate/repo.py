@@ -68,7 +68,7 @@ class Repo:
             raise FileNotFoundError("The provided path does not exist.")
 
         # read the file contents
-        with open(full_path, 'r') as f:
+        with open(full_path, 'r', encoding='ascii', errors='replace') as f:
             return f.read()
 
     def _get_file_tree_dict(self, tree_root: os.PathLike) -> dict:
