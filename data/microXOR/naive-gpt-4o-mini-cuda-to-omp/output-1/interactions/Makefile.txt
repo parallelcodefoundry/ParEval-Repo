@@ -1,0 +1,43 @@
+Here is the translated Makefile for the OpenMP Offload execution model:
+
+```makefile
+# Makefile for OpenMP Offload microXOR
+
+CXX ?= g++
+SM_VERSION ?= 80
+SRC = src
+INC = include
+OBJ = obj
+CXXFLAGS ?= -fopenmp -I$(INC) -std=c++17 -O3
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+LDFLAGS ?= -L/usr/local/cuda/lib64 -lcudart
+
+CXXFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CXXFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
+
+clean:
+	rm -f $(OBJS) $(EXE)
+
+.PHONY: clean
+```
+
+### Notes:
+1. The file extensions for the source files have been changed from `.cu` to `.cpp` to reflect the transition from CUDA to OpenMP.
+2. The `LDFLAGS` line assumes that the CUDA runtime library is still required; adjust as necessary based on your actual dependencies.
+3. The `CXXFLAGS` include the `-fopenmp` flag to enable OpenMP support.
+4. The `SM_VERSION` variable is included for compatibility with the original Makefile, but it may not be directly used in OpenMP; you can adjust it based on your needs.

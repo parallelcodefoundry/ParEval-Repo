@@ -1,0 +1,44 @@
+Here is the translated Makefile for the OpenMP Offload execution model:
+
+```Makefile
+# Makefile for OpenMP Offload microXOR
+
+CXX ?= g++
+SM_VERSION ?= 80
+SRC = src
+INC = include
+OBJ = obj
+CXXFLAGS ?= -fopenmp -I$(INC) -std=c++17 -O3
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+LDFLAGS ?= -lgomp
+
+CXXFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CXXFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(OBJS) -o $(EXE) $(LDFLAGS)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
+
+clean:
+	rm -f $(OBJS) $(EXE)
+
+.PHONY: clean
+```
+
+### Notes:
+1. The file extensions have been changed from `.cu` to `.cpp` to reflect the transition from CUDA to OpenMP.
+2. The `nvcc` compiler has been replaced with `g++`, which is suitable for OpenMP.
+3. The `LDFLAGS` now includes `-lgomp` for linking the OpenMP library.
+4. The `CXXFLAGS` includes `-fopenmp` to enable OpenMP support.
+5. The `SM_VERSION` variable is retained for compatibility with the original structure, although it may not be directly applicable in OpenMP.

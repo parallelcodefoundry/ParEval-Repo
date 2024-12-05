@@ -1,0 +1,43 @@
+Here is the translated Makefile for the OpenMP Offload execution model:
+
+```Makefile
+# Makefile for OpenMP Offload microXOR
+
+CXX ?= g++
+SM_VERSION ?= 80
+SRC = src
+INC = include
+OBJ = obj
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx-none -I$(INC) -std=c++17
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+LDFLAGS ?= -lgomp
+
+CXXFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CXXFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
+
+clean:
+	rm -f $(OBJS) $(EXE)
+
+.PHONY: clean
+```
+
+### Notes:
+1. The file extensions have been changed from `.cu` to `.cpp` to reflect the transition from CUDA to standard C++ with OpenMP.
+2. The `-fopenmp-targets=nvptx-none` flag is used to specify that the code will be offloaded to an NVIDIA GPU.
+3. The `LDFLAGS` variable now includes `-lgomp` for linking against the OpenMP library.
+4. The `SM_VERSION` variable is retained for compatibility with the original structure, although it may not be directly used in OpenMP.
