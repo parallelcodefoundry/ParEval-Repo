@@ -22,13 +22,14 @@ def get_args():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("-i", "--input", type=str, required=True, help="Path to the input source code repository.")
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
+    parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
     parser.add_argument("--method", choices=["naive"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
     parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
-    parser.add_argument("--dry", action="store_true", help="Dry run the translation.")
+    parser.add_argument("--dry", "-d", action="store_true", help="Dry run the translation.")
     parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
 
     # subgroup of arguments for the naive translation method
@@ -64,12 +65,23 @@ def main():
     else:
         os.mkdir(args.output)
 
+    # check that the dest model target json for prompt config exists
+    if not os.path.exists(args.config):
+        raise FileNotFoundError(f"Destination model target json {args.config} not found.")
+
     # create a Repo object for the input directory
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method, args.naive_llm)
-    translator = translator_cls(input_repo, args.output, args.src_model, args.dst_model, args.output_id, args.app_name, args.naive_llm)
+    translator = translator_cls(input_repo,
+                                args.output,
+                                args.src_model,
+                                args.dst_model,
+                                args.output_id,
+                                args.app_name,
+                                args.naive_llm,
+                                args.config)
     translator.translate(dry=args.dry, log_interactions=args.log_interactions)
 
 

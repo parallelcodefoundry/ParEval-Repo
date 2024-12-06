@@ -16,8 +16,8 @@ from repo import Repo
 
 class NaiveLlamaTranslator(NaiveTranslator):
 
-    def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str, output_id: int, app_name: str, llm_name: str):
-        super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name, llm_name)
+    def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str, output_id: int, app_name: str, llm_name: str, dst_config: os.PathLike):
+        super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name, llm_name, dst_config)
         self._model = None
 
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
