@@ -22,5 +22,12 @@
     "perf_outputs": [
         "(Valid)"
     ],
-    "run_timeout": 120
+    "run_timeout": 120,
+    "ex_build_cmd": "make CUDA_ARCH=80 COMPILER=llvm",
+    "ex_build_desc": "a system with an NVIDIA GPU with compute capability 80 compiler with the clang++ compiler",
+    "build_filename": "Makefile",
+    "ex_run_cmd": "./XSBench -m event -s large",
+    "ex_run_desc": "an event-based simulation with the large input size",
+    "main_filename": "Main.c",
+    "filename_desc": "C"
 }
