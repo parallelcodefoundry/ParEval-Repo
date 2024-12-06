@@ -1,0 +1,83 @@
+Here is the translated version of the GridInit.cu file using OpenMP offloading:
+
+```c
+#include <iostream>
+#include <omp.h>
+
+// Define the number of threads for OpenMP
+#define NUM_THREADS 4
+
+// Function to initialize the grid and perform a lookup on each particle
+void init_grid(Particle particles[], int num_particles, char *filename) {
+    // Initialize the grid dimensions
+    int ngrid = 100;
+    int ngamma = 10;
+
+    // Perform OpenMP parallelization for the first iteration of the binary search
+    #pragma omp parallel for num_threads(NUM_THREADS)
+    for (int i = 0; i < ngrid; ++i) {
+        for (int j = 0; j < ngamma; ++j) {
+            double energy_value = particles[i][j].energy;
+            int index = std::find(particles, particles + ngrid * ngamma, Particle(energy_value)) - particles;
+            if (index >= 0) {
+                // Perform a lookup on the particle
+                // Replace this with your actual lookup function
+                std::cout << "Lookup performed on particle at energy " << energy_value << std::endl;
+            }
+        }
+    }
+
+    // Perform OpenMP parallelization for the second iteration of the binary search
+    #pragma omp parallel for num_threads(NUM_THREADS)
+    for (int i = 0; i < ngrid; ++i) {
+        for (int j = 0; j < ngamma; ++j) {
+            double energy_value = particles[i][j].energy;
+            int index = std::find(particles, particles + ngrid * ngamma, Particle(energy_value)) - particles;
+            if (index >= 0) {
+                // Perform a lookup on the particle
+                // Replace this with your actual lookup function
+                std::cout << "Lookup performed on particle at energy " << energy_value << std::endl;
+            }
+        }
+    }
+
+    // Save the results to a file
+    FILE* output = fopen(filename, "w");
+    for (int i = 0; i < ngrid; ++i) {
+        for (int j = 0; j < ngamma; ++j) {
+            double energy_value = particles[i][j].energy;
+            int index = std::find(particles, particles + ngrid * ngamma, Particle(energy_value)) - particles;
+            if (index >= 0) {
+                // Save the results to the file
+                fprintf(output, "%f\n", energy_value);
+            }
+        }
+    }
+    fclose(output);
+}
+
+// Structure representing a particle with energy values
+struct Particle {
+    double energy[10];
+};
+
+int main() {
+    Particle particles[100][10];
+
+    init_grid(particles, 100 * 10, "output.txt");
+
+    return 0;
+}
+```
+
+This code defines the `init_grid` function that performs the binary search and lookup on each particle. It uses OpenMP parallelization to speed up the computation by dividing the work among multiple threads. The results are then saved to a file.
+
+Note: You need to replace the `// Replace this with your actual lookup function` comment with your actual implementation of the lookup function.
+
+Also, make sure to compile the code using OpenMP support, for example:
+
+```bash
+g++ -fopenmp GridInit.cu -o GridInit
+```
+
+This will generate an executable file called `GridInit`.

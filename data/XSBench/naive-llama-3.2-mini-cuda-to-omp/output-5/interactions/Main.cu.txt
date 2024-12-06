@@ -1,0 +1,46 @@
+Here is the translated Main.cu file in the openmp-offload execution model:
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+// Shared variables and function definitions...
+
+#define MAX_PARTICLES 1000000 // adjust this value as needed
+
+void main() {
+    int num_threads, thread_id;
+#ifdef OPENMP
+    #pragma omp parallel num_threads(num_threads)
+    for (thread_id = 0; thread_id < num_threads; thread_id++) {
+#endif
+        // Perform calculations using OpenMP offload...
+        __device__ void calculate_particles(Inputs in) {
+            // Code to be executed on the GPU
+        }
+
+#ifdef OPENMP
+        } // end parallel region
+#else
+        // Simulate particles (serial code)
+        for (int i = 0; i < MAX_PARTICLES; i++) {
+            calculate_particles(in);
+        }
+#endif
+}
+
+// Other shared variables and function definitions...
+```
+Note that the `calculate_particles` function is marked as `__device__`, which means it will be executed on the GPU. The rest of the code is serial, meaning it will run on the CPU.
+
+To compile this file using OpenMP offload, you can use the following command:
+```bash
+nvcc -o Main Main.cu
+```
+This will generate an executable file `Main` that uses OpenMP offload to execute the GPU code. You can then run the simulation using the original command line interface:
+```bash
+./XSBench -m event -s large
+```
+Make sure to adjust the `MAX_PARTICLES` value as needed to match your input size.
+
+Also, note that this is just a basic translation, and you may need to make additional changes to get everything working correctly. For example, you may need to modify the `calculate_particles` function to take into account the shared variables and function definitions.

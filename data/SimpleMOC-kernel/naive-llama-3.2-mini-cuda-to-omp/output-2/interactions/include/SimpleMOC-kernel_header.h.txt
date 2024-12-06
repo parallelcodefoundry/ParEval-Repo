@@ -1,0 +1,115 @@
+Here is the translated version of `include/SimpleMOC-kernel_header.h` using OpenMP offload:
+```c
+#ifndef SIMPLEMOC_KERNEL_HEADER_H
+#define SIMPLEMOC_KERNEL_HEADER_H
+
+#include <omp.h>
+#include <cuda_runtime.h>
+
+typedef struct {
+    float dx;
+    float maxVal;
+    int N;
+    float values[2*N];
+} Table;
+
+typedef struct {
+    Source *sources;
+    Source_Arrays *SA_d;
+    Source_Arrays *SA_h;
+    cudaStream_t stream;
+} Kernel;
+
+extern void kernel_main(Kernel *kernel);
+extern Table buildExponentialTable(void);
+
+#endif // SIMPLEMOC_KERNEL_HEADER_H
+```
+
+```c
+#include "SimpleMOC-kernel_header.h"
+
+void __cudaCheckError(const char *file, const int line) {
+#ifdef CUDA_ERROR_CHECK
+    cudaError err = cudaGetLastError();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "kernel_main() failed at %s:%i : %s\n", file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+    
+    // More careful checking. However, this will affect performance.
+    // Comment away if needed.
+    err = cudaDeviceSynchronize();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "kernel_main() with sync failed at %s:%i : %s\n", file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+#endif
+}
+
+extern void kernel_main(Kernel *kernel) {
+#pragma omp target map(tofrom:kernel->stream) envvar(CUDAStream)
+{
+    Kernel k = *kernel;
+    k.SA_d->fine_source_arr = k.SA_h->fine_source_arr;
+    k.SA_d->fine_flux_arr = k.SA_h->fine_flux_arr;
+    k.SA_d->sigT_arr = k.SA_h->sigT_arr;
+    k.sources = k.ssources;
+
+#ifdef __cplusplus
+}
+#endif
+
+#pragma omp offload target(kernel) map(tofrom:kernel->stream)
+{
+    Table table = buildExponentialTable();
+    kernel->SA_d->fine_source_arr = table.values[0];
+    kernel->SA_d->fine_flux_arr = table.values[1];
+
+    // Initialize SigT Values
+    for (int i = 0; i < table.N; ++i) {
+        kernel->SA_d->sigT_arr[i] = table.dx;
+    }
+}
+}
+
+#endif // SIMPLEMOC_KERNEL_HEADER_H
+```
+
+```c
+#include "SimpleMOC-kernel_header.h"
+
+Table buildExponentialTable() {
+#pragma omp target map(tofrom:cudaStream) envvar(CUDAStream)
+{
+    Table table;
+
+#ifdef __cplusplus
+}
+#endif
+
+#pragma omp offload target(kernel) map(tofrom:cudaStream)
+{
+    // compute number of arry values
+    int N = 353; 
+
+    // compute spacing
+    float dx = 10.0 / (float) N;
+
+    // store linear segment information (slope and y-intercept)
+    for (int n = 0; n < N; ++n) {
+        float exponential = exp(-n * dx);
+        table.values[2*n] = -exponential;
+        table.values[2*n+1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    // assign data to table
+    table.dx = dx;
+    table.maxVal = table.dx;
+    table.N = N;
+
+    return table;
+}
+```
+
+Please note that the translation may not be perfectly accurate, as OpenMP offload requires additional synchronization and error checking. The original code is written for a specific GPU device, and this translated version assumes it's also running on the same device.

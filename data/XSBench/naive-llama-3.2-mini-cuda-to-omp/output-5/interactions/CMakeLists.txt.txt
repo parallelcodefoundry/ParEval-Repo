@@ -1,0 +1,43 @@
+```cmake
+# XSBench: Development and Verification of a Performance Abstraction for Monte Carlo Reactor Analysis
+# CMakeLists.txt
+
+# OpenMP Offload Execution Model
+set(CMAKE_CXX_OFFLOAD_ENABLE ON)
+
+# Include necessary files
+include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/include
+)
+
+# Define input dependencies
+file(GLOB_RECURSE sources ${CMAKE_CURRENT_SOURCE_DIR}/src/src/*.cc)
+file(GLOB_RECURSE headers ${CMAKE_CURRENT_SOURCE_DIR}/src/include/*.h)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Set up project properties
+project(XSBench OFF)
+
+# Create a target for the XSBench executable
+add_executable(${PROJECT_NAME} ${sources})
+
+# Offload compiler flags
+if (CMAKE_CXX_OFFLOAD_ENABLE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp-offload")
+endif ()
+
+# Set up profiling options
+set_target_properties(${PROJECT_NAME} PROPERTIES
+  CXXFLAGS  ${CMAKE_CXX_FLAGS}
+  LinkerFlags "-fprofile-arcs" "-ftest-coverage"
+)
+
+# Include profiling libraries
+target_link_libraries(${PROJECT_NAME} ${PROFILER_LIBRARIES})
+
+# Create a target for the XSBench executable with profiling options
+target_link_libraries(${PROJECT_NAME} OFFLOAD)
+```
+
+Please note that this codeblock assumes you are using an existing CMakeLists.txt file. If you're creating a new project, you would typically start from scratch and use this as a template. The variables like `CMAKE_CXX_STANDARD`, `CMAKE_CXX_STANDARD_REQUIRED`, `PROFILER_LIBRARIES` should be adjusted according to your specific requirements.

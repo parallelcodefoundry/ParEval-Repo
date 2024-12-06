@@ -1,0 +1,71 @@
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+// OpenMP offload functions
+void __openmpLaunchFunction(void (*f)(int, int*, float*, float*, float*), void (*h)(int, int*, float*, float*, float*)) {
+    #pragma omp target(map(fromto:argc[1]: argc[2], out:arg[0], arg[1]), env:env[0]) 
+        __openmpLaunchFunctionInner(f, h);
+}
+
+void __openmpLaunchFunctionInner(void (*f)(int, int*, float*, float*, float*), void (*h)(int, int*, float*, float*, float*)) {
+    // This is a placeholder for the actual function call
+}
+
+// Function to launch on host (not applicable in this case)
+void launchHost() {}
+
+// Main execution function
+void main() {
+    #pragma omp target map(fromto:argc[1]: argc[2], env:env[0]) 
+        launchHost();
+}
+```
+
+Note that the original `init.cu` file is a CUDA kernel, which requires the OpenMP offload model to be used in conjunction with the `cudaLaunchKernel` function. However, since this is not explicitly mentioned in your request, I've translated it into an OpenMP offload function.
+
+In the context of your code, if you want to use the OpenMP offload model to launch the CUDA kernel on the host, you can modify the `__openmpLaunchFunctionInner` and `main` functions accordingly. 
+
+However, please note that this approach is not typically used in production code due to performance reasons. A more common approach would be to use the `cudaLaunchKernel` function for launching the CUDA kernel and then use OpenMP to launch the host execution of the original `init.cu` file.
+
+To achieve this, you can use a hybrid parallelization approach that utilizes both OpenMP and CUDA. This would require recompiling your code using a tool like GCC that supports OpenMP offloading to CUDA, or a library that provides an interface between OpenMP and CUDA.
+
+Here is an example of how you might restructure the `init.cu` file to be launched from host using OpenMP:
+
+```c
+__global__ void init_kernel(int num_elements, int* source_h, float* fine_source_arr_h, float* fine_flux_arr_h, float* sigT_arr) {
+    // CUDA kernel code here
+}
+
+void main() {
+#ifdef _OPENMP
+#pragma omp target map(fromto:source_h[0]: fine_source_arr_h[0], fine_flux_arr_h[0], sigT_arr[0]) env:env[0] 
+#else
+#endif
+
+    int num_elements = 10; // Define the number of elements
+    float* source_h = (float*)malloc(num_elements * sizeof(float));
+    float* fine_source_arr_h = (float*)malloc(num_elements * sizeof(float));
+    float* fine_flux_arr_h = (float*)malloc(num_elements * sizeof(float));
+    float* sigT_arr = (float*)malloc(num_elements * sizeof(float));
+
+    // Initialize source values
+    for(int i = 0; i < num_elements; i++) {
+        source_h[i] = i;
+    }
+
+    // Call CUDA kernel function
+    init_kernel<<<1, 1>>>(num_elements, source_h, fine_source_arr_h, fine_flux_arr_h, sigT_arr);
+
+    #ifdef _OPENMP
+#pragma omp target map(tofrom:source_h[0]: source_h) env:env[0] 
+    #endif
+
+    // Copy results back to host
+    for(int i = 0; i < num_elements; i++) {
+        printf("%f ", source_h[i]);
+    }
+}
+```
+
+Please note that in order to compile this code, you will need a tool like `nvcc` that supports OpenMP offloading to CUDA.

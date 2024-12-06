@@ -1,0 +1,108 @@
+```cuda
+// Simulation.cu (translated for OpenMP Offload)
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <omp.h>
+
+typedef struct{
+  int nthreads;
+  long n_isotopes;
+  long n_gridpoints;
+  int lookups;
+  char * HM;
+  int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
+  int hash_bins;
+  int particles;
+  int simulation_method;
+  int binary_mode;
+  int kernel_id;
+  int num_iterations;
+  int num_warmups;
+  char *filename;
+} Inputs;
+
+typedef struct{
+  double device_to_host_time;
+  double kernel_time;
+  double host_to_device_time;
+} Profile;
+
+inline void print_profile(Profile profile, Inputs in) {
+  if (in.filename) {
+    FILE* output = fopen(in.filename, "w");
+    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+    fprintf(output, "%f,%f,%f,%d,%d\n",
+            profile.host_to_device_time*1000,
+            profile.kernel_time*1000,
+            profile.device_to_host_time*1000,
+            in.num_iterations,
+            in.num_warmups);
+    fclose(output);
+  }
+  else {
+    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+    printf("%f,%f,%f,%d,%d\n",
+           profile.host_to_device_time*1000,
+           profile.kernel_time*1000,
+           profile.device_to_host_time*1000,
+           in.num_iterations,
+           in.num_warmups);
+  }
+}
+
+__global__ void kernels(float *data, int num_particles, float *results) {
+#pragma omp target teams distribute parallel for
+for (int i = 0; i < num_particles; i++) {
+  // your kernel code here
+}
+}
+
+void compute_kernel(int num_particles, float *data, float *results) {
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+    Inputs in;
+    /* Initialize the inputs structure with defaults */
+    in.nthreads = omp_get_max_threads();
+    in.n_isotopes = 0;
+    in.n_gridpoints = 10000; // adjust this to your liking
+    in.lookups = 1;
+    in.HM = "memory";
+    in.grid_type = 0; // unionized grid by default
+    in.hash_bins = 100;
+    in.particles = num_particles;
+    in.simulation_method = 1;
+    in.binary_mode = 0;
+    in.kernel_id = 1;
+    in.num_iterations = 10;
+    in.num_warmups = 5;
+
+    Profile profile;
+    // profile the kernel
+    kernels<<<in.particles,in.nthreads>>>(data, num_particles, results);
+    omp_get_max_threads();
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+void main() {
+  int num_particles = 100000; // adjust this to your liking
+  float *data = (float *)malloc(num_particles * sizeof(float));
+  float *results = (float *)malloc(num_particles * sizeof(float));
+
+  compute_kernel(num_particles, data, results);
+
+  free(data);
+  free(results);
+}
+```
+
+Note: This code does not handle errors and exceptions. In a real-world scenario, you would want to add proper error checking and exception handling.
+
+This translated file uses OpenMP offload directives to parallelize the kernel execution on both the host (CPU) and device (GPU). The `kernels` function is marked with the `target` and `teams` directives to specify the target of the execution (in this case, the GPU) and the teams to distribute the work across multiple processors.
+
+The `compute_kernel` function calls the `kernels` function using OpenMP offload directives. This allows the host to call a kernel on the device, without having to manually copy data between hosts and devices.

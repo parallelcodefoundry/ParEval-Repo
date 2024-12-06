@@ -1,0 +1,40 @@
+```
+cmake_minimum_required(VERSION 3.10)
+project(XSBench)
+
+# Enable OpenMP
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+
+# Target for main executable
+add_executable(${PROJECT_NAME}
+  XSBench.cpp
+  # Add other source files as needed
+)
+
+target_compile_options(${PROJECT_NAME} PRIVATE
+  -std=c++11
+  -O3
+  -Wall
+  -Wextra
+  -fopenmp
+)
+
+# Set the executable to be compiled on a GPU (optional)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -fopencl -ftarget-device=nvidia")
+```
+
+Note: The `target_compile_options` line sets the C++ flags for the main executable. The `-fopenmp` flag enables OpenMP, but you may need to adjust this depending on your target architecture and compiler.
+
+Also, note that in order to use OpenMP offloading with CUDA or OpenCL, you would need to modify the source code to offload computation to the GPU device. This would typically involve using OpenMP's `omp_set_num_threads` function to specify the number of threads for the CPU-side code, and then using OpenMP's `pragma omp target` to specify that certain regions of code should be executed on the GPU.
+
+For example:
+
+```
+// Set the number of threads for the CPU-side code
+omp_set_num_threads(1)
+
+// Offload computation to the GPU device
+#pragma omp target map(tofrom(device: <device_name>))
+```
+
+This is a simplified example and may not work as-is in your specific use case. You would need to consult the documentation for the OpenMP compiler you are using, as well as any additional libraries or frameworks you are using (such as CUDA or OpenCL).

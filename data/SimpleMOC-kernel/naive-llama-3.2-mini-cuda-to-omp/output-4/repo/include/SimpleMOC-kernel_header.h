@@ -1,0 +1,45 @@
+#ifndef SIMPLEMOC_KERNEL_HEADER_H
+#define SIMPLEMOC_KERNEL_HEADER_H
+
+#include <omp.h>
+
+// Function declarations for OpenMP offloading
+void initialize_device_sources_(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+Source* initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+Table buildExponentialTable();
+
+// Wrapper functions for OpenMP offloading
+void initialize_device_sources_(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
+    #pragma omp target map(in: I, out: SA_h, inout: sources_h)
+    {
+        Source* sources_d = initialize_device_sources(I, SA_h, SA_d, sources_h);
+    }
+}
+
+Source* initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
+    #pragma omp target map(in: I, out: SA_d, inout: sources_h)
+    {
+        return initialize_device_sources_(I, SA_h, SA_d, sources_h);
+    }
+}
+
+Table buildExponentialTable() {
+    Table table;
+    float maxVal = 10.0;	
+    int N = (int) (maxVal * sqrt(1.0 / (8.0 * 0.01)) );
+    float dx = maxVal / (float) N;
+
+    for(int n = 0; n < N; n++) {
+        float exponential = exp(-n * dx);
+        table.values[2*n] = -exponential;
+        table.values[2*n+1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    table.dx = dx;
+    table.maxVal = maxVal - table.dx;
+    table.N = N;
+
+    return table;
+}
+
+#endif //SIMPLEMOC_KERNEL_HEADER_H

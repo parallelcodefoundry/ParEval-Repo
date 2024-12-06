@@ -1,0 +1,32 @@
+#ifndef MICROXOR_OFFLOAD_CUH
+#define MICROXOR_OFFLOAD_CUH
+
+#include <iostream>
+#include <random>
+#include <cuda_runtime.h>
+
+void cellsXOR(const int *input, int *output, size_t N) {
+  #pragma omp target map(input[input], output[output])
+  __device__ void kernel(const int *input, int *output, size_t N) {
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < N && j < N) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      output[i*N + j] = (count == 1) ? 1 : 0;
+    }
+  }
+
+  #pragma omp target map(tofrom(input), tofrom(output))
+  __host__ void execute(const int *input, int *output, size_t N) {
+    dim3 threadsPerBlock(256, 256);
+    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    cellsXOR<<<numBlocks, threadsPerBlock>>>(input, output, N);
+  }
+}
+
+#endif // MICROXOR_OFFLOAD_CUH

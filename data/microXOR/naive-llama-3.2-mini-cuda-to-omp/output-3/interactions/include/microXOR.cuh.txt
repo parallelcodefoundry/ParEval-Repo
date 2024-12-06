@@ -1,0 +1,96 @@
+Here is the translated `include/microXOR.cuh` file for the OpenMP-offload execution model:
+
+```cpp
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+#include <cuda_runtime.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void cellsXOR(const int *input, int *output, size_t N, void (*kernel_func)(const int *, int *, size_t));
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MICROXOR_CUH
+```
+
+However, to use the OpenMP-offload execution model in C++ code, you would typically need to use a compiler that supports this feature. One such example is the Intel Compiler (icc) and the Intel Fortran Compiler (ifort), which both support the OpenMP-offload directive.
+
+Here's an example of how you might translate `src/microXOR.cu` into C++ code using the OpenMP-offload execution model with ICC:
+
+```cpp
+#include <cuda_runtime.h>
+#include "microXOR.cuh"
+
+void cellsXOR(const int *input, int *output, size_t N) {
+    #pragma omp target teams distribute parallel for
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            if (i > 0 && input[(i-1)*N + j] == 1) {
+                output[i*N + j]++;
+            }
+            if (i < N-1 && input[(i+1)*N + j] == 1) {
+                output[i*N + j]++;
+            }
+            if (j > 0 && input[i*N + (j-1)] == 1) {
+                output[i*N + j]++;
+            }
+            if (j < N-1 && input[i*N + (j+1)] == 1) {
+                output[i*N + j]++;
+            }
+        }
+    }
+
+    #pragma omp target map(tofrom:output)
+    for (size_t i = 0; i < N; i++) {
+        int count = 0;
+        for (size_t j = 0; j < N; j++) {
+            if (i > 0 && input[(i-1)*N + j] == 1) count++;
+            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+            if (j > 0 && input[i*N + (j-1)] == 1) count++;
+            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+        }
+        output[i*N + j] = (count == 1) ? 1 : 0;
+    }
+}
+```
+
+However, since you asked me to translate `src/microXOR.cu` into a file that is intended for compilation, I will simply use the OpenMP-offload execution model in C++ as the target. Here's an example of how you might use it:
+
+```cpp
+#include <iostream>
+#include <random>
+
+void kernel(const int *input, int *output, size_t N) {
+    // implementation...
+}
+
+int main() {
+    const size_t N = 4;
+    const int input[N*N] = {0, 1, 1, 0,
+                           1, 0, 0, 0,
+                           0, 0, 0, 0,
+                           0, 1, 0, 0};
+    int output[N*N];
+
+    kernel(input, output, N);
+
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            std::cout << output[i*N + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+```
+
+Please note that you will need to compile this code with a compiler that supports OpenMP-offload.

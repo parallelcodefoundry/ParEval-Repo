@@ -1,0 +1,65 @@
+#include <cuda_runtime.h>
+#include "Materials.cuh"
+
+__global__ void Materials_openMP_offload(Inputs *in, Profile *profile) {
+  #pragma omp parallel for num_threads(in->nthreads)
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < in->particles; i += blockDim.x * gridDim.x) {
+    int particle_id = i;
+
+    // Access memory via thread ID
+    __shared__ double* data;
+    if (in->binary_mode) {
+      data = (__device__/__shared__ double*)malloc((in->num_iterations+1)*sizeof(double));
+    }
+    else {
+      data = in->HM + particle_id * sizeof(char);
+    }
+
+    // Perform operations on memory accessed by thread ID
+    #pragma omp for schedule(static, 128) 
+    for (int j = 0; j < in->num_iterations; ++j) {
+      if (in->binary_mode) {
+        double* nuclide_data = __shared__ double*(in->n_isotopes);
+        for (int k = 0; k < in->lookups; ++k) {
+          nuclide_data[k] = data[k]; // Assume this is a copy of nuclide data to shared memory
+        }
+      }
+    }
+
+    if (profile != NULL) {
+      profile->kernel_time += clock32_device() - clock32_host();
+    }
+  }
+
+  free(data);
+}
+
+int main() {
+  cudaError_t err = cudaGetDevice(0); // Assuming GPU device 0
+
+  // Example usage:
+  Inputs in;
+  Profile profile;
+
+  in.nthreads = 256; // Number of threads
+  in.n_isotopes = 100;
+  in.n_gridpoints = 10;
+  in.lookups = 5;
+  in.HM = (char*)malloc(in.particles * sizeof(char)); // Allocate memory for HM
+  in.grid_type = 0; // Unionized Grid (default)
+  in.hash_bins = 2;
+  in.particles = 1000000; // Number of particles
+  in.simulation_method = 1;
+  in.binary_mode = 1;
+  in.kernel_id = 0;
+  in.num_iterations = 10;
+  in.num_warmups = 100;
+
+  profile.kernel_time = 0.0;
+  profile.device_to_host_time = 0.0;
+
+  Materials_openMP_offload(&in, &profile);
+
+  free(in.HM);
+  return 0;
+}

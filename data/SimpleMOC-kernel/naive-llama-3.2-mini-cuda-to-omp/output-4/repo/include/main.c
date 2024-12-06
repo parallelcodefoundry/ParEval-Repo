@@ -1,0 +1,196 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <omp.h>
+
+// Table structure
+struct Table {
+    float dx;
+    float maxVal;
+    int N;
+    float values[2*N];
+};
+
+// Source structure
+struct Source {
+    int sigT_id;
+    float fine_source_arr_id;
+    float fine_flux_arr_id;
+};
+
+// Build exponential table function
+Table buildExponentialTable() {
+    // define table
+    Table table;
+
+    //float precision = 0.01;
+    float maxVal = 10.0;	
+
+    // compute number of arry values
+    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
+    int N = 353; 
+
+    // compute spacing
+    float dx = maxVal / (float) N;
+
+    // store linear segment information (slope and y-intercept)
+    for (int n = 0; n < N; n++) {
+        // compute slope and y-intercept for ( 1 - exp(-x) )
+        float exponential = exp( -n * dx );
+        table.values[2*n] = -exponential;
+        table.values[2*n + 1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    // assign data to table
+    table.dx = dx;
+    table.maxVal = maxVal - table.dx;
+    table.N = N;
+
+    return table;
+}
+
+// Initialize device sources function
+struct Source* initialize_device_sources(struct Table table, int num_devices, struct Source** sources_h, struct Source** sources_d) {
+    // Allocate & Copy Fine Source Data
+    cudaMalloc((void**) &(*sources_d)->fine_source_arr, (*num_devices)*sizeof(float));
+    cudaMemcpy((*sources_d)->fine_source_arr, (*sources_h)->fine_source_arr, (*num_devices)*sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Fine Flux Data
+    cudaMalloc((void**) &(*sources_d)->fine_flux_arr, (*num_devices)*sizeof(float));
+    cudaMemcpy((*sources_d)->fine_flux_arr, (*sources_h)->fine_flux_arr, (*num_devices)*sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy SigT Data
+    int N_sigT = table.N * 2;
+    cudaMalloc((void**) &(*sources_d)->sigT_arr, N_sigT * sizeof(float));
+    cudaMemcpy((*sources_d)->sigT_arr, (*sources_h)->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Source Array Data
+    struct Source* sources_d_copy = (struct Source*)malloc((num_devices) * sizeof(struct Source));
+    for (int i = 0; i < num_devices; i++) {
+        struct Source source;
+        source.sigT_id = i * table.N * 2;
+        sources_d_copy[i].sigT_id = source.sigT_id;
+        sources_d_copy[i].fine_source_arr_id = source.fine_source_arr_id;
+        sources_d_copy[i].fine_flux_arr_id = source.fine_flux_arr_id;
+        cudaMalloc((void**) &source.fine_source_arr, sizeof(float));
+        cudaMalloc((void**) &source.fine_flux_arr, sizeof(float));
+        cudaMemcpy(source.fine_source_arr, NULL, sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(source.fine_flux_arr, NULL, sizeof(float), cudaMemcpyHostToDevice);
+    }
+
+    free(*sources_h->sigT_arr);
+    *sources_h = sources_d_copy;
+
+    *sources_d = (struct Source*)malloc((num_devices) * sizeof(struct Source));
+
+    return sources_d;
+}
+
+// Build exponential table function
+void buildExponentialTableInThread(struct Table* table, int num_thread, void** thread_data) {
+    (*thread_data)[0] = -exp(-num_thread * 0.01);
+    (*thread_data)[1] = 1 + (num_thread * 0.01 - 1) * exp(-num_thread * 0.01);
+}
+
+// Build exponential table function
+void buildExponentialTableInKernel(struct Table* table, int num_devices, void** thread_data) {
+    for (int n = 0; n < table->N; n++) {
+        float exponential = exp( -n * 0.01 );
+        (*thread_data)[2*n] = -exponential;
+        (*thread_data)[2*n + 1] = 1 + (n * 0.01 - 1) * exponential;
+    }
+}
+
+// Initialize device sources function
+void initialize_device_sourcesInKernel(struct Table table, int num_devices, struct Source* sources_h, struct Source** sources_d) {
+    // Allocate & Copy Fine Source Data
+    cudaMalloc((void**) &(*sources_d)->fine_source_arr[0], (*num_devices)*sizeof(float));
+    cudaMemcpy((*sources_d)->fine_source_arr[0], (*sources_h)->fine_source_arr, (*num_devices)*sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Fine Flux Data
+    cudaMalloc((void**) &(*sources_d)->fine_flux_arr[0], (*num_devices)*sizeof(float));
+    cudaMemcpy((*sources_d)->fine_flux_arr[0], (*sources_h)->fine_flux_arr, (*num_devices)*sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy SigT Data
+    int N_sigT = table.N * 2;
+    cudaMalloc((void**) &(*sources_d)->sigT_arr[0], N_sigT * sizeof(float));
+    cudaMemcpy((*sources_d)->sigT_arr[0], (*sources_h)->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Source Array Data
+    for (int i = 0; i < num_devices; i++) {
+        cudaMalloc((void**) &(*sources_d)->fine_source_arr[i], sizeof(float));
+        cudaMalloc((void**) &(*sources_d)->fine_flux_arr[i], sizeof(float));
+
+        free((*sources_h)->sigT_arr[i]);
+        (*sources_h)->sigT_arr[i] = NULL;
+        free((*sources_h)->fine_source_arr[i]);
+        (*sources_h)->fine_source_arr[i] = NULL;
+        free((*sources_h)->fine_flux_arr[i]);
+        (*sources_h)->fine_flux_arr[i] = NULL;
+
+    }
+
+}
+
+// Main function
+int main() {
+    Table table;
+    table.dx = 0.01;
+    table.maxVal = 10 - table.dx;
+    table.N = 1000;
+
+    struct Source* sources_h = (struct Source*)malloc(1 * sizeof(struct Source));
+    struct Source** sources_d = &sources_h;
+
+    #pragma omp parallel for num_threads(8)
+    void buildExponentialTableInThread(&table, OMP_GET_NUM_THREADS(), malloc(sizeof(float) * table.N * 2));
+
+    initialize_device_sources(&table, OMP_GET_NUM_THREADS(), sources_h, sources_d);
+
+    int num_devices = OMP_GET_NUM_DEVICES();
+
+    for (int i = 0; i < num_devices; i++) {
+        cudaMalloc((void**) &(*sources_d)->fine_source_arr[i], sizeof(float));
+        cudaMalloc((void**) &(*sources_d)->fine_flux_arr[i], sizeof(float));
+
+        free((*sources_h)->sigT_arr[i]);
+        (*sources_h)->sigT_arr[i] = NULL;
+        free((*sources_h)->fine_source_arr[i]);
+        (*sources_h)->fine_source_arr[i] = NULL;
+        free((*sources_h)->fine_flux_arr[i]);
+        (*sources_h)->fine_flux_arr[i] = NULL;
+
+    }
+
+    #pragma omp parallel for num_threads(8)
+    void buildExponentialTableInKernel(&table, OMP_GET_NUM_THREADS(), malloc(sizeof(float) * table.N * 2));
+
+    initialize_device_sourcesInKernel(&table, OMP_GET_NUM_DEVICES(), sources_h, sources_d);
+
+    printf("Fine Source Data: \n");
+    for (int i = 0; i < num_devices; i++) {
+        struct Source* source = (*sources_d)[i];
+        printf("%f\n", source->fine_source_arr_id);
+    }
+
+    printf("Fine Flux Data: \n");
+    for (int i = 0; i < num_devices; i++) {
+        struct Source* source = (*sources_d)[i];
+        printf("%f\n", source->fine_flux_arr_id);
+    }
+
+    free((*sources_h)->sigT_arr);
+    free((*sources_h)->fine_source_arr);
+    free((*sources_h)->fine_flux_arr);
+
+    free(*sources_d->sigT_arr);
+    free(*sources_d->fine_source_arr[0]);
+    for (int i = 1; i < OMP_GET_NUM_DEVICES(); i++) {
+        free(*sources_d->sigT_arr[i]);
+        free(*sources_d->fine_source_arr[i]);
+        free(*sources_d->fine_flux_arr[i]);
+    }
+    free(*sources_d);
+
+    return 0;
+}

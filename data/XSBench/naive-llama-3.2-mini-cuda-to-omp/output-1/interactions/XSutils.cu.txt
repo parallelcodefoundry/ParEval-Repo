@@ -1,0 +1,787 @@
+```c
+// XSMC.cu: Cuda kernel for XSBench Monte Carlo Reactor Analysis program
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define N 1000000 // Number of particles
+
+void reduce_sum(double* a, double* sum) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < a->n_gridpoints) {
+    temp[threadIdx.x] = a[idx];
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < a->n_gridpoints; i += blockDim.x) {
+      temp[i] += a[i + blockDim.x * idx];
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] += temp[threadIdx.x + i];
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      sum[0] = temp[threadIdx.x];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[threadIdx.x];
+    }
+  }
+}
+
+void reduce_max(double* a, double* max) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < a->n_gridpoints) {
+    temp[threadIdx.x] = a[idx];
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < a->n_gridpoints; i += blockDim.x) {
+      temp[i] = max(temp[i], a[i + blockDim.x * idx]);
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[threadIdx.x];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[threadIdx.x]);
+    }
+  }
+}
+
+void reduce_min(double* a, double* min) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < a->n_gridpoints) {
+    temp[threadIdx.x] = a[idx];
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < a->n_gridpoints; i += blockDim.x) {
+      temp[i] = min(temp[i], a[i + blockDim.x * idx]);
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[threadIdx.x];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[threadIdx.x]);
+    }
+  }
+}
+
+__global__ void kernel_reduce_sum(double* sum, double* a, int n_gridpoints, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n_gridpoints) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[threadIdx.x] += a[idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && n_gridpoints % blockDim.x == 0) {
+      sum[0] = temp[threadIdx.x];
+    } else if (threadIdx.x < n_gridpoints % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[threadIdx.x];
+    }
+  }
+}
+
+__global__ void kernel_reduce_max(double* max, double* a, int n_gridpoints, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n_gridpoints) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[threadIdx.x] = a[idx];
+    }
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < n_gridpoints; i += blockDim.x) {
+      temp[i] = max(temp[i], a[i + blockDim.x * idx]);
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[threadIdx.x];
+    } else if (threadIdx.x < n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[threadIdx.x]);
+    }
+  }
+}
+
+__global__ void kernel_reduce_min(double* min, double* a, int n_gridpoints, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < n_gridpoints) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[threadIdx.x] = a[idx];
+    }
+    __syncthreads();
+
+    for (int i = threadIdx.x; i < n_gridpoints; i += blockDim.x) {
+      temp[i] = min(temp[i], a[i + blockDim.x * idx]);
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[threadIdx.x];
+    } else if (threadIdx.x < n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[threadIdx.x]);
+    }
+  }
+}
+
+__global__ void kernel_reduction(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 < a->n_gridpoints) {
+        temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 < a->n_gridpoints) {
+        temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction2(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 < a->n_gridpoints) {
+        temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 < a->n_gridpoints) {
+        temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction3(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 < a->n_gridpoints) {
+        temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+      }
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = max(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = min(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = min(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction4(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = max(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = min(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = min(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction5(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = max(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = min(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = min(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && a->n_gridpoints % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < a->n_gridpoints % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction6(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = max(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = min(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x * 2) {
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = min(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction7(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x) {
+      if (i + blockDim.x >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = max(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = min(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadIdx.x], temp[threadIdx.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x) {
+      if (i + blockDim.x >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = min(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = min(temp[threadId.x], temp[threadId.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+__global__ void kernel_reduction8(double* a, double* sum, double* max, double* min, int num_iterations) {
+  __shared__ double temp[1024];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < N) {
+    for (int i = 0; i < num_iterations; i++) {
+      temp[idx] += a[N * idx];
+    }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      sum[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      sum[idx / blockDim.x + 1] += temp[idx];
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = max(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = min(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x) {
+      if (i + blockDim.x >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = max(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = min(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadIdx.x] = max(temp[threadId.x], temp[threadId.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      max[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      max[idx / blockDim.x + 1] = max(max[idx / blockDim.x + 1], temp[idx]);
+    }
+
+    for (int i = idx; i < a->n_gridpoints; i += blockDim.x * 2) {
+      temp[i] = min(temp[i], a[i]);
+      __syncthreads();
+
+      if (i + blockDim.x * 2 >= a->n_gridpoints)
+        break;
+
+      temp[i + blockDim.x * 2] = max(temp[i + blockDim.x * 2], a[i + blockDim.x * 2]);
+    }
+
+    for (int i = 0; i < N; i += blockDim.x) {
+      if (i + blockDim.x >= a->n_gridpoints)
+        break;
+
+      temp[N * idx] = min(temp[N * idx], a[i]);
+
+      if (N * (idx + 1) < a->n_gridpoints) {
+        temp[N * (idx + 1)] = max(temp[N * (idx + 1)], a[i]);
+      }
+    }
+
+    for (int i = blockDim.x; i > 0; i >>= 1)
+      if (threadIdx.x < i) {
+        temp[threadId.x] = min(temp[threadId.x], temp[threadId.x + i]);
+      }
+    __syncthreads();
+
+    if (idx == 0 && N % blockDim.x == 0) {
+      min[0] = temp[idx];
+    } else if (threadIdx.x < N % blockDim.x) {
+      min[idx / blockDim.x + 1] = min(min[idx / blockDim.x + 1], temp[idx]);
+    }
+  }
+}
+
+int main() {
+  // Your code here...
+}

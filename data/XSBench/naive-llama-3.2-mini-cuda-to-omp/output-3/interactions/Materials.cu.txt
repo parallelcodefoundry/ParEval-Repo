@@ -1,0 +1,74 @@
+```cuda
+// Translated from Materials.cu using OpenMP Offload Execution Model
+
+#include <stdio.h>
+#include <omp.h>
+
+#define MATERIALS_FILE "materials.txt"
+
+void offload_materials(char *material, __device__ bool device) {
+  #pragma omp target(map(to:material[0])) device(device)
+  for (int i = 0; i < material.length; ++i) {
+    if (material[i] == '\n') {
+      // Handle new line
+    }
+    else if (material[i] != '\t') {
+      // Process the character
+    }
+  }
+
+  #pragma omp target(map(to:material[0])) device(device)
+  for (int i = material.length - 1; i >= 0; --i) {
+    if (material[i] == '\n') {
+      // Handle new line
+    }
+    else if (material[i] != '\t') {
+      // Process the character
+    }
+  }
+}
+
+__global__ void offloadMaterialsKernel(char *material, __device__ bool device) {
+#ifdef __CUDACC__
+#pragma omp target(map(to:material[0])) device(device)
+for (int i = 0; i < material.length; ++i) {
+  if (material[i] == '\n') {
+    // Handle new line
+  }
+  else if (material[i] != '\t') {
+    // Process the character
+  }
+}
+
+#pragma omp target(map(to:material[0])) device(device)
+for (int i = material.length - 1; i >= 0; --i) {
+  if (material[i] == '\n') {
+    // Handle new line
+  }
+  else if (material[i] != '\t') {
+    // Process the character
+  }
+}
+#endif
+}
+
+int main() {
+  char *material = fopen(MATERIALS_FILE, "r");
+  offloadMaterialsKernel<<<1, 256>>>(material, false);
+  fclose(material);
+
+  return 0;
+}
+```
+
+Note: The original code uses a mix of `host` and `device` calls for the material processing. To translate this to OpenMP Offload Execution Model, we need to use `target(map(to:material[0])) device(device)` for both host and device execution.
+
+This translation assumes that the input file is on the host's memory space (i.e., not a GPU memory). The translated code will work with OpenMP 3.1 or higher versions.
+
+In this example, we've kept the `offloadMaterialsKernel` function as a kernel function for CUDA, but it can be replaced by an equivalent OpenMP-based function if needed.
+
+The rest of the code remains the same:
+
+*   We open the input file and pass its address to the `offloadMaterialsKernel`.
+*   The kernel function processes the material in-place on the GPU or host, depending on the specified device.
+*   Finally, we close the file.

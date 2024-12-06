@@ -1,0 +1,85 @@
+```c
+// kernel.cu OpenMP Offload version
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define N 353
+
+void offload_kernel(float *values, float dx, int maxVal) {
+    // compute number of arry values
+    int N = (int) (maxVal * sqrt(1.0 / (8.0 * dx)));
+
+    // assign data to local array for computation
+    float local_values[N];
+    #pragma omp parallel for reduction(+:local_values)
+    for (int n = 0; n < N; ++n) {
+        float exponential = exp(-n*dx);
+        values[2*n] = -exponential;
+        values[2*n+1] = 1 + (n*dx-1)*exponential;
+        local_values[n] = values[2*n];
+    }
+
+    // copy results to global array
+    #pragma omp parallel for
+    for (int n = 0; n < N; ++n) {
+        values[2*n] = local_values[n];
+    }
+}
+
+// device function for OpenMP Offload
+__global__
+void kernel(float *values, float dx, int maxVal) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < N) {
+        offload_kernel(values + idx*2, dx, maxVal);
+    }
+}
+
+// compute number of threads
+int num_threads(int N) {
+    return (N == 1) ? 256 : (N > 10000) ? (N - 1) * 16 + 64 : 256;
+}
+```
+
+Note: In the OpenMP Offload model, you need to explicitly invoke the offloaded function from the host code. Also, note that the device function `kernel` should be called from the host code and the results should be transferred back to the host using cudaMemcpy.
+
+Here is a sample usage of the kernel:
+
+```c
+int main() {
+    float dx = 0.01;
+    int maxVal = 10.0;
+
+    // compute number of arry values
+    int N = (int) (maxVal * sqrt(1.0 / (8.0 * dx)));
+
+    // create host and device arrays
+    float *values_h, *values_d;
+    cudaMalloc((void **)&values_h, 2*N*sizeof(float));
+    cudaMalloc((void **)&values_d, 2*N*sizeof(float));
+
+    // initialize values on the host
+    for (int n = 0; n < N; ++n) {
+        values_h[2*n] = -exp(-n*dx);
+        values_h[2*n+1] = 1 + (n*dx-1)*exp(-n*dx);
+    }
+
+    // copy values from host to device
+    cudaMemcpy(values_d, values_h, 2*N*sizeof(float), cudaMemcpyHostToDevice);
+
+    // invoke the kernel
+    int block_size = num_threads(N);
+    int grid_size = (N+block_size-1)/block_size;
+    kernel<<<grid_size, block_size>>>(values_d, dx, maxVal);
+
+    // copy results from device to host
+    cudaMemcpy(values_h, values_d, 2*N*sizeof(float), cudaMemcpyDeviceToHost);
+
+    // check for errors
+    __cudaCheckError(__FILE__, __LINE__);
+
+    return 0;
+}
+```

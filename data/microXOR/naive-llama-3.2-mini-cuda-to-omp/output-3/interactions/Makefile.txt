@@ -1,0 +1,51 @@
+Here is the translated Makefile file:
+```makefile
+ifeq ($(shell which gcc),gcc)
+  # C++ compiler and linker flags
+  CXX=g++
+  CXXFLAGS=-std=c++14 -fopenmp -O3
+  LDFLAGS=-fopenmp
+endif
+
+SM_VERSION=$(shell echo $1)
+
+# Source files
+CXX_FILES=microXOR.cpp
+header_files=cellsXOR.h microXOR.h
+
+# Dependencies
+DEPENDENCIES=$(addprefix $(CXX),$(foreach file,$(header_files),\( -include $(file) \)))
+
+# Build flags for OpenMP offload
+BUILD_FLAGS=-fopenmp --target=nvptx32
+
+# Linking flags
+LINK_FLAGS=$(CXXFLAGS)
+
+all: microXOR SM_VERSION=$(SM_VERSION)
+
+microXOR: $(DEPENDENCIES) main.o
+	$(CXX) -c $(CXX_FILES) $(CXXFLAGS)
+	$(CXX) $(LINK_FLAGS) -o $@ main.o
+
+main.o: $(CXX_FILES) cellsXOR.o microXOR.o
+	$(CXX) -c $(CXX_FILES) $(BUILD_FLAGS)
+
+cellsXOR.o: cellsXOR.cpp $(header_files)
+	$(CXX) -c $(CXX_FILES) $(BUILD_FLAGS)
+
+microXOR.h: microXOR.h
+	echo "/* This is a header file. Do not edit this directly */"
+
+clean:
+	rm -f $(CXX_FILES).o main.o cellsXOR.o
+```
+Note that I've assumed the `cellsXOR.cpp` and `main.cpp` files are in the same directory as the Makefile, and that you want to build the `microXOR` executable. If your file names are different, you'll need to adjust the `CXX_FILES` variable accordingly.
+
+Also note that this Makefile is written for GCC 4.7 or later, which supports OpenMP 3.0 and CUDA target option (`-fopenmp --target=nvptx32`). You may need to modify the Makefile if you're using an earlier version of GCC.
+
+To build the `microXOR` executable with a specific SM version, use the following command:
+```
+make SM_VERSION=80
+```
+Replace `80` with the desired SM version.

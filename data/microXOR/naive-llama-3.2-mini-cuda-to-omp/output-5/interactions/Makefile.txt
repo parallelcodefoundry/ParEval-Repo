@@ -1,0 +1,36 @@
+```makefile
+# Makefile for OpenMP-offload microkernel
+
+CC = g++
+CFLAGS = -O3 -fopenmp --target=nvcc
+LDLIBS = -shared -fPIC
+
+# Source files
+SRCS = microXOR.cpp cellsXOR.cpp main.cpp
+
+# Object files
+OBJS = $(SRCS:.cpp=.o)
+
+# Shared library target
+TARGET = microXOR.so
+
+# Additional dependencies for OpenMP-offload
+SM_VERSION ?= 80
+CXXFLAGS += -D __NVCC_VERSION__=$(SM_VERSION)
+CXXFLAGS += -fopenmp
+
+$(TARGET): $(OBJS) $(LDLIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f *.o $(TARGET)
+```
+
+Note that this Makefile assumes you're using an NVIDIA GPU with compute capability 80, which is indicated by the `SM_VERSION` variable. The `--target=nvcc` flag tells the C++ compiler to generate code for the NVCC backend.
+
+Also note that the `-fopenmp` flag enables OpenMP support, and the `-D __NVCC_VERSION__=$(SM_VERSION)` flag sets a preprocessor macro that is used in the kernel functions. This macro should be defined before including `microXOR.h` in your C++ source files to ensure correct compilation.
+
+The rest of the Makefile does not need any modifications. It compiles the source files into object files, links them together with the OpenMP runtime library to produce a shared library, and cleans up any temporary files.
