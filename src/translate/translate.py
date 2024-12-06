@@ -68,6 +68,9 @@ def main():
     # check that the dest model target json for prompt config exists
     if not os.path.exists(args.config):
         raise FileNotFoundError(f"Destination model target json {args.config} not found.")
+    # add target.json to the path if it points to a directory
+    if os.path.isdir(args.config):
+        args.config = os.path.join(args.config, "target.json")
 
     # create a Repo object for the input directory
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
