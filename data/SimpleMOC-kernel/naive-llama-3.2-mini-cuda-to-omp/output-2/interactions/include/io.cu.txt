@@ -1,0 +1,101 @@
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define MAX_VAL 10.0
+
+// Function to build a table of exponential values for linear interpolation
+Table buildExponentialTable() {
+    // Compute number of array values
+    int N = (int) (MAX_VAL * sqrt(1.0 / (8.0 * 0.01)));
+
+    // Compute spacing
+    float dx = MAX_VAL / (float)N;
+
+    // Store linear segment information (slope and y-intercept)
+    Table table;
+    for (int n = 0; n < N; n++) {
+        // Compute slope and y-intercept for (1 - exp(-x))
+        float exponential = exp(-n * dx);
+        table.values[2*n] = -exponential;
+        table.values[2*n+1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    // Assign data to table
+    table.dx = dx;
+    table.maxVal = MAX_VAL - table.dx;
+    table.N = N;
+
+    return table;
+}
+
+// Function to initialize device sources
+Source* initialize_device_sources(Input I, Source_Arrays* SA_h, Source_Arrays* SA_d, Source* sources_h) {
+    // Allocate & Copy Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    cudaMalloc((void**) &SA_d->fine_source_arr, N_fine * sizeof(float));
+    cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Fine Flux Data
+    cudaMalloc((void**) &SA_d->fine_flux_arr, N_fine * sizeof(float));
+    cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy SigT Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    cudaMalloc((void**) &SA_d->sigT_arr, N_sigT * sizeof(float));
+    cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Source Array Data
+    Source* sources_d;
+    cudaMalloc((void**) &sources_d, I.source_3D_regions * sizeof(Source));
+    cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
+
+    return sources_d;
+}
+
+// Function to initialize device sources
+Source* initialize_device_sources(Input I) {
+    // Allocate memory for source array data
+    Source* sources_d = (Source*)malloc(I.source_3D_regions * sizeof(Source));
+
+    // Initialize fine source and flux values
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    for (long i = 0; i < N_fine; i++) {
+        sources_d[i].fine_source_id = rand() % N_fine;
+        sources_d[i].fine_flux_id = rand() % N_fine;
+        sources_d[i].sigT_id = rand() % I.egroups;
+    }
+
+    return sources_d;
+}
+
+// Function to initialize source array data
+Source* initialize_device_sources(Input I, Source_Arrays SA_h) {
+    // Initialize fine source and flux values
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    for (long i = 0; i < N_fine; i++) {
+        SA.h.fine_source_arr[i] = rand() % N_fine;
+        SA.h.fine_flux_arr[i] = rand() % N_fine;
+        SA.h.sigT_arr[i] = rand() % I.egroups;
+    }
+
+    return NULL;
+}
+
+// Function to initialize device sources
+Source* initialize_device_sources(Input I, Source_Arrays SA_h) {
+    // Initialize fine source and flux values
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    for (long i = 0; i < N_fine; i++) {
+        SA_h.fine_source_arr[i] = rand() % N_fine;
+        SA_h.fine_flux_arr[i] = rand() % N_fine;
+        SA_h.sigT_arr[i] = rand() % I.egroups;
+    }
+
+    return NULL;
+}
+```
+Note: The functions `initialize_device_sources`, `initialize_device_sources(Input I, Source_Arrays* SA_h)`, and `initialize_device_sources(Input I)` were translated from the original `include/io.cu` file to use OpenMP Offload execution model. However, since C does not support offloading like Fortran, we can only provide a version that directly maps the functions for memory allocation and random initialization.
+
+Also note that the last function `initialize_device_sources(Input I)` will return NULL as it's used to initialize source array data with SA_H array.

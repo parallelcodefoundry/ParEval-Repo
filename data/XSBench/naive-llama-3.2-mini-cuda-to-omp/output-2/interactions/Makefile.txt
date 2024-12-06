@@ -1,0 +1,95 @@
+Here is the translated Makefile:
+```makefile
+# XSBench Makefile
+
+# Compiler flags for CUDA device compilation (openMP-offload)
+CCFLAGS += -fopenmp -fopencl-icc -O3 -g -Wall -Wextra -pedantic -std=c++11
+
+# Linker flags for CUDA device compilation (openMP-offload)
+LDFLAGS += -fopenmp -fopencl-icc -L/usr/local/cuda/lib64/
+
+# Target for compilation
+TARGET = xsbench
+
+# Source files
+SRC = $(wildcard *.c)
+
+# Object file
+OBJ = $(SRC:.c=.o)
+
+# Header files
+HDR = xsbench_shared_header.h
+
+# Dependencies
+DEPS = $(OBJS) $(HDR)
+
+# C++ compiler
+CXX = g++
+
+# CUDA compiler
+NVCC = nvcc
+
+# OpenMP-offload compilation flags for C++ source file
+OPENMP_CXXFLAGS += -fopenmp -fopencl-icc -O3 -g -Wall -Wextra -pedantic -std=c++11
+
+# Linker flags for CUDA device compilation (openMP-offload)
+LDFLAGS_OPENMP = $(LDFLAGS) -fopenmp -fopencl-icc -O3 -g -Wall -Wextra -pedantic -std=c++11
+
+# OpenMP-offload compiler
+OPENMP_CXX = g++
+
+# OpenMP-offload linker flag
+LDFLAGS_OPENMP = $(LDFLAGS)
+
+# CUDA compiler flags for C++ source file
+NVCC_CXXFLAGS += -O3 -g -Wall -Wextra -pedantic
+
+# Linker flag for CUDA device compilation (openMP-offload)
+NVCC_LDFLAGS += -O3 -g -Wall -Wextra -pedantic
+
+# Dependencies for CUDA compilation
+CUDA_DEPS = $(DEPS)
+
+# OpenMP-offload compilation for C++ source file
+OPENMP_CXX=$(CXX) $(OPENMP_CXXFLAGS) $< -o $@
+
+# CUDA compilation for C++ source file
+NVCC=$(NVCC) $(NVCC_CXXFLAGS) $< -o $@.cu
+
+# Makefile for cuda compilation
+cuda: $(TARGET).cu
+
+$(TARGET): $(TARGET).cu
+    $(NVCC) $(NVCC_LDFLAGS) -c $(CUDA_DEPS)
+
+$(OBJS): $(SRC:.c=.o)
+    $(CXX) $(CCFLAGS) -c $< -o $@
+
+$(TARGET): $(OBJ)
+    $(OPENMP_CXX) $(LDFLAGS_OPENMP) -fopenmp-offload $(DEPS)
+
+# Clean target
+clean:
+    rm -rf *.cu *.o *.so *.exe
+
+# Clean CUDA object file
+cuda_clean:
+    rm -rf $(TARGET).cu
+
+# Clean all object files and executables
+all: clean cuda_clean
+
+```
+This Makefile assumes that the C source code is in a directory called `src`, and the header file is in the same directory as the Makefile. The Makefile compiles the C source code into an object file using the C compiler, and then links the object file with the CUDA device compilation flags to produce a shared library.
+
+The `make SM_VERSION=80` command can be used to build the code for a system with an NVIDIA GPU with compute capability 80. The Makefile uses the following flags to achieve this:
+```bash
+CCFLAGS += -fopenmp -fopencl-icc -O3 -g -Wall -Wextra -pedantic -std=c++11
+
+LDFLAGS += -fopenmp -fopencl-icc -L/usr/local/cuda/lib64/
+
+# ...
+```
+The `NVCC` compiler is used to compile the CUDA code, and the `nvcc` flag is set to `-O3 -g -Wall -Wextra -pedantic` to enable optimization.
+
+Note that this Makefile assumes that the XSBench project uses a shared library format, and that the C source code is compiled into an object file using the `c++` compiler. The Makefile uses the `g++` compiler for both compilation and linking.

@@ -1,0 +1,76 @@
+Here is the translated `src/microXOR.cu` file for the OpenMP-Offload execution model:
+
+```cpp
+// microXOR kernel (offload)
+
+#include <iostream>
+#include <fstream>
+#include <cuda_runtime.h>
+
+#define N 1024 // adjust to your needs
+
+void cellsXOR(const int *input, int *output, size_t N) {
+  #pragma omp parallel for
+  for (int i = 0; i < N; ++i) {
+    for (int j = 0; j < N; ++j) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      output[i*N + j] = (count == 1) ? 1 : 0;
+    }
+  }
+}
+
+void cellsXOROffload(const int *input, int *output, size_t N) {
+  #pragma omp target offload
+  __attribute__((accelerate)) {
+    // Copy data from host to device (if needed)
+    // cudaMemcpy(d_input, input, N * sizeof(int), cudaMemcpyHostToDevice);
+    // cudaMemcpy(d_output, output, N * sizeof(int), cudaMemcpyDeviceToHost);
+
+    cellsXOR(input, output, N);
+  }
+}
+```
+
+In the OpenMP-Offload model, we have introduced two functions: `cellsXOR` and `cellsXOROffload`. The `cellsXOR` function is a plain C++ function that performs the kernel computation. The `cellsXOROffload` function is an offloaded function that uses OpenMP targets to execute the kernel on the device.
+
+Note that we have used the `#pragma omp target offload` directive to indicate that the data should be moved from host to device and executed offload. This requires that the compiler supports offloading, which is not supported by all compilers.
+
+Also note that in the OpenMP-Offload model, the data transfer between host and device needs to be done explicitly using `cudaMemcpy`. In this example, I have commented out these lines as they are not necessary for the execution of the kernel. However, you may need to uncomment them depending on your specific use case.
+
+In order to compile and run this code, you will also need to include the following flags:
+
+- `-fopenmp`
+- `-Ofast` (for optimized compilation)
+- `-march=native` (for native instruction set)
+
+Here is an example of how you can compile this code:
+
+```bash
+g++ -std=c++11 -Ofast -march=native -fopenmp -o microXOR microXOR.cpp
+```
+
+You will also need to link against the OpenMP runtime library.
+
+To run this code, simply call the `cellsXOROffload` function with your input and output arrays:
+
+```cpp
+int main() {
+  int input[N];
+  int output[N];
+
+  // Initialize input array
+  for (int i = 0; i < N; ++i) {
+    input[i] = rand() % 2;
+  }
+
+  cellsXOROffload(input, output, N);
+
+  return 0;
+}
+```
+
+Note that this code will work on systems with a CUDA-capable GPU. The performance gain from offloading to the device will depend on the size of your data and the capabilities of your system.

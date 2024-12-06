@@ -1,0 +1,59 @@
+```c
+#ifndef MICROXOR_OFFLOAD_CUH
+#define MICROXOR_OFFLOAD_CUH
+
+#include <iostream>
+#include <random>
+#include <cstdint>
+
+void cellsXOR(const int *input, int *output, size_t N);
+
+#endif
+```
+
+To compile and link this file with other files in the OpenMP-offload model, you can use a tool like `g++`. The general command for compiling this file would look something like this:
+
+```bash
+g++ -fopenmp -c -o cellsXOR.o cellsXOR_offload.cuh cellsXOR.cpp
+```
+
+However, since `cellsXOR` function is declared in the header file and its definition should be in a source file (e.g., `cellsXOR.cpp`). So you need to have this code in your main function:
+
+```c
+#include "microXOR_offload.cuh"
+
+int main() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 1);
+
+    const size_t N = 4;
+
+    int input[N*N] = {dis(gen), dis(gen), dis(gen), dis(gen),
+                      dis(gen), dis(gen), dis(gen), dis(gen),
+                      dis(gen), dis(gen), dis(gen), dis(gen),
+                      dis(gen), dis(gen), dis(gen), dis(gen)};
+
+    int output[N*N];
+    cellsXOR(input, output, N);
+
+    // Validate the output
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            if (i > 0 && input[(i-1)*N + j] == 1) continue;
+            if (i < N-1 && input[(i+1)*N + j] == 1) continue;
+            if (j > 0 && input[i*N + (j-1)] == 1) continue;
+            if (j < N-1 && input[i*N + (j+1)] == 1) continue;
+
+            if (output[i*N + j] != 1) {
+                std::cout << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                return 1;
+            }
+        }
+    }
+
+    std::cout << "Validation passed." << std::endl;
+
+    return 0;
+}
+```

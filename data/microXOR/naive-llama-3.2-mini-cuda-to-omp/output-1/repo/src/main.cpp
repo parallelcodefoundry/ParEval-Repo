@@ -1,0 +1,103 @@
+#include <iostream>
+#include <random>
+#include <omp.h>
+
+// Function to validate output
+void validateOutput(const int *input, int *output, size_t N) {
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            int count = 0;
+            if (i > 0 && input[(i-1)*N + j] == 1) count++;
+            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+            if (j > 0 && input[i*N + (j-1)] == 1) count++;
+            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+            if (count == 1) {
+                if (output[i*N + j] != 1) {
+                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                    return;
+                }
+            } else {
+                if (output[i*N + j] != 0) {
+                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                    return;
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    // Set seed for random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 1);
+
+    int N = 1024;  // Input matrix size
+
+    // Allocate memory on host and device
+    int *input, *output;
+    cudaMalloc((void **)&input, N * N * sizeof(int));
+    cudaMalloc((void **)&output, N * N * sizeof(int));
+
+    // Initialize input matrix with random values
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            input[i*N + j] = dis(gen);
+        }
+    }
+
+    // Allocate memory on device
+    int *d_input, *d_output;
+    cudaMalloc((void **)&d_input, N * N * sizeof(int));
+    cudaMalloc((void **)&d_output, N * N * sizeof(int));
+
+    // Copy input matrix from host to device
+    cudaMemcpy(d_input, input, N * N * sizeof(int), cudaMemcpyHostToDevice);
+
+    // Validate kernel launch parameters
+    int block_size = 32;  // Threads per block
+    dim3 threadsPerBlock(block_size, block_size);
+    int numBlocksX = (N + threadsPerBlock.x - 1) / threadsPerBlock.x;
+    int numBlocksY = (N + threadsPerBlock.y - 1) / threadsPerBlock.y;
+
+    #pragma omp parallel for
+    {
+        // Copy data from device to output matrix on host in parallel using OpenMP
+        for (size_t i = 0; i < N; i++) {
+            for (size_t j = 0; j < N; j++) {
+                int count = 0;
+                if (i > 0 && d_input[(i-1)*N + j] == 1) count++;
+                if (i < N-1 && d_input[(i+1)*N + j] == 1) count++;
+                if (j > 0 && d_input[i*N + (j-1)] == 1) count++;
+                if (j < N-1 && d_input[i*N + (j+1)] == 1) count++;
+                output[i*N + j] = (count == 1) ? 1 : 0;
+            }
+        }
+    }
+
+    // Validate kernel output
+    validateOutput(d_input, output, N);
+
+    // Copy output matrix from host to device in parallel using OpenMP
+#pragma omp parallel for
+{
+    cudaMemcpy(d_output, output, N * N * sizeof(int), cudaMemcpyHostToDevice);
+}
+
+// Copy result from device to host in parallel using OpenMP
+int *result_host;
+cudaMalloc((void **)&result_host, N * N * sizeof(int));
+cudaMemcpy(result_host, d_output, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+
+    // Validate kernel output on host
+    validateOutput(d_input, result_host, N);
+
+    // Cleanup
+    cudaFree(input);
+    cudaFree(output);
+    cudaFree(d_input);
+    cudaFree(d_output);
+    cudaFree(result_host);
+
+    return 0;
+}
