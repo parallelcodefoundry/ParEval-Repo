@@ -83,8 +83,8 @@ def gather_code_repos(args, results):
                 exp_meta_path = os.path.join(case_path, "experiment_metadata.json")
                 repo_path = os.path.join(case_path, "repo")
                 if not os.path.isfile(exp_meta_path):
-                    logging.error(f"Could not find experiment_metadata.json for {case_name} under {case_path}.")
-                    raise FileNotFoundError(f"Could not find experiment_metadata.json for {case_name} under {case_path}.")
+                    logging.info(f"Could not find experiment_metadata.json for {case_name} under {case_path}, skipping.")
+                    continue
                 if not os.path.isdir(repo_path):
                     logging.error(f"Could not find repo for {case_name} under {case_path}.")
                     raise FileNotFoundError(f"Could not find repo for {case_name} under {case_path}.")
