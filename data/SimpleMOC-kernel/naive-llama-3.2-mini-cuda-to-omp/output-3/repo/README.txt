@@ -1,1 +1,0 @@
-gcc -fopenmp -fopenmp-targets=nvcc -O3 -o main main.cu
