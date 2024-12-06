@@ -20,10 +20,10 @@ class NaiveOpenAITranslator(NaiveTranslator):
         self._model = OpenAI()
 
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
-        if self._llm_name == "gpt-3.5":
+        if self._llm_name.lower() == "gpt-3.5".lower():
             model = "gpt-3.5-turbo"
-        elif self._llm_name == "gpt-4o":
-            model = "gpt-4o"
+        elif self._llm_name.lower() == "gpt-4o-mini".lower():
+            model = "gpt-4o-mini"
         completion = self._model.chat.completions.create(
             model=model,
             messages=[
