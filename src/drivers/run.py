@@ -32,7 +32,9 @@ def check_exec(repo_data, target_config, system_config, i, args, tempdir):
 
 def run_repo(repo_data, system_config, args, tempdir):
     # Find the target config for this repo per dest model and app name
-    target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
+    target_config = find_config(repo_data["app"], repo_data["source_model"], args.target_path)
+    # patch: using source_model instead of dest_model since
+    # the translate code used source_model when it should have used dest_model
 
     # Get dep cmds from system, target config
     cmds = list_dep_cmds(system_config, target_config)

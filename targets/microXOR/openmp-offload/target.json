@@ -1,6 +1,6 @@
 {
     "app": "microxor",
-    "model": "omp",
+    "model": "openmp-offload",
     "path": "targets/microXOR/openmp-offload/repo",
     "dependencies": ["llvm", "cuda"],
     "build_commands_debug": "make SM_VERSION=sm_80 DEBUG=yes",

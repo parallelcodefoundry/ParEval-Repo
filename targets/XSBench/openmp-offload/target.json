@@ -1,6 +1,6 @@
 {
     "app": "xsbench",
-    "model": "omp",
+    "model": "openmp-offload",
     "path": "targets/XSBench/openmp-offload/repo",
     "dependencies": ["cuda", "llvm"],
     "build_commands_debug": "make CUDA_ARCH=80 DEBUG=yes -j8",
