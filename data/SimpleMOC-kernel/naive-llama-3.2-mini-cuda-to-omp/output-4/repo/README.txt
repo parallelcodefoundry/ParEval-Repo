@@ -1,1 +1,0 @@
-g++ -o main main.cpp -lcudart -lcuda -fopenmp
