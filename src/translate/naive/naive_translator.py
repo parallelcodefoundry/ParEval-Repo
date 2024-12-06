@@ -37,8 +37,30 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
 """
 
-    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume reasonable filenames for a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
+    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume {exts_set} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
 """
+
+    # Dicts of file extension mappings
+    _ext_to_type: dict = {
+        ".cu": "code",
+        ".cuh": "header",
+        ".cpp": "code",
+        ".h": "header",
+        ".hpp": "header",
+        ".c": "code",
+        ".cc": "code",
+        ".cxx": "code",
+        ".hh": "header",
+        ".hxx": "header",
+        ".c++": "code",
+        ".h++": "header"
+    }
+
+    _type_to_ext: dict = {
+        "cuda": {"code": ".cu", "header": ".cuh"},
+        "c++": {"code": ".cpp", "header": ".hpp"},
+        "c": {"code": ".c", "header": ".h"}
+    }
 
     def get_system_prompt(self):
         return self.SYSTEM_TEMPLATE.format(src_model=self._src_model, dst_model=self._dst_model)
@@ -51,7 +73,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 fpath + ":\n"
                 + self._input_repo.get_file_contents(rel_path=fpath),
                 all_fpaths))
-        prompt_config = self._input_repo.get_meta_dict()
+        prompt_config_src = self._input_repo.get_meta_dict()
+        prompt_config_dst = json.load(open(self._dst_config, 'r'))
 
         base_prompt = self.PROMPT_TEMPLATE.format(
             src_model=self._src_model,
@@ -61,18 +84,20 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             filename=fname
         )
 
-        if fname == prompt_config["main_filename"]:
+        if fname == prompt_config_src["main_filename"]:
             base_prompt += ("\n" + self.MAIN_ADDENDUM.format(
                 dst_model=self._dst_model,
-                ex_run_cmd=prompt_config["ex_run_cmd"],
-                ex_run_desc=prompt_config["ex_run_desc"]))
+                ex_run_cmd=prompt_config_dst["ex_run_cmd"],
+                ex_run_desc=prompt_config_dst["ex_run_desc"]))
 
-        if fname == prompt_config["build_filename"]:
+        if fname == prompt_config_src["build_filename"]:
+            exts_set = self._type_to_ext[prompt_config_dst["filename_desc"].lower()].values()
             base_prompt += ("\n" + self.MAKEFILE_ADDENDUM.format(
                 dst_model=self._dst_model,
-                filename_desc=prompt_config["filename_desc"],
-                ex_build_cmd=prompt_config["ex_build_cmd"],
-                ex_build_desc=prompt_config["ex_build_desc"]))
+                exts_set=", ".join(v for v in exts_set),
+                filename_desc=prompt_config_dst["filename_desc"],
+                ex_build_cmd=prompt_config_dst["ex_build_cmd"],
+                ex_build_desc=prompt_config_dst["ex_build_desc"]))
 
         return base_prompt
 
@@ -87,38 +112,18 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
 
     def update_output_file_extension(self, fname: str) -> str:
         """ Return the filename with updated extension based on the destination model """
-        # Dicts of file extension mappings
-        ext_to_type = {
-            ".cu": "code",
-            ".cuh": "header",
-            ".cpp": "code",
-            ".h": "header",
-            ".hpp": "header",
-            ".c": "code",
-            ".cc": "code",
-            ".cxx": "code",
-            ".hh": "header",
-            ".hxx": "header",
-            ".c++": "code",
-            ".h++": "header"
-        }
-        type_to_ext = {
-            "cuda": {"code": ".cu", "header": ".cuh"},
-            "C++": {"code": ".cpp", "header": ".hpp"},
-            "C": {"code": ".c", "header": ".h"}
-        }
 
         # Check if file has an extension
         if "." in fname:
             name, current_ext = os.path.splitext(fname)
 
             # Check if the extension is in the dict
-            if current_ext in ext_to_type:
+            if current_ext in self._ext_to_type:
                 if self._dst_model == "cuda":
                     ext_category = self._dst_model
                 else:
                     ext_category = self._input_repo.get_meta_dict()["filename_desc"]
-                return name + type_to_ext[ext_category][ext_to_type[current_ext]]
+                return name + self._type_to_ext[ext_category.lower()][self._ext_to_type[current_ext]]
         return fname
 
     @abstractmethod
