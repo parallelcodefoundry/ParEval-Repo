@@ -1,4 +1,4 @@
-for iter in {0..4}; do
+for iter in {0..0}; do
     python3 ../src/agent/swe-agent-translator.py \
         --repo_path "/Users/ishan/tmp/microXOR_cuda_repo" \
         --output_base_dir "/Users/ishan/pssg/code-translation/data/microXOR/SWE-agent-cuda-to-omp" \
@@ -9,5 +9,10 @@ for iter in {0..4}; do
         --host_url "http://127.0.0.1:11434" \
         --per_instance_cost_limit 0.50 \
         --input_directory "/Users/ishan/pssg/code-translation/targets/microXOR/cuda"
-    sleep 30
+    
+    python3 ../src/agent/util/clean_ansi.py \
+        --input_file "../data/microXOR/SWE-agent-cuda-to-omp/output-0/output-0-swe-agent-comments.txt" \
+        --output_file "../data/microXOR/SWE-agent-cuda-to-omp/output-0/cleaned-comments.txt"
+    
+    sleep 5
 done
