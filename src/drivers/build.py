@@ -5,7 +5,9 @@ from util import run_bash, find_config, list_dep_cmds
 
 def build_repo(repo_data, system_config, args, tempdir):
     # Find the target config for this repo per dest model and app name
-    target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
+    target_config = find_config(repo_data["app"], repo_data["source_model"], args.target_path)
+    # patch: using source_model instead of dest_model since
+    # the translate code used source_model when it should have used dest_model
 
     # Run setup commands if provided
     if "setup_commands" in target_config:
