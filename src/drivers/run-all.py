@@ -96,6 +96,9 @@ def gather_code_repos(args, results):
                         logging.debug(f"Skipping {case_path}/{case_name} because dest model {exp_meta['dest_model']} not in {args.models}.")
                         continue
 
+                    # Clean up the path in the experiment metadata
+                    exp_meta["path"] = repo_path
+
                     prompt_strategy = exp_meta["prompt_strategy"]
                     llm_name = exp_meta["llm_name"]
                     source_model = exp_meta["source_model"]
