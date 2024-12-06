@@ -104,7 +104,7 @@ if __name__ == "__main__":
     try:
         run_swe_agent(0, args)
     except subprocess.CalledProcessError as e:
-        print(f"Error during iteration 0: {e}")
+        print(f"Error during iteration: {e}")
     finally:
         print("Resetting repository...")
         reset_repo(args.repo_path)
