@@ -10,8 +10,8 @@ def get_args():
     parser.add_argument("--keys_cfg", type=str, required=True, help="Path to the keys.cfg file")
     parser.add_argument("--config_file", type=str, required=True, help="Path to the config.yaml file")
     parser.add_argument("--data_path", type=str, required=True, help="Path to the data file")
-    parser.add_argument("--model_name", type=str, default="ollama:llama3.2", help="Name of the Ollama model to use")
-    parser.add_argument("--host_url", type=str, default="http://127.0.0.1:11434", help="URL of the Ollama server")
+    parser.add_argument("--model_name", type=str, help="Name of the Ollama model to use")
+    parser.add_argument("--host_url", type=str, help="URL of the Ollama server")
     parser.add_argument("--per_instance_cost_limit", type=float, required=True, help="Cost limit per instance")
     parser.add_argument("--input_directory", type=str, required=True, help="Path to the input source directory")
     return parser.parse_args()
@@ -58,7 +58,6 @@ def run_swe_agent(iteration, args):
         "--apply_patch_locally",
         f"--per_instance_cost_limit={args.per_instance_cost_limit}"
     ]
-
 
     print(f"Running iteration {iteration}...")
 

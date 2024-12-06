@@ -6,7 +6,7 @@ for iter in {0..0}; do
         --config_file "/Users/ishan/pssg/SWE-agent/config/default.yaml" \
         --data_path "/Users/ishan/pssg/code-translation/targets/microXOR/translation_task.md" \
         --model_name "ollama:llama3.2" \
-        --host_url "http://127.0.0.1:11434" \
+        --host_url "http://localhost:11434" \
         --per_instance_cost_limit 0.50 \
         --input_directory "/Users/ishan/pssg/code-translation/targets/microXOR/cuda"
     
