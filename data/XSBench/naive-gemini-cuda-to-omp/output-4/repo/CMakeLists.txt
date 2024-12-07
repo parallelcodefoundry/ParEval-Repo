@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(
+    XSBench_OpenMP
+    VERSION 1.0
+    LANGUAGES CXX
+)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -fPIC") # Add -fPIC for shared libraries
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS}") #Set C flags to be the same as C++ flags
+
+set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp) #Change .cu to .cpp
+
+add_executable(XSBench ${SOURCE})
+target_link_libraries(XSBench ${OpenMP_CXX_FLAGS}) #Link OpenMP library
+
+# Enable OpenMP offloading
+set(CMAKE_OPENMP_FLAG "-fopenmp")
+target_compile_options(XSBench PRIVATE "${CMAKE_OPENMP_FLAG}")
+
+# Add compiler flags for offloading if needed (e.g., for specific targets)
+# Example for using OpenMP offloading with a specific device (replace with actual target)
+#if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+#  target_compile_options(XSBench PRIVATE "-fopenmp-targets=nvptx64-nvidia-cuda")
+#endif
+
+
+install(TARGETS XSBench DESTINATION bin)
