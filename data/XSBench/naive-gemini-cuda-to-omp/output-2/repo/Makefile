@@ -1,0 +1,84 @@
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= llvm
+CUDA_ARCH   ?= 80
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.c \
+io.c \
+Simulation.c \
+GridInit.c \
+XSutils.c \
+Materials.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -fopenmp -foffload=-march=native -foffload=-mllvm -foffload=-mattr=+fp16,+fp64,+fma
+
+# Linker Flags
+LDFLAGS = -lm
+
+# Compiler
+ifeq ($(COMPILER),gcc)
+  CC = gcc
+endif
+ifeq ($(COMPILER),llvm)
+  CC = clang
+endif
+
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+  LDFLAGS  += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+# CUDA Architecture Flags (passed to offloading compiler)
+CUDA_FLAGS = -foffload=$(CUDA_ARCH)
+
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
+	$(CC) $(CFLAGS) $(CUDA_FLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
+	$(CC) $(CFLAGS) $(CUDA_FLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.h XSbench_shared_header.h
+
+run:
+	./$(program)

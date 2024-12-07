@@ -1,0 +1,120 @@
+```cpp
+#include "XSbench_header.cuh"
+
+int main(int argc, char *argv[]) {
+    // =====================================================================
+    // Initialization & Command Line Read-In
+    // =====================================================================
+    int version = 20;
+    int mype = 0;
+    double omp_start, omp_end;
+    int nprocs = 1;
+    unsigned long long verification;
+
+    // Process CLI Fields -- store in "Inputs" structure
+    Inputs in = read_CLI(argc, argv);
+
+    // Print-out of Input Summary
+    if (mype == 0)
+        print_inputs(in, nprocs, version);
+
+    // =====================================================================
+    // Prepare Nuclide Energy Grids, Unionized Energy Grid, & Material Data
+    // This is not reflective of a real Monte Carlo simulation workload,
+    // therefore, do not profile this region!
+    // =====================================================================
+
+    SimulationData SD;
+
+    // If read from file mode is selected, skip initialization and load
+    // all simulation data structures from file instead
+    if (in.binary_mode == READ)
+        SD = binary_read(in);
+    else
+        SD = grid_init_do_not_profile(in, mype);
+
+    // If writing from file mode is selected, write all simulation data
+    // structures to file
+    if (in.binary_mode == WRITE && mype == 0)
+        binary_write(in, SD);
+
+    Profile profile;
+
+    // =====================================================================
+    // Cross Section (XS) Parallel Lookup Simulation
+    // This is the section that should be profiled, as it reflects a
+    // realistic continuous energy Monte Carlo macroscopic cross section
+    // lookup kernel.
+    // =====================================================================
+    if (mype == 0) {
+        printf("\n");
+        border_print();
+        center_print("SIMULATION", 79);
+        border_print();
+    }
+
+    // Start Simulation Timer
+    omp_start = get_time();
+
+    // Run simulation
+    if (in.simulation_method == EVENT_BASED) {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, mype);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, mype);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, mype);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, mype);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, mype);
+        else {
+            printf("Error: No kernel ID %d found!\n", in.kernel_id);
+            exit(1);
+        }
+    } else {
+        printf(
+            "History-based simulation not implemented in OpenMP offload. Instead,\nuse "
+            "the event-based method with \"-m event\" argument.\n");
+        exit(1);
+    }
+
+    if (mype == 0) {
+        printf("\n");
+        printf("Simulation complete.\n");
+    }
+
+
+    // End Simulation Timer
+    omp_end = get_time();
+
+    // Release device memory.  This is a no-op in the OpenMP offload model since we're not using CUDA.
+    release_memory(SD);
+
+    // Final Hash Step
+    verification = verification % 999983;
+
+    // Print / Save Results and Exit
+    int is_invalid_result =
+        print_results(in, mype, omp_end - omp_start, nprocs, verification);
+
+    print_profile(profile, in);
+
+    return is_invalid_result;
+}
+```
+To make this code compile and run correctly with OpenMP offloading, you will need to:
+
+1. **Modify the `Simulation.cu` file:**  Replace all CUDA-specific functions and keywords (e.g., `__global__`, `__device__`, `cudaMalloc`, `cudaMemcpy`, `cudaFree`, `cudaDeviceSynchronize`, `cudaPeekAtLastError`) with their OpenMP offloading equivalents.  This will require significant changes to how the kernels are launched and data is transferred to and from the device.  You'll likely use OpenMP target regions and clauses like `#pragma omp target`, `#pragma omp teams`, `#pragma omp distribute parallel for`, and data clauses to manage data movement.  The `thrust` library calls will need to be replaced with OpenMP-compatible alternatives or standard C++ algorithms.
+
+2. **Modify the `GridInit.cu` file:** Similarly, adapt the functions in this file to use OpenMP offloading for memory allocation and data transfer.
+
+3. **Update the `Makefile` and `CMakeLists.txt`:**  Change the compiler to your preferred OpenMP compiler (like g++ with OpenMP flags) and remove the CUDA-specific compiler and linker flags.  The source files will need to be treated as C++ files rather than CUDA files.
+
+4. **Header Files:** Ensure that the header files (`XSbench_header.cuh` and `XSbench_shared_header.h`) are appropriately modified to remove CUDA-specific includes and definitions and include the necessary OpenMP headers.
+
+This translation is a substantial undertaking and will involve rewriting a significant portion of the codebase.  The provided `main` function is a starting point; the real work lies in translating the CUDA kernels and data management to the OpenMP offloading model.  The complexity arises from the intricate data structures and the parallel nature of the CUDA code.  A naive translation will likely be inefficient.  Careful consideration of data layout, parallel constructs, and data transfer strategies will be crucial for achieving good performance in the OpenMP offload version.
