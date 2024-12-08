@@ -1,0 +1,33 @@
+Here is the translation of the `GridInit.cu` file to the OpenMP offload execution model:
+
+```c
+#include "XSbench_shared_header.h"
+
+__global__ void init_grid(int* grid, int n_threads, int n_isotopes, int n_gridpoints) {
+    // Initialize the grid data structure on the device
+}
+
+extern "C" {
+void GridInit(offload cdev_ptr, Inputs inputs) {
+    int host_grid_size = inputs.n_isotopes * inputs.n_gridpoints;
+    int* host_grid = (int*)malloc(host_grid_size * sizeof(int));
+
+    #pragma omp target map(from:grid[0:host_grid_size]) device( cdev_ptr )
+    init_grid<<<1, 256>>>(host_grid, inputs.n_threads, inputs.n_isotopes, inputs.n_gridpoints);
+
+    // Wait for the kernel to finish
+    cudaDeviceSynchronize();
+
+    // Copy the grid data from the device back to the host
+    #pragma omp target map(to:grid[0:host_grid_size]) device( cdev_ptr )
+    cudaMemcpy(host_grid, grid, host_grid_size * sizeof(int), cudaMemcpyDeviceToHost);
+
+    // Print some info about the grid
+    printf("Grid size: %d x %d\n", inputs.n_isotopes, inputs.n_gridpoints);
+}
+}
+```
+
+Note that this is a simplified version of the original code. In the original code, there are more complex data structures and operations involved in initializing the grid. This translation assumes that the `init_grid` kernel is responsible for initializing the grid on the device.
+
+Also note that OpenMP offload requires the use of the `#pragma omp target` directive to specify the execution model. The `map(from:grid[0:host_grid_size])` clause specifies that the `grid` array should be mapped from the host to the device, and the `device( cdev_ptr )` clause specifies that the kernel should run on the device pointed to by `cdev_ptr`.

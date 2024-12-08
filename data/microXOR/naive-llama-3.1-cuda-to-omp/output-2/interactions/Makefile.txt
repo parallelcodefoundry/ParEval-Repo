@@ -1,0 +1,33 @@
+Here is the translated Makefile:
+```
+# OpenMP-offload Makefile
+CXX = $(CXX_COMPILER)
+SM_VERSION := $(SM_VERSION)
+OFFLOAD_DEVICES = nvidia
+OFFLOAD_ARCHS = $(SM_VERSION)
+
+default: main.cpp microXOR.cpp
+	$(CXX) -fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS) $^ -o main
+
+clean:
+	rm -rf main
+
+%.o : %.cpp
+	$(CXX) -c -fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS) $< -o $@
+
+microXOR.o: microXOR.cpp
+main.o: main.cpp
+
+microXOR.cpp:
+main.cpp:
+```
+Note that the following changes have been made:
+
+* `CXX` is set to the user-specified compiler, `CXX_COMPILER`.
+* The `SM_VERSION` environment variable is used to specify the target architecture.
+* The `OFFLOAD_DEVICES` and `OFFLOAD_ARCHS` variables are set to "nvidia" and $(SM_VERSION), respectively.
+* The `-fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS)` flags are added to compile with OpenMP and offloading support.
+* The source files are compiled as C++ files (`.cpp`) instead of CUDA files (`.cu`).
+* The `clean` target is modified to remove only the generated executable file.
+
+This Makefile can be used to build a C++ program that uses OpenMP offloading to NVIDIA GPUs. To use it, simply set the `SM_VERSION`, `CXX_COMPILER`, and other environment variables as needed, and run `make`.

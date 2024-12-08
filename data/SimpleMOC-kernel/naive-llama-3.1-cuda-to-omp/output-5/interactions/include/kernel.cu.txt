@@ -1,0 +1,103 @@
+To translate the `include/kernel.cu` file to the OpenMP Offloading execution model, we need to replace CUDA-specific code with OpenMP Offloading APIs. Here's the translated `kernel.cu` file:
+
+```c
+#include <omp.h>
+
+#define MAX_THREADS 256
+
+// Function to initialize fine source and flux data
+Source *initialize_fine_data(Input I) {
+    Source *sources = (Source *) malloc(I.source_3D_regions * sizeof(Source));
+    // Initialize fine source and flux to random numbers
+    for(long i = 0; i < I.fine_axial_intervals * I.egroups * I.source_3D_regions; i++) {
+        sources[i].fine_source = (float) rand() / RAND_MAX;
+        sources[i].fine_flux = (float) rand() / RAND_MAX;
+    }
+    return sources;
+}
+
+// Function to build a table of exponential values for linear interpolation
+Table buildExponentialTable() {
+    // define table
+    Table table;
+
+    //float precision = 0.01;
+    float maxVal = 10.0;    
+
+    // compute number of array values
+    int N = (int) (maxVal * sqrt(1.0 / (8.0 * 0.01)));
+
+    // store linear segment information (slope and y-intercept)
+    for(int n = 0; n < N; n++) {
+        float exponential = exp(-n);
+        table.values[2*n] = -exponential;
+        table.values[2*n + 1] = 1 + (n * 1.0 - 1) * exponential;
+    }
+
+    // assign data to table
+    table.dx = 1.0 / N;
+    table.maxVal = maxVal - table.dx;
+    table.N = N;
+
+    return table;
+}
+
+int main() {
+    // Initialize OpenMP Offloading context
+    omp_set_num_threads(MAX_THREADS);
+
+    // Initialize input parameters
+    Input I;
+
+    // Initialize fine source and flux data on the host
+    Source *sources_h = initialize_fine_data(I);
+
+    // Create a team of threads
+    #pragma omp parallel {
+        // Get the thread ID
+        int tid = omp_get_thread_num();
+
+        // Initialize device sources
+        Source_Arrays *SA_d;
+        Source *sources_d;
+
+        // Copy fine source and flux data to the device
+        cudaMalloc((void **)&SA_d, sizeof(Source_Arrays));
+        cudaMemset(SA_d, 0, sizeof(Source_Arrays));
+
+        #pragma omp single
+        {
+            // Allocate memory for fine source and flux on the device
+            cudaMalloc((void **)&SA_d->fine_source_arr, I.fine_axial_intervals * I.egroups * I.source_3D_regions * sizeof(float));
+            cudaMemset(SA_d->fine_source_arr, 0, I.fine_axial_intervals * I.egroups * I.source_3D_regions * sizeof(float));
+
+            // Copy fine source and flux data from the host to the device
+            cudaMemcpy(SA_d->fine_source_arr, sources_h->fine_source_arr, I.fine_axial_intervals * I.egroups * I.source_3D_regions * sizeof(float), cudaMemcpyHostToDevice);
+
+            // Initialize device sources
+            sources_d = initialize_device_sources(I, (Source_Arrays *) SA_d);
+        }
+
+        // Synchronize the team of threads
+        #pragma omp barrier
+
+        // Perform kernel launch on the device
+        #pragma omp single
+        {
+            kernel_launch(sources_d, I);
+        }
+    }
+
+    return 0;
+}
+```
+
+Note that this is a partial translation as some functions and variables are not defined. Also, OpenMP Offloading is used in this example for illustration purposes only; actual performance may vary depending on the specific use case.
+
+To compile this code with OpenMP Offloading support:
+
+```bash
+gcc -fopenmp kernel.cu -o kernel.exe
+```
+
+Please note that you'll need to have a compatible compiler and CUDA toolkit installed. This is just an example of how the file could be translated; actual translation may require more modifications depending on the original code.

@@ -1,0 +1,43 @@
+Here is the translated Makefile for the OpenMP Offload execution model:
+
+```makefile
+# Makefile for OpenMP Offload microXOR
+
+CXX ?= $(CXX_COMPILER)
+SM_VERSION ?= 80
+SRC = src
+INC = include
+OBJ = obj
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx-none -I$(INC) -std=c++17
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+LDFLAGS ?= -lcudart
+
+CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CPPFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
+
+clean:
+	rm -f $(OBJS) $(EXE)
+
+.PHONY: clean
+```
+
+### Changes Made:
+1. Changed the compiler from `nvcc` to a C++ compiler (e.g., `clang++`) with OpenMP support.
+2. Updated the flags to include OpenMP offload options (`-fopenmp` and `-fopenmp-targets=nvptx-none`).
+3. Renamed the source files from `.cu` to `.cpp` and header files from `.cuh` to `.hpp`.
+4. Adjusted the object file and executable names accordingly.

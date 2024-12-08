@@ -1,0 +1,89 @@
+To translate the `SimpleMOC-kernel_header.h` file from the CUDA execution model to the OpenMP-offload execution model, we need to replace CUDA-specific headers and types with their OpenMP equivalents. Here's how the translated header file would look:
+
+```c
+#ifndef __SimpleMOC_header
+#define __SimpleMOC_header
+
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <malloc.h>
+#include <assert.h>
+
+// User inputs
+typedef struct {
+    int source_2D_regions;
+    int source_3D_regions;
+    int coarse_axial_intervals;
+    int fine_axial_intervals;
+    int decomp_assemblies_ax; // Number of subdomains per assembly axially
+    long segments;
+    int egroups;
+    int nthreads;
+    int streams;
+    int seg_per_thread;
+    size_t nbytes;
+} Input;
+
+// Source Region Structure
+typedef struct {
+    long fine_flux_id;
+    long fine_source_id;
+    long sigT_id;
+} Source;
+
+// Source Arrays
+typedef struct {
+    float *fine_flux_arr;
+    float *fine_source_arr;
+    float *sigT_arr;
+} Source_Arrays;
+
+// Table structure for computing exponential
+typedef struct {
+    float values[706];
+    float dx;
+    float maxVal;
+    int N;
+} Table;
+
+// Function prototypes for kernels and utility functions
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
+void interpolateTable(Table *table, float x, float *out);
+
+// init.c
+double mem_estimate(Input I);
+void setup_kernel(unsigned int *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
+Source *initialize_sources(Input I, Source_Arrays *SA);
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+Table buildExponentialTable(void);
+Input set_default_input(void);
+
+// io.c
+void logo(int version);
+void center_print(const char *s, int width);
+void border_print(void);
+void fancy_int(int a);
+void print_input_summary(Input input);
+void read_CLI(int argc, char *argv[], Input *input);
+void print_CLI_error(void);
+
+#endif
+```
+
+### Key Changes:
+1. **Header Files**: Removed CUDA-specific headers (`<curand_kernel.h>`, `<cuda.h>`) and added `<omp.h>` for OpenMP support.
+2. **Random Number Generation**: The `curandState` type is replaced with a generic `unsigned int` type for random state management. In OpenMP, you might use standard C/C++ random number generation functions or libraries.
+3. **Function Prototypes**: Updated function prototypes to remove CUDA-specific qualifiers and replace them with standard C function prototypes. The actual implementation of these functions will need to be adapted to use OpenMP pragmas and constructs.
+4. **Error Checking**: Removed CUDA error checking macros since OpenMP does not require similar constructs. Error handling will be different in OpenMP and should be implemented in the respective source files.
+
+The actual implementation of the functions in the source files will need to be adapted to use OpenMP pragmas for parallel execution and data management.

@@ -1,0 +1,54 @@
+#include <omp.h>
+#include <iostream>
+
+__attribute__((reqd_work_group_size(1, 1, 1))) __kernel void init_sources(
+    __global Source *sources,
+    __global float *fine_source_arr,
+    __global float *fine_flux_arr,
+    __global float *sigT_arr
+) {
+    int idx = get_global_id(0);
+    sources[idx].fine_source_id = fine_source_arr[idx];
+    sources[idx].fine_flux_id = fine_flux_arr[idx];
+    sources[idx].sigT_id = sigT_arr[idx];
+}
+
+__attribute__((reqd_work_group_size(1, 1, 1))) __kernel void init_device_sources(
+    __global Source *sources_d,
+    __global float *SA_h_fine_source_arr,
+    __global float *SA_h_fine_flux_arr,
+    __global float *SA_h_sigT_arr
+) {
+    int idx = get_global_id(0);
+    sources_d[idx].fine_source_id = SA_h_fine_source_arr[idx];
+    sources_d[idx].fine_flux_id = SA_h_fine_flux_arr[idx];
+    sources_d[idx].sigT_id = SA_h_sigT_arr[idx];
+}
+
+int main() {
+    // OpenMP offload clause
+    #pragma omp target data map(to:SA_h) device(0)
+    {
+
+        Source_Arrays SA_h;
+        Source *sources_h = initialize_sources(SA_h);
+
+        // Initialize fine source and flux to random numbers on host
+        for (long i = 0; i < N_fine; i++) {
+            SA_h.fine_source_arr[i] = (float) rand() / RAND_MAX;
+            SA_h.fine_flux_arr[i] = (float) rand() / RAND_MAX;
+        }
+
+        // Initialize SigT Values
+        for (int i = 0; i < N_sigT; i++) {
+            SA_h.sigT_arr[i] = (float) rand() / RAND_MAX;
+
+        // Offload to device with initialization of sources
+        Source *sources_d = initialize_device_sources(SA_h, SA_d);
+    }
+
+    // Initialize exponential table on host
+    Table table = buildExponentialTable();
+
+    return 0;
+}

@@ -1,0 +1,49 @@
+Here is the translated Makefile in one code block:
+```
+# Makefile for openmp-offload execution model
+
+SM_VERSION ?= 80
+CXX = clang
+CUDA_DIR = /usr/local/cuda-11.x
+
+ifeq ($(shell uname -s), Linux)
+    CFLAGS += -L$(CUDA_DIR)/lib64 -lcudart -lcusolver -lculibos -lnvrtc_static 
+    CXX = $(CUDA_DIR)/bin/nvcc
+else ifeq ($(shell uname -s), Darwin)
+    CFLAGS += -L/opt/cuda-11.x/targets/x86_64-darwin/lib/stubs -lcudart -lcusolver -lculibos -lnvrtc_static 
+    CXX = $(CUDA_DIR)/bin/nvcc
+endif
+
+# OpenMP flags for offloading to GPU
+OPENMP_FLAGS = -fopenmp-targets=nvidia-cuda --offload-architecture=sm_$(SM_VERSION)
+
+CFLAGS += -O3 -std=c++11 -D__NVCC__ $(OPENMP_FLAGS)
+LDFLAGS += -lcudart
+
+OBJS = init.o main.o utils.o cuda_helper.o
+
+%.o: %.c
+    $(CXX) -c $< -o $@ $(CFLAGS)
+
+init.o: init.c utils.h
+main.o: main.c init.h utils.h
+utils.o: utils.c
+cuda_helper.o: cuda_helper.c
+
+all: program.exe
+
+program.exe: main.o init.o utils.o cuda_helper.o
+    $(CXX) -o $@ $^ $(LDFLAGS)
+
+clean:
+    rm -f *.o *.exe
+```
+Note that I've assumed the following:
+
+* You are using CUDA 11.x as your CUDA installation.
+* Your system is either Linux or macOS (as these are the only two platforms supported by NVIDIA).
+* You want to use clang as your C++ compiler, and nvcc as your CUDA compiler.
+* You have installed the necessary libraries (`libcudart`, `libcusolver`, `libculibos`, and `libnvrtc_static`) in the `/usr/local/cuda-11.x/lib64` directory (or a similar location on macOS).
+* The NVIDIA library directory is located at `/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/` (this may need to be adjusted depending on your system configuration).
+
+Please note that you will need to modify the Makefile as necessary to match your specific system and installation setup.

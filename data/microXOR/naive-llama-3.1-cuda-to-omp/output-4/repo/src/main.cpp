@@ -1,0 +1,105 @@
+// microXOR driver
+
+#include "microXOR.cuh"
+
+#define NUM_THREADS_PER_BLOCK_X 32
+#define NUM_THREADS_PER_BLOCK_Y 32
+
+int main(int argc, char** argv) {
+    int N = 0;
+    if (argc < 2 || atoi(argv[1]) <= 0) {
+        std::cerr << "Error: invalid input size" << std::endl;
+        return 1;
+    }
+    N = atoi(argv[1]);
+
+    if (argc < 3 || strcmp(argv[2], "-threads=32") != 0) {
+        std::cerr << "Error: invalid number of threads per block" << std::endl;
+        return 1;
+    }
+
+    int* input = new int[N*N];
+    int* output = new int[N*N];
+
+    // Initialize the input matrix
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            if ((i == 0 || j == 0) || (i == N-1 || j == N-1)) {
+                input[i*N + j] = 0;
+            } else {
+                // Initialize the input matrix with some values
+                input[i*N + j] = rand() % 2;
+            }
+        }
+    }
+
+    int* d_input, *d_output;
+
+    cl_mem cl_input, cl_output;
+    cl_context context;
+    cl_command_queue queue;
+    cl_device_id device;
+    cl_platform_id platform;
+
+    // Create a OpenCL context and command queue
+    cl_int error = CL_SUCCESS;
+    clGetDeviceIDs(0, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
+    context = clCreateContext(NULL, 1, &device, NULL, NULL, &error);
+
+    // Create buffers for input and output on the device
+    cl_input = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, N*N*sizeof(int), input, NULL);
+    cl_output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, N*N*sizeof(int), NULL, NULL);
+
+    // Enqueue kernel execution
+    cl_event event;
+    clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_input);
+    clSetKernelArg(kernel, 1, sizeof(cl_mem), &cl_output);
+    clSetKernelArg(kernel, 2, sizeof(int), &N);
+    clEnqueueNDRangeKernel(queue, kernel, 2, NULL, (size_t)N*NUM_THREADS_PER_BLOCK_X, (size_t)NUM_THREADS_PER_BLOCK_Y, 0, NULL, &event);
+
+    // Wait for the kernel to finish
+    clWaitForEvents(1, &event);
+
+    // Read output from the device
+    clEnqueueReadBuffer(queue, cl_output, CL_TRUE, 0, N*N*sizeof(int), output, 0, NULL, NULL);
+
+    /*
+    for (int i = 0; i < N*N; i++) {
+        std::cout << output[i] << " ";
+        if (i % N == N - 1) std::cout << std::endl;
+    }
+    */
+
+    // Validate the output
+    bool validation_passed = true;
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            int count = 0;
+            if (i > 0 && input[(i-1)*N + j] == 1) count++;
+            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+            if (j > 0 && input[i*N + (j-1)] == 1) count++;
+            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+            if (count == 1) {
+                if (output[i*N + j] != 1) {
+                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                    validation_passed = false;
+                }
+            } else {
+                if (output[i*N + j] != 0) {
+                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                    validation_passed = false;
+                }
+            }
+        }
+    }
+    if (validation_passed)
+        std::cout << "Validation passed." << std::endl;
+
+    // Cleanup
+    clReleaseMemObject(cl_input);
+    clReleaseMemObject(cl_output);
+    delete[] input;
+    delete[] output;
+
+    return 0;
+}

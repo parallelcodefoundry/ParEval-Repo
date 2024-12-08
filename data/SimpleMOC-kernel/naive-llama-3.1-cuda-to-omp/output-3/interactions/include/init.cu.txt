@@ -1,0 +1,74 @@
+To translate the `include/init.cu` file to the OpenMP Offload execution model, we need to make the following changes:
+
+1.  Replace all CUDA kernel launch syntax with OpenMP target offloading directives.
+2.  Replace CUDA memory management functions like `cudaMalloc`, `cudaMemcpy`, etc., with OpenMP target data clauses.
+3.  Remove any CUDA-specific headers and includes.
+
+Here is the translated code in one code block:
+```cpp
+#include <omp.h>
+
+// ... (other includes and definitions)
+
+Table buildExponentialTable( void )
+{
+    // define table
+    Table table;
+
+    //float precision = 0.01;
+    float maxVal = 10.0;   
+
+    // compute number of arry values
+    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
+    int N = 353; 
+
+    // compute spacing
+    float dx = maxVal / (float) N;
+
+#pragma omp target data map(to:table.values[:2*N]) map(from:dx,maxVal,N)
+    {
+        for( int n = 0; n < N; n++ )
+        {
+            // compute slope and y-intercept for ( 1 - exp(-x) )
+            float exponential = exp( - n * dx );
+            table.values[ 2*n ] = - exponential;
+            table.values[ 2*n + 1 ] = 1 + ( n * dx - 1 ) * exponential;
+        }
+
+        // assign data to table
+        table.dx = dx;
+        table.maxVal = maxVal - table.dx;
+        table.N = N;
+    }
+
+    return table;
+}
+
+void __ompCheckError( const char *file, const int line )
+{
+#ifdef OPENMP_ERROR_CHECK
+    omp_err_t err = omp_get_error();
+    if ( omp_no_error != err )
+    {
+        fprintf( stderr, "ompCheckError() failed at %s:%i : %s\n",
+                 file, line, omp_strerror(err) );
+        exit( -1 );
+    }
+ 
+    // More careful checking. However, this will affect performance.
+    // Comment away if needed.
+    err = omp_get_last_status();
+    if(omp_success != err)
+    {
+        fprintf(stderr, "ompCheckError() with sync failed at %s:%i : %s\n",
+                file, line, omp_strerror(err) );
+        exit(-1);
+    }
+#endif
+ 
+    return;
+}
+```
+Note that we have replaced the CUDA-specific headers and includes with OpenMP ones. We have also replaced the CUDA kernel launch syntax with OpenMP target offloading directives and removed any CUDA memory management functions.
+
+The `__ompCheckError` function is similar to the original `__cudaCheckError` function, but it uses OpenMP error checking instead of CUDA error checking.

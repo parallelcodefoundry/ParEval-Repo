@@ -1,0 +1,9 @@
+{
+    "app": "XSBench",
+    "prompt_strategy": "naive",
+    "llm_name": "gpt-4o-mini",
+    "source_model": "cuda",
+    "dest_model": "openmp-offload",
+    "output_number": 1,
+    "path": "../../../data/XSBench/naive-gpt-4o-mini-cuda-to-omp/output-1/repo"
+}

@@ -1,0 +1,21 @@
+Here is the translation of `include/microXOR.cuh` to the OpenMP-offload execution model:
+
+```c
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+
+#pragma offload_attribute(push, target devices(opencl:gpu))
+__global__ void cellsXOR(const int *input, int *output, size_t N);
+#pragma offload_attribute(pop)
+
+#endif  // MICROXOR_CUH
+```
+
+Note that the OpenMP-offload attribute is used to specify the device where the kernel will be executed. In this case, we're targeting an OpenCL GPU device.
+
+Also note that in OpenMP-offload, the kernel definition must not include any OpenACC or CUDA specific attributes. The kernel function should be defined as a plain C++ function without any special attributes.
+
+In order to use OpenMP-offload, you need to link your program with the offload library (e.g., `-lomp` in GCC).

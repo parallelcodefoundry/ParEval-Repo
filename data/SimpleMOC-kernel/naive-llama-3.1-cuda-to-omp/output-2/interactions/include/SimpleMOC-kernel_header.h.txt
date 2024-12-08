@@ -1,0 +1,56 @@
+Here is the translation of `include/SimpleMOC-kernel_header.h` to OpenMP offloading:
+
+```c
+#ifndef __SIMPLE_MOC_KERNEL_HEADER__
+#define __SIMPLE_MOC_KERNEL_HEADER__
+
+#include <omp.h>
+
+// Define the number of threads for OpenMP
+#define NUM_THREADS 4
+
+// Define a function to initialize device sources
+void init_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
+
+// Define a kernel function to perform computation on the device
+__global__
+void compute_kernel( Input I, Source_Arrays * SA_d ) {
+    // Get the global thread ID
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Perform computation based on the input and source arrays
+    if (tid < I.source_3D_regions) {
+        // Access source array data using offloaded pointers
+        float fine_source_val = SA_d->fine_source_arr[tid];
+        float fine_flux_val = SA_d->fine_flux_arr[tid];
+        float sigT_val = SA_d->sigT_arr[tid];
+
+        // Perform computation using the accessed values
+        // ...
+    }
+}
+
+// Define a function to build an exponential table for linear interpolation
+Table build_exponential_table( void );
+
+#endif  // __SIMPLE_MOC_KERNEL_HEADER__
+```
+
+Note that this translation assumes you have already written the kernel function `compute_kernel` and other functions in C++ with OpenMP offloading directives. The translated code snippet only shows the interface and headers necessary for the kernel to be executed on a device.
+
+In your main program, you would need to add the following lines:
+
+```c
+omp_set_num_threads(NUM_THREADS);
+init_device_sources( I, SA_h, SA_d, sources_h );
+
+// Launch the kernel on the device
+int num_blocks = (I.source_3D_regions + 255) / 256;
+dim3 dim_block(16, 1, 1);
+compute_kernel<<<num_blocks, dim_block>>>( I, SA_d );
+__cudaCheckError(__FILE__, __LINE__);
+```
+
+This code sets the number of threads for OpenMP and initializes device sources. It then launches the kernel function on the device with the appropriate block configuration.
+
+Please note that this is a simplified example and you may need to adjust it based on your specific use case and requirements.

@@ -1,0 +1,80 @@
+```c
+// microXOR driver (OpenMP version)
+
+#include "microXOR.cuh"
+#include <omp.h>
+
+int main(int argc, char** argv) {
+    if (argc != 3) {
+        std::cerr << "Usage: ./microXOR.exe N BLOCK_SIZE" << std::endl;
+        return 1;
+    }
+
+    int N = atoi(argv[1]);
+    int blockSize = atoi(argv[2]);
+
+    // Allocate input and output arrays on the host
+    int* input = (int*)malloc(N * N * sizeof(int));
+    int* output = (int*)malloc(N * N * sizeof(int));
+
+    // Initialize input array
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            input[i*N + j] = rand() % 2;
+        }
+    }
+
+    // Create OpenMP device team with the number of threads equal to BLOCK_SIZE
+    omp_set_num_threads(blockSize);
+#pragma omp target teams distribute parallelize(collapse(4))
+    {
+        // Allocate input and output arrays on the device
+        int* d_input = (int*)omp_target_alloc(N * N * sizeof(int));
+        int* d_output = (int*)omp_target_alloc(N * N * sizeof(int));
+
+        // Copy input array to the device
+        omp_target_memcpy(d_input, input, N * N * sizeof(int), omp_direction_from_host);
+
+        // Launch kernel on an NxN grid of threads
+        cellsXOR<<<omp_get_num_teams(), blockSize>>>(d_input, d_output, N);
+
+        // Copy output array from the device to the host
+        omp_target_memcpy(output, d_output, N * N * sizeof(int), omp_direction_to_host);
+    }
+
+    // Validate the output
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            int count = 0;
+            if (i > 0 && input[(i-1)*N + j] == 1) count++;
+            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+            if (j > 0 && input[i*N + (j-1)] == 1) count++;
+            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+            if (count == 1) {
+                if (output[i*N + j] != 1) {
+                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                    return 1;
+                }
+            } else {
+                if (output[i*N + j] != 0) {
+                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+                    return 1;
+                }
+            }
+        }
+    }
+
+    std::cout << "Validation passed." << std::endl;
+
+    // Free device memory
+    omp_target_free(d_input);
+    omp_target_free(d_output);
+
+    // Clean up host memory
+    free(input);
+    free(output);
+
+    return 0;
+}
+```
+This translated code uses OpenMP to parallelize the kernel execution. The main function remains similar, but it now uses OpenMP directives to allocate and manage device memory, copy data between the host and device, and launch the kernel on a distributed grid of threads. Note that you need to link against an implementation of OpenMP-offload (e.g., OpenACC) to compile this code.

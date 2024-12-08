@@ -1,0 +1,46 @@
+Here is the `include/microXOR.cuh` file translated from the CUDA execution model to the OpenMP offload execution model:
+
+```c
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+
+// Define a macro for the number of threads in each direction
+#define NUM_THREADS_X 32
+#define NUM_THREADS_Y 32
+
+#pragma offload_attribute(push)
+#pragma offload_attribute(target(mic))
+extern "C" {
+void cellsXOR(int *input, int *output, size_t N);
+}
+
+// Kernel function declaration (not necessary with OpenMP offload)
+// __global__ void cellsXOR(const int *input, int *output, size_t N);
+
+#endif  // MICROXOR_CUH
+```
+
+Note that we define the number of threads in each direction using macros. In an actual application, you would want to use a more flexible way to specify these values.
+
+Also note that OpenMP offload does not require explicit kernel function declarations like CUDA does. The `cellsXOR` function will be automatically translated by the compiler when used with OpenMP directives.
+
+The `#pragma offload_attribute(push)` and `#pragma offload_attribute(pop)` directives are used to specify the target architecture (in this case, a MIC device) for the functions that follow.
+
+Here's how you might use this header file in your kernel source code:
+
+```c
+#include "microXOR.cuh"
+
+__attribute__((offload( target(mic), c(1) )))
+void cellsXOR(int *input, int *output, size_t N)
+{
+    // Kernel function implementation here...
+}
+```
+
+In the above example, `cellsXOR` is marked with the `offload` attribute to specify that it should be offloaded to a MIC device. The `(c(1))` clause specifies that this function should be called on the host (i.e., the CPU). You would replace this with the relevant OpenMP offload directives for your use case.
+
+Remember to compile your code with the `-fopenmp-targets=mic` flag and link it against an OpenMP offload-enabled library to enable MIC offloading.

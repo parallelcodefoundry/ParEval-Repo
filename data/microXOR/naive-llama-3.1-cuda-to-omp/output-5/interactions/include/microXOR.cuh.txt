@@ -1,0 +1,41 @@
+Here is the translated `include/microXOR.cuh` file for OpenMP-offload:
+
+```c
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+#include <omp.h>
+
+void cellsXOR(const int *input, int *output, size_t N);
+
+#endif
+```
+
+In the OpenMP-offload execution model, kernel functions are not defined in header files. Instead, they should be implemented in a .cu file and then compiled with nvcc.
+
+Here is an example of how you could implement the `cellsXOR` function in a .cu file (e.g., `microXOR.cu`) for OpenMP-offload:
+
+```c
+#include "microXOR.h"
+
+#pragma offload_target(accelerator_type:gpu)
+void cellsXOR(const int *input, int *output, size_t N) {
+    #pragma omp parallel for
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            int count = 0;
+            if (i > 0 && input[(i-1)*N + j] == 1) count++;
+            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+            if (j > 0 && input[i*N + (j-1)] == 1) count++;
+            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+            output[i*N + j] = (count == 1) ? 1 : 0;
+        }
+    }
+}
+```
+
+This implementation uses the `omp parallel for` directive to parallelize the loops over the grid. The OpenMP compiler will generate code that is executed on the GPU, taking advantage of its massive parallelism.
+
+Note: Make sure you have the OpenACC and/or OpenMP compilers installed on your system, as well as the NVIDIA drivers (if targeting a CUDA GPU).

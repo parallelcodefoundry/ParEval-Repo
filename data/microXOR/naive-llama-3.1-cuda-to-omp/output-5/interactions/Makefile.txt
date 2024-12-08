@@ -1,0 +1,47 @@
+```Makefile
+# Makefile translated from CUDA to OpenMP-offload
+
+CXX = clang++
+CXXFLAGS = -fopenmp -fopenacc
+LDLIBS = -lomp
+SM_VERSION ?= $(shell ompi_info --version)
+ifeq ($(SM_VERSION), 80)
+    CXXFLAGS += -acc -Minfo=all
+endif
+
+CC = clang
+CFLAGS = -fopenmp -fopenacc
+
+# Default target is build
+build: microXOR.cpp microXOR.hpp main.cpp
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+
+main.o: main.cpp microXOR.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+microXOR.o: microXOR.cpp microXOR.hpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Cleaning target
+clean:
+	rm -f *.o build
+
+# Target for building for a specific SM version
+build-sm-80: CXX = clang++
+build-sm-80: LDLIBS = -lomp
+build-sm-80: microXOR.cpp microXOR.hpp main.cpp
+	$(CXX) $(CXXFLAGS) -acc -Minfo=all $^ -o $@ $(LDLIBS)
+
+# Target for building with a specific C++ compiler
+build-cxx-compiler: CXX = clang++
+build-cxx-compiler: LDLIBS =
+build-cxx-compiler: microXOR.cpp microXOR.hpp main.cpp
+	$(CXX) $(CXXFLAGS) $^ -o build $(LDLIBS)
+```
+
+Note that I've made the following changes:
+- Replaced `CXX` with `clang++`, as OpenMP-offload requires a C++ compiler.
+- Added `-fopenmp` to enable OpenMP support.
+- Removed CUDA-specific flags and libraries (e.g., `-device-cuda`, `-ccbin=/usr/bin/nvcc`, `--gpu-architecture=sm_80`).
+- Replaced the build target with a generic one that compiles all `.cpp` files in the directory. You can change this to suit your specific needs.
+- Added targets for building for a specific SM version (e.g., `build-sm-80`) and using a specific C++ compiler (e.g., `build-cxx-compiler`). These targets allow you to customize the build process by specifying additional flags or libraries as needed.

@@ -1,0 +1,25 @@
+Here is the translated Makefile to compile this code as an OpenMP-offload code:
+
+```makefile
+# We define a variable for our SM_VERSION (compute capability)
+SM_VERSION ?= 80
+
+# We specify the path to the NVIDIA libraries
+CUDA_LIB_PATH ?= /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+
+# We specify the compiler and CXX flags
+CXX = clang
+CXXFLAGS = -std=c++11 -fopenmp
+
+# We compile each file separately using the NVCC compiler (which supports offloading to NVIDIA GPUs)
+.cu.o:
+    $(NVCC) $(CXXFLAGS) -D__CUDA_ARCH__=$(SM_VERSION) -ccbin=$(CXX) -I. $< -o $@
+
+# We link all object files together
+%.exe: %.cu.o
+    $(NVCC) $(LDFLAGS) $^ -L$(CUDA_LIB_PATH) -lcudart -lnvtoolkit $(LIBS) -o $@
+```
+
+Note that we're assuming `clang` as the compiler, and also including the necessary libraries (`-L` flag is used to specify the library path). We're using the NVCC compiler (which supports offloading to NVIDIA GPUs) to compile each `.cu` file. The resulting executable will be linked against the cudart library.
+
+Also note that this Makefile assumes you have `nvcc` installed and configured properly on your system. If you want to use a different compiler or flags, feel free to modify them according to your needs.

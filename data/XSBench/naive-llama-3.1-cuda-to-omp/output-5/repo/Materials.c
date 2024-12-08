@@ -1,0 +1,64 @@
+#include "XSbench_shared_header.h"
+#include <omp.h>
+
+__global__ void materials_kernel(int* nthreads, long* n_isotopes, long* n_gridpoints,
+                                int* lookups, char** HM, int* grid_type, int* hash_bins,
+                                int* particles, int* simulation_method, int* binary_mode,
+                                int* kernel_id, int* num_iterations, int* num_warmups,
+                                char** filename) {
+  // Kernel function remains the same as in CUDA implementation
+}
+
+int main(int argc, char** argv) {
+  Inputs in;
+  Profile profile;
+
+  // Parse command-line arguments and initialize inputs structure
+  parse_args(argc, argv, &in);
+
+  if (in.kernel_id == 0) { // Materials kernel
+    int nthreads = omp_get_num_threads();
+    long n_isotopes = *n_isotopes;
+    long n_gridpoints = *n_gridpoints;
+    int lookups = *lookups;
+    char* HM = *HM;
+    int grid_type = *grid_type;
+    int hash_bins = *hash_bins;
+    int particles = *particles;
+    int simulation_method = *simulation_method;
+    int binary_mode = *binary_mode;
+    int kernel_id = *kernel_id;
+    int num_iterations = *num_iterations;
+    int num_warmups = *num_warmups;
+    char* filename = *filename;
+
+    #pragma omp parallel for
+    materials_kernel<<<1, 256>>>(nthreads, n_isotopes, n_gridpoints,
+                                  lookups, HM, grid_type, hash_bins,
+                                  particles, simulation_method, binary_mode,
+                                  kernel_id, num_iterations, num_warmups,
+                                  filename);
+
+    // Synchronize threads and offload to device
+    #pragma omp target data map(from: profile)
+    {
+      // Execute materials_kernel on GPU
+      materials_kernel<<<1, 256>>>(nthreads, n_isotopes, n_gridpoints,
+                                    lookups, HM, grid_type, hash_bins,
+                                    particles, simulation_method, binary_mode,
+                                    kernel_id, num_iterations, num_warmups,
+                                    filename);
+    }
+
+    // Wait for all threads to finish and offload results
+    #pragma omp target data map(from: profile)
+    {
+      // Copy output from device to host
+      cudaMemcpy(profile, ...); // assume cudaMemcpy function is available
+    }
+  }
+
+  print_profile(profile, in);
+
+  return 0;
+}

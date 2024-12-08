@@ -1,0 +1,21 @@
+Certainly! Below is the translation of the `include/microXOR.cuh` file to the OpenMP Offload execution model:
+
+```cpp
+// microXOR header file for OpenMP Offload
+
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
+
+#include <iostream>
+#include <random>
+#include <omp.h>
+
+void cellsXOR(const int *input, int *output, size_t N);
+
+#endif
+```
+
+### Key Changes:
+- The `#include <cuda_runtime.h>` directive has been removed since it is specific to CUDA.
+- The `__global__` keyword, which is specific to CUDA, is not used in OpenMP. Instead, we will define `cellsXOR` as a regular function and use OpenMP pragmas in the implementation file to handle parallel execution.
+- The file extension has been changed from `.cuh` to `.hpp` to reflect a more standard C++ header file naming convention, although this is optional and depends on your project's naming conventions.
