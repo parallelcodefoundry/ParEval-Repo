@@ -24,6 +24,8 @@ class NaiveOpenAITranslator(NaiveTranslator):
             model = "gpt-3.5-turbo"
         elif self._llm_name.lower() == "gpt-4o-mini".lower():
             model = "gpt-4o-mini"
+        elif self._llm_name.lower() == "gpt-4o".lower():
+            model = "gpt-4o"
         completion = self._model.chat.completions.create(
             model=model,
             messages=[
