@@ -34,7 +34,7 @@ def get_args():
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama-3.2"], default="gemini", help="The LLM to use for translation.")
+    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama-3.2", "llama-3.1", "gpt-4o"], default="gemini", help="The LLM to use for translation.")
     return parser.parse_args()
 
 
@@ -42,7 +42,7 @@ def get_translator_cls(method: str, naive_llm: str):
     if method == "naive":
         if naive_llm == "gemini":
             return NaiveGeminiTranslator
-        if naive_llm == "llama-3.2":
+        if "llama" in naive_llm:
             return NaiveLlamaTranslator
         else:
             return NaiveOpenAITranslator

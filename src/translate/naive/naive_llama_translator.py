@@ -21,7 +21,11 @@ class NaiveLlamaTranslator(NaiveTranslator):
         self._model = None
 
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
-        completion = chat(model="llama3.2",
+        if self._llm_name.lower() == "llama-3.2".lower():
+            self._llm_name = "llama3.2"
+        elif self._llm_name.lower() == "llama-3.1".lower():
+            self._llm_name = "llama3.1"
+        completion = chat(model=self._llm_name,
                           messages=[{"role": "system", "content": system_prompt},
                                     {"role": "user", "content": prompt}
                                     ],

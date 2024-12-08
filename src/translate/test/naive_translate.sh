@@ -3,7 +3,7 @@ if [ "$#" -eq 1 ]; then
     echo "Running all experiments for ${llm_version}"
     for application in "microXOR" "XSBench" "SimpleMOC-kernel" "llm.c"; do
         for iter in {1..5}; do
-            python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/openmp-offload --output ../../../data/${application}/naive-${llm_version}-cuda-to-omp --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model openmp-offload --log-interactions
+            python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/openmp-offload --output ../../../data/${application}/naive-${llm_version}-cuda-to-omp --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model openmp-offload --log-interactions -f
             sleep 15
         done
     done
@@ -12,7 +12,7 @@ elif [ "$#" -eq 2 ]; then
     application=$2
     echo "Running all experiments for ${llm_version} and ${application}"
     for iter in {1..5}; do
-        python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/openmp-offload --output ../../../data/${application}/naive-${llm_version}-cuda-to-omp --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model openmp-offload --log-interactions
+        python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/openmp-offload --output ../../../data/${application}/naive-${llm_version}-cuda-to-omp --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model openmp-offload --log-interactions -f
         sleep 15
     done
 else
