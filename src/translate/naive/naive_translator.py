@@ -135,7 +135,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
 
-        for fpath in alive_it(all_files, title="Translating files"):
+        for fpath in alive_it(all_files, title="Translating files", max_cols=os.get_terminal_size().columns):
             prompt = self.get_prompt(fpath)
 
             output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath))
