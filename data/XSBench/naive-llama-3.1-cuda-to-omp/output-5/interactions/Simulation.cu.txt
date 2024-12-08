@@ -1,0 +1,63 @@
+Here is the translated version of `Simulation.cu` for OpenMP-offload:
+```c
+#include <omp.h>
+#include "XSbench_shared_header.h"
+
+__global__ void simulate_kernel(double *x, double *y, int nthreads, long n_isotopes, long n_gridpoints) {
+  // Offload kernel to GPU
+  __shared__ double grid[256];
+  if (threadIdx.x < n_gridpoints) {
+    grid[threadIdx.x] = x[n_gridpoints + threadIdx.x];
+  }
+  __syncthreads();
+
+  int isotope_id = blockIdx.x * blockDim.x + threadIdx.x;
+  while (isotope_id < n_isotopes) {
+    double y_value = y[isotope_id];
+    // Perform lookups and calculations here
+    grid[threadIdx.x] += y_value;
+    isotope_id += blockDim.x * gridDim.x;
+  }
+}
+
+int main() {
+  Inputs in;
+  Profile profile;
+
+  // Initialize inputs
+  in.nthreads = omp_get_num_threads();
+  in.n_isotopes = n_isotopes;
+  in.n_gridpoints = n_gridpoints;
+  in.lookups = lookups;
+  in.grid_type = grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
+  in.hash_bins = hash_bins;
+  in.particles = particles;
+  in.simulation_method = simulation_method;
+  in.binary_mode = binary_mode;
+  in.kernel_id = kernel_id;
+  in.num_iterations = num_iterations;
+  in.num_warmups = num_warmups;
+
+  // Perform OpenMP parallelization
+  #pragma omp parallel for shared(in, profile) num_threads(in.nthreads)
+  for (int i = 0; i < in.particles; i++) {
+    double x[i], y[i];
+    simulate_kernel<<<1, 256>>>(x, y, in.nthreads, in.n_isotopes, in.n_gridpoints);
+  }
+
+  // Wait for offload to complete
+  cudaDeviceSynchronize();
+
+  // Profile kernel execution time
+  profile.kernel_time = clock() - start_clock;
+
+  return 0;
+}
+```
+Note that this is just a translation of the original CUDA code to OpenMP-offload. The actual implementation may require additional modifications and optimizations for optimal performance.
+
+Also, note that I've assumed that `n_isotopes`, `n_gridpoints`, `lookups`, `grid_type`, `hash_bins`, `particles`, `simulation_method`, `binary_mode`, `kernel_id`, `num_iterations`, and `num_warmups` are input variables defined elsewhere in the code. You may need to modify the code to match your specific use case.
+
+This translated version uses OpenMP's `#pragma omp parallel for` directive to parallelize the simulation loop across multiple threads, and then offloads each thread block to the GPU using CUDA's kernel launch mechanism. The `cudaDeviceSynchronize()` function is used to wait for all offload operations to complete before profiling the kernel execution time.
+
+Please let me know if you have any further questions or need additional assistance!

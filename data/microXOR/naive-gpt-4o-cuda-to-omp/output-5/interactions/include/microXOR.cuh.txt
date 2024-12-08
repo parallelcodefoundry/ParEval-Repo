@@ -1,0 +1,23 @@
+```cpp
+// microXOR header file
+
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+#include <omp.h>
+
+void cellsXOR(const int *input, int *output, size_t N);
+
+#endif
+```
+
+### Explanation:
+
+1. **Include Directives**: 
+   - Removed `#include <cuda_runtime.h>` since CUDA-specific runtime headers are not needed in OpenMP.
+   - Added `#include <omp.h>` for OpenMP support.
+
+2. **Function Declaration**:
+   - Changed the `__global__` function declaration to a regular function declaration since OpenMP does not use CUDA's execution qualifiers. The function will be defined with OpenMP pragmas in the implementation file.

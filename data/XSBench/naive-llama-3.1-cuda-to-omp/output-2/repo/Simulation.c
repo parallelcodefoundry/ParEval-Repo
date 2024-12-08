@@ -1,0 +1,73 @@
+#include "XSbench_shared_header.h"
+#include <omp.h>
+
+#define BLOCK_SIZE 256
+
+__global__ void kernel(float* d_x, float* d_y, int n_particles) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= n_particles) return;
+
+  // Perform some simulation-related work
+  float x = d_x[idx];
+  float y = d_y[idx];
+
+  // Offload the kernel to the device
+#pragma offload target(mic) in(d_x:length(n_particles), d_y:length(n_particles)) out(d_x[:],d_y[:])
+  {
+    __asm__ volatile("SIMD offloading enabled");
+    // Perform some offloaded work here
+    for (int i = 0; i < n_particles; ++i) {
+      float x_offload = d_x[i];
+      float y_offload = d_y[i];
+
+      // Offload a part of the kernel to the device
+#pragma offload target(mic) in(x_offload, y_offload)
+      {
+        __asm__ volatile("SIMD offloading enabled");
+        // Perform some offloaded work here
+        float result = x_offload * y_offload;
+      }
+    }
+  }
+
+  d_x[idx] += 1.0f;
+  d_y[idx] -= 2.0f;
+}
+
+int main(int argc, char** argv) {
+  Inputs in;
+  // Initialize inputs...
+  // Open the kernel file and read contents
+  FILE* kernel_file = fopen("kernel.cu", "r");
+  fseek(kernel_file, 0L, SEEK_END);
+  size_t kernel_size = ftell(kernel_file);
+  rewind(kernel_file);
+
+  char* kernel_contents = malloc(kernel_size + 1);
+  fread(kernel_contents, 1, kernel_size, kernel_file);
+  fclose(kernel_file);
+
+  // Replace the kernel contents with our offloaded kernel
+  char* new_kernel_contents = malloc(kernel_size + 1);
+  strncpy(new_kernel_contents, kernel_contents, kernel_size);
+  free(kernel_contents);
+
+  // Create a device context and memory allocation for the kernel
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);
+  cudaMalloc((void**)&d_x, n_particles * sizeof(float));
+  cudaMalloc((void**)&d_y, n_particles * sizeof(float));
+
+  // Launch the offloaded kernel on the device
+  dim3 grid(dim3(n_particles / BLOCK_SIZE + 1, 1));
+  kernel<<<grid, BLOCK_SIZE>>>(d_x, d_y, n_particles);
+
+  // Copy results back to host memory
+  cudaMemcpy(h_x, d_x, n_particles * sizeof(float), cudaMemcpyDeviceToHost);
+  cudaMemcpy(h_y, d_y, n_particles * sizeof(float), cudaMemcpyDeviceToHost);
+
+  // Print results...
+  printf("Results: x = %f, y = %f\n", h_x[0], h_y[0]);
+
+  return 0;
+}

@@ -1,0 +1,85 @@
+Here is the translated Makefile for the OpenMP Offload execution model:
+
+```makefile
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= llvm
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+CUDA_ARCH   ?= 80
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.c \
+io.c \
+Simulation.c \
+GridInit.c \
+XSutils.c \
+Materials.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := 
+
+# Linker Flags
+LDFLAGS = -lm
+
+# LLVM Compiler
+ifeq ($(COMPILER),llvm)
+  CC = clang++
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -O3 -std=c11 -D__OPENMP_OFFLOAD__ -D__NVPTX__ -D__CUDA_ARCH__=$(CUDA_ARCH)
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.h
+
+run:
+	./$(program)
+```
+
+### Key Changes:
+1. **Compiler Change**: The Makefile now uses `clang++` for compiling with OpenMP Offload support.
+2. **Flags for OpenMP Offload**: Added flags for OpenMP Offload compilation, specifically `-fopenmp` and `-fopenmp-targets=nvptx64-nvidia-cuda`.
+3. **CUDA Architecture**: The architecture is specified using `CUDA_ARCH` variable.
+4. **File Extensions**: Changed the file extensions from `.cu` to `.c` to reflect the C codebase for OpenMP Offload.

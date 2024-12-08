@@ -1,0 +1,31 @@
+```cmake
+cmake_minimum_required(VERSION 3.21)
+
+project(
+    XSBench_OpenMP
+    VERSION 1.0
+    LANGUAGES C CXX
+)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
+
+add_executable(XSBench ${SOURCE})
+
+# Add OpenMP support
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(XSBench PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
+install(TARGETS XSBench DESTINATION bin)
+```
+
+In this translation, the `LANGUAGES` directive in the `project` command is updated to include `C` and `CXX` instead of `CUDA`, as OpenMP offloading is typically used with C/C++ compilers. The `find_package(OpenMP REQUIRED)` command is added to locate the OpenMP package, and `target_link_libraries` is used to link the OpenMP libraries to the `XSBench` target. This setup assumes that the source files have been appropriately modified to use OpenMP directives for offloading instead of CUDA.

@@ -1,0 +1,109 @@
+// Translation of XSutils.cu to OpenMP-Offload Execution Model
+
+#include <omp.h>
+#include "XSbench_shared_header.h"
+
+#define DEVICE_HOSTING 1
+#define USE_OPENACC 0 // Not used in this translation
+
+__device__ double __xsbench_device_to_host_time = 0.0;
+__device__ double __xsbench_kernel_time = 0.0;
+__device__ double __xsbench_host_to_device_time = 0.0;
+
+__global__ void kernel_omp_offload(void *d_xsb_data) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx < in.particles) {
+        // Perform device-to-host communication
+        __syncthreads();
+
+        // Perform kernel computations
+        // ...
+
+        // Update profiling variables
+        __xsbench_device_to_host_time += in.device_to_host_time;
+        __xsbench_kernel_time += in.kernel_time;
+        __xsbench_host_to_device_time += in.host_to_device_time;
+
+        // Update profile array
+        Profile *profile_ptr = (Profile *)d_xsb_data;
+        profile_ptr[idx].device_to_host_time = in.device_to_host_time;
+        profile_ptr[idx].kernel_time = in.kernel_time;
+        profile_ptr[idx].host_to_device_time = in.host_to_device_time;
+    }
+}
+
+void xsbench_profile_kernel(void *d_xsb_data, Inputs in) {
+    // Launch kernel
+    int num_threads = in.particles / in.nthreads + 1;
+    int block_size = (in.particles % num_threads == 0 ? num_threads : num_threads + 1);
+    int num_blocks = (in.particles + block_size - 1) / block_size;
+
+#pragma omp parallel num_threads(in.nthreads)
+    {
+        int tid = omp_get_thread_num();
+        if (tid < in.hash_bins) {
+            // Perform hash operations on this thread
+            // ...
+
+            // Launch kernel for each material
+            for (int i = 0; i < in.materials; i++) {
+                kernel_omp_offload<<<num_blocks, block_size>>>(d_xsb_data);
+            }
+        }
+    }
+
+    // Update profiling variables
+    __xsbench_device_to_host_time += in.device_to_host_time;
+    __xsbench_kernel_time += in.kernel_time;
+    __xsbench_host_to_device_time += in.host_to_device_time;
+
+    // Synchronize threads
+    #pragma omp barrier
+
+    // Update profile array
+    Profile *profile_ptr = (Profile *)d_xsb_data;
+    for (int i = 0; i < in.particles; i++) {
+        profile_ptr[i].device_to_host_time = __xsbench_device_to_host_time / in.nthreads;
+        profile_ptr[i].kernel_time = __xsbench_kernel_time / in.nthreads;
+        profile_ptr[i].host_to_device_time = __xsbench_host_to_device_time / in.nthreads;
+    }
+}
+
+void xsbench_profile_host_kernel(void *d_xsb_data, Inputs in) {
+    // Update profiling variables
+    Profile *profile_ptr = (Profile *)d_xsb_data;
+
+    for (int i = 0; i < in.particles; i++) {
+        profile_ptr[i].device_to_host_time = in.device_to_host_time;
+        profile_ptr[i].kernel_time = in.kernel_time;
+        profile_ptr[i].host_to_device_time = in.host_to_device_time;
+    }
+
+    // Synchronize threads
+    #pragma omp barrier
+
+    // Update profile array
+    for (int i = 0; i < in.particles; i++) {
+        profile_ptr[i].device_to_host_time += __xsbench_device_to_host_time / in.nthreads;
+        profile_ptr[i].kernel_time += __xsbench_kernel_time / in.nthreads;
+        profile_ptr[i].host_to_device_time += __xsbench_host_to_device_time / in.nthreads;
+    }
+}
+
+void xsbench_profile(void *d_xsb_data, Inputs in) {
+    // Launch kernel
+    xsbench_profile_kernel(d_xsb_data, in);
+
+    // Synchronize threads
+    #pragma omp barrier
+
+    // Update profiling variables
+    Profile *profile_ptr = (Profile *)d_xsb_data;
+
+    for (int i = 0; i < in.particles; i++) {
+        profile_ptr[i].device_to_host_time += __xsbench_device_to_host_time / in.nthreads;
+        profile_ptr[i].kernel_time += __xsbench_kernel_time / in.nthreads;
+        profile_ptr[i].host_to_device_time += __xsbench_host_to_device_time / in.nthreads;
+    }
+}

@@ -1,0 +1,53 @@
+Here is the translated Main.cu file in OpenMP-offload execution model:
+```c
+#include "XSbench_shared_header.h"
+#include <omp.h>
+#include <stdio.h>
+
+int main(int argc, char **argv) {
+  // Parse command-line arguments
+  Inputs in;
+  parse_args(argc, argv, &in);
+
+  if (in.simulation_method == EVENT_BASED_METHOD) {
+    #pragma omp target data map(to: in)
+    {
+      // Perform sorting and initialization here
+      sort_particles(&in);
+      init_data_structures(&in);
+    }
+  }
+
+  #pragma omp target teams distribute parallel for
+  {
+    // Main simulation loop
+    if (in.simulation_method == EVENT_BASED_METHOD) {
+      perform_event_based_simulation(&in);
+    } else {
+      // Default to event-free simulation
+      perform_event_free_simulation(&in);
+    }
+  }
+
+  Profile profile;
+  #pragma omp target update from(in)
+  {
+    // Calculate performance metrics
+    calculate_performance_metrics(&profile, &in);
+  }
+
+  print_profile(profile, in);
+
+  return 0;
+}
+```
+Note that I've assumed the `parse_args`, `sort_particles`, `init_data_structures`, `perform_event_based_simulation`, and `perform_event_free_simulation` functions are defined elsewhere in the codebase. You'll need to modify this translation to match your specific use case.
+
+The key changes made to translate the file include:
+
+*   Replacing CUDA-specific calls with OpenMP-offload directives.
+*   Moving data initialization and sorting into OpenMP regions.
+*   Using `omp target teams distribute parallel for` to offload the main simulation loop to multiple threads on the host or device.
+*   Updating performance metrics and printing results using OpenMP-offload semantics.
+
+Please verify that this translation works as expected with your specific use case.

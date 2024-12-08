@@ -1,0 +1,69 @@
+# Converted from original Makefile by [author]
+
+CC=gcc
+CXX=c++
+CUDA_CC=nvcc
+CFLAGS=-O3 -mavx -mavx2 -mfma -msse4.2 -march=haswell
+LDFLAGS=
+CUDA_CFLAGS=-gencode arch=compute_80,code=sm_80
+
+# CUDA_ARCH = 80 (NVIDIA GPU with compute capability 80)
+CUDA_ARCH ?= 80
+# COMPILER = llvm (clang++ compiler)
+COMPILER ?= clang++
+
+ifdef CUDA_ARCH
+    ifeq ($(shell uname -s), Darwin) # macOS
+        CXX += $(CFLAGS) -march=native
+        CUDA_CFLAGS += $(CFLAGS) -march=native
+    else
+        CXX += -fopenmp-targets=nvptx64-nvidia-cuda=$(CUDA_ARCH)
+        CUDA_CFLAGS += --gpu-architecture=sm_$(CUDA_ARCH)
+    endif
+endif
+
+ifdef COMPILER
+    ifeq ($(COMPILER), llvm)
+        CXX += $(CFLAGS) -march=native
+        CUDA_CFLAGS += $(CFLAGS) -march=native
+        CC = clang++
+        LDFLAGS += -lomp
+    else
+        # Default compiler is assumed to be GCC (for CPU code)
+    endif
+endif
+
+# Source files and object files
+XSBECH_SHARED_OBJS = XSbench_shared.o
+XSBECH_NUCLIDE_OBJS = XSbench_nuclide.o
+XSBECH_UNIONIZED_OBJS = XSbench_unionized.o
+XSBECH_CUDA_OBJS = XSbench_cuda.o
+
+# Compile and link
+all: $(XSBECH_SHARED_OBJS) $(XSBECH_NUCLIDE_OBJS) $(XSBECH_UNIONIZED_OBJS) $(XSBECH_CUDA_OBJS)
+    $(CXX) -o XSbench_shared.o $^
+
+$(XSBECH_NUCLIDE_OBJS): XSbench_nuclide.c
+    $(CC) -c -o $@ $<
+
+$(XSBECH_UNIONIZED_OBJS): XSbench_unionized.c
+    $(CC) -c -o $@ $<
+
+$(XSBECH_CUDA_OBJS): XSbench_cuda.cu
+    $(CUDA_CC) -c -o $@ $<
+
+# Offload to GPU
+openmp-offload: $(XSBECH_SHARED_OBJS) $(XSBECH_NUCLIDE_OBJS) $(XSBECH_UNIONIZED_OBJS) $(XSBECH_CUDA_OBJS)
+    $(CXX) $(CUDA_CFLAGS) -o XSbench_shared.o $^
+    # TODO: offload to GPU
+
+# Run and profiling
+run:
+    ./XSbench_shared
+
+profile:
+    @echo "Profiling..."
+    @./XSbench_shared > profile.out
+
+clean:
+    rm -f *.o *~

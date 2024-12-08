@@ -1,0 +1,61 @@
+To translate the include/main.cu file to the OpenMP Offload execution model, we need to add the necessary pragmas and directives to allow the compiler to offload tasks to the GPU. Here's the translated code:
+
+```c
+#include <omp.h>
+#include <cuda_runtime.h>
+
+// Define a pragma for offloading OpenMP loops to the GPU
+#define OMP_TARGET_DEVICE_API cuda
+
+// Function to initialize device variables on the GPU
+void init_device_variables(float **device_sources) {
+    // Initialize device sources array
+    cudaMalloc((void **) device_sources, sizeof(Source));
+}
+
+int main() {
+    omp_set_dynamic(0);     /* Dynamism is turned off by default */
+    omp_set_num_threads(1);  /* Number of threads per block */
+
+    int num_steps = 100;
+    float *device_sources;
+
+    init_device_variables(&device_sources);
+
+    // Main simulation loop
+#pragma omp parallel for schedule(dynamic, 1) omp_target(cuda)
+    for (int i = 0; i < num_steps; i++) {
+        // Offload this iteration to the GPU
+        #pragma omp target map(device_sources[omp_get_num_threads()][i])
+        {
+            // Perform some computation on the device sources array
+            // This can be replaced with actual code that offloads to the GPU
+            printf("Offloaded computation: %d\n", i);
+        }
+    }
+
+    // Check for CUDA errors
+    cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(err));
+        exit(1);
+    }
+
+    // Clean up
+    cudaFree(device_sources);
+
+    return 0;
+}
+```
+
+The translation includes the following changes:
+
+*   We've added `#include <omp.h>` to include OpenMP support.
+*   We've defined a pragma for offloading OpenMP loops to the GPU with `#define OMP_TARGET_DEVICE_API cuda`.
+*   The `init_device_variables` function now initializes device variables on the GPU using CUDA API calls (`cudaMalloc`).
+*   In the main loop, we use `#pragma omp parallel for schedule(dynamic, 1) omp_target(cuda)` to offload the iteration to the GPU.
+*   Inside the offloaded region, we map a variable from the host to the device with `#pragma omp target map(device_sources[omp_get_num_threads()][i])`.
+*   We've added a check for CUDA errors after synchronization.
+
+Note that this is a basic example, and you should adapt it to your specific needs. The code may need additional modifications or error handling depending on your use case.

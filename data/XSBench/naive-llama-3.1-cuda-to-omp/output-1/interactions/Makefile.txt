@@ -1,0 +1,32 @@
+Here is the translated Makefile:
+```makefile
+# Translated from original Makefile
+
+# Default target
+all: xsbench_shared.o xsbench_kernel.o xsbench_offload.o
+    nvcc -o xsbench -O3 --offload-architecture=compute_80 xsbench_shared.o xsbench_kernel.o xsbench_offload.o $(CUDAFLAGS)
+
+# Rule for building xsbench_shared.o
+xsbench_shared.o: xsbench_shared.c xsbench_shared.h
+    ${COMPILER} -c -O3 -o $@ $<
+
+# Rule for building xsbench_kernel.o
+xsbench_kernel.o: xsbench_kernel.c xsbench_shared.h
+    ${COMPILER} -c -O3 -o $@ $<
+
+# Rule for building xsbench_offload.o
+xsbench_offload.o: xsbench_offload.c xsbench_shared.h
+    ${COMPILER} -fopenmp-offload -c -O3 -o $@ $<
+```
+Note that I assumed the original Makefile was written in the GNU Make syntax. If it's a different type of Makefile (e.g., BSD Make, etc.), you may need to modify this translation accordingly.
+
+Also note that I used `nvcc` as the compiler for building the offload code, which is the CUDA compiler provided by NVIDIA. You can change this to your preferred compiler if needed.
+
+The rest of the translation assumes the following:
+
+* The original Makefile targets are named `xsbench_shared.c`, `xsbench_kernel.c`, and `xsbench_offload.c`.
+* The shared header file is named `xsbench_shared.h`.
+* The CUDA architecture is set to 80 (which corresponds to a modern NVIDIA GPU).
+* The compiler flag for offloading is set to `-fopenmp-offload`.
+
+Please adjust these settings as needed for your specific use case.

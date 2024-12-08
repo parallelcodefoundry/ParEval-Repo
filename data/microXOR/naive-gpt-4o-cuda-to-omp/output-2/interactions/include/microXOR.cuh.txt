@@ -1,0 +1,20 @@
+Certainly! Below is the translation of the `include/microXOR.cuh` file to the OpenMP Offload execution model:
+
+```cpp
+// microXOR header file for OpenMP Offload
+
+#ifndef MICROXOR_CUH
+#define MICROXOR_CUH
+
+#include <iostream>
+#include <random>
+#include <omp.h>
+
+void cellsXOR(const int *input, int *output, size_t N);
+
+#endif
+```
+
+### Key Changes:
+- Removed the inclusion of `cuda_runtime.h` since it's specific to CUDA and not needed for OpenMP.
+- The `__global__` CUDA keyword is removed from the function declaration. In OpenMP, we will use `#pragma omp target` and related directives to offload computation to the GPU.

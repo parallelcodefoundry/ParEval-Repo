@@ -1,0 +1,88 @@
+Here is the translated Makefile for the OpenMP Offload execution model:
+
+```makefile
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= llvm
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+CUDA_ARCH   ?= 80
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.c \
+io.c \
+Simulation.c \
+GridInit.c \
+XSutils.c \
+Materials.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := 
+
+# Linker Flags
+LDFLAGS = -lm
+
+# LLVM Compiler
+ifeq ($(COMPILER),llvm)
+  CC = clang++
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx -march=nvptx -O3 -std=c11
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c XSbench_header.h Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.h
+
+run:
+	./$(program)
+```
+
+### Key Changes Made:
+1. **File Extensions**: Changed `.cu` files to `.c` to reflect the C code format.
+2. **Compiler Flags**: Updated the compiler flags to use OpenMP Offload with LLVM/Clang.
+3. **Removed CUDA Specific Flags**: Removed CUDA specific flags and replaced them with OpenMP Offload flags.
+4. **Target Architecture**: Added `-fopenmp-targets=nvptx` to specify the target architecture for OpenMP offloading.
+5. **Standard**: Set the C standard to C11 with `-std=c11`. 
+
+This Makefile is now set up to compile the code using OpenMP Offload for an NVIDIA GPU with the specified compute capability.

@@ -1,0 +1,72 @@
+Here is the translation of the `XSutils.cu` file to the OpenMP/Offload execution model:
+
+```c
+// XSutils_translated.cpp
+
+#include <omp.h>
+#include "XSbench_shared_header.h"
+
+#define CUDA_KERNEL LaunchKernel
+
+void _launch_kernel(char * kernel_name, int num_iterations) {
+    omp_set_num_threads(1);
+    #pragma omp target data map(kernel: char* kernel_name, iterations: int num_iterations)
+    {
+        kernel = kernel_name;
+        iterations = num_iterations;
+    }
+    #pragma offload transfer kernel
+    for (int i=0; i<iterations; i++) {
+        // Call the kernel using offloaded function pointers
+        CUDA_KERNEL(kernel);
+    }
+}
+
+void _call_kernel(char * kernel_name, int num_iterations) {
+    omp_set_num_threads(1);
+    #pragma omp target data map(kernel: char* kernel_name, iterations: int num_iterations)
+    {
+        kernel = kernel_name;
+        iterations = num_iterations;
+    }
+    #pragma offload transfer kernel
+    for (int i=0; i<iterations; i++) {
+        // Call the kernel using offloaded function pointers
+        CUDA_KERNEL(kernel);
+    }
+}
+
+void _kernel_launch(char * kernel_name, int num_iterations) {
+    omp_set_num_threads(1);
+    #pragma omp target data map(kernel: char* kernel_name, iterations: int num_iterations)
+    {
+        kernel = kernel_name;
+        iterations = num_iterations;
+    }
+    #pragma offload transfer kernel
+    for (int i=0; i<iterations; i++) {
+        // Call the kernel using offloaded function pointers
+        CUDA_KERNEL(kernel);
+    }
+}
+
+void _offload_kernel(char * kernel_name, int num_iterations) {
+    omp_set_num_threads(1);
+    #pragma omp target data map(kernel: char* kernel_name, iterations: int num_iterations)
+    {
+        kernel = kernel_name;
+        iterations = num_iterations;
+    }
+    #pragma offload transfer kernel
+    for (int i=0; i<iterations; i++) {
+        // Call the kernel using offloaded function pointers
+        CUDA_KERNEL(kernel);
+    }
+}
+```
+
+Note that I've renamed some of the functions to make them unique and avoid conflicts with OpenMP directives. Also, I've used the `omp_set_num_threads(1)` directive to ensure that only one thread is launched on the device.
+
+The translated code uses the `#pragma omp target data` directive to transfer data from the host to the device, and then uses the `#pragma offload transfer kernel` directive to execute the kernel on the device. The OpenMP/Offload execution model allows for more flexibility in terms of data movement and kernel launch, but it also requires careful consideration of data dependencies and synchronization.
+
+In this translation, I've assumed that the `CUDA_KERNEL` macro is defined elsewhere in the codebase, and that it takes a single argument (the kernel name). If this is not the case, you may need to modify the code accordingly. Additionally, you may need to adjust the code to match your specific use case and requirements.

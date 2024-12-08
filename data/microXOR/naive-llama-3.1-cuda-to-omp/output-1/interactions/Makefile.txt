@@ -1,0 +1,49 @@
+Here is the Makefile translated to the openmp-offload execution model:
+
+```
+# Use compiler flags to enable OpenMP and offloading
+CXX = $(CXX_COMPILER)
+CXXFLAGS = -fopenmp -march=$(SM_VERSION) -cuda
+
+# Directories and files
+SRCDIR = src
+BUILDDIR = build
+BINDIR = bin
+
+# Source and header files
+SOURCES = $(wildcard $(SRCDIR)/microXOR.cpp) $(wildcard $(SRCDIR)/microXOR.h)
+OBJECTS = $(patsubst $(SRCDIR)/%.cpp, $(BUILDDIR)/%.o, $(SOURCES:.h=.cpp))
+
+# Build target
+TARGET = $(BINDIR)/microXOR
+
+# Rules
+$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
+	@mkdir -p $(BUILDDIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(TARGET): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+# Clean up
+clean:
+	rm -rf $(BUILDDIR) $(BINDIR)/microXOR
+
+# Target to build the executable for a specific SM version
+build-%:
+	$(MAKE) CXX_COMPILER=$(shell which clang++) SM_VERSION=$* TARGET=$(TARGET)
+
+# Default target
+default: build-80
+
+.PHONY: clean default
+```
+
+This Makefile is similar to the original one, but it uses compiler flags to enable OpenMP and offloading. The `CXX` variable is used to specify the C++ compiler (in this case, clang++), and the `CXXFLAGS` variable is used to pass additional flags to the compiler.
+
+The rules for building the object files and the target executable are similar to those in the original Makefile. However, the OpenMP offloading target is specified using the `build-%` rule, which takes a SM version as an argument.
+
+To build the code for a specific SM version (e.g., 80), you can use the following command:
+```
+make SM_VERSION=80 CXX_COMPILER=$(shell which clang++)
+```

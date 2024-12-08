@@ -1,0 +1,124 @@
+Here is the translation of the `include/init.cu` file to the OpenMP-offload execution model:
+
+```c
+#include <omp.h>
+#include <stdio.h>
+
+#define CUDA_ERROR_CHECK 1
+
+int main() {
+    int num_threads = omp_get_max_threads();
+    printf("Number of threads: %d\n", num_threads);
+
+    // Initialize random seed
+    srand(42);
+
+    // Define input parameters
+    const int num_sources = 100;
+    const float maxVal = 10.0f;
+
+    // Create table for exponential interpolation
+    Table* table = (Table*) malloc(sizeof(Table));
+
+    // Build exponential table on host
+    buildExponentialTable(table, num_threads);
+
+    // Offload data to device
+    #pragma omp target map(to:table) device(0)
+    {
+        // Allocate memory on device
+        cudaMalloc((void**) &table->values, 2 * num_sources * sizeof(float));
+        cudaMalloc((void**) &table->dx, sizeof(float));
+        cudaMalloc((void**) &table->maxVal, sizeof(float));
+        cudaMalloc((void**) &table->N, sizeof(int));
+
+        // Copy data to device
+        cudaMemcpy(table->values, table->values_host, 2 * num_sources * sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(table->dx, &table->dx_host, sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(table->maxVal, &table->maxVal_host, sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(table->N, &table->N_host, sizeof(int), cudaMemcpyHostToDevice);
+
+        // Initialize device memory
+        cudaMemset(table->values, 0, 2 * num_sources * sizeof(float));
+    }
+
+    // Offload computation to device
+    #pragma omp target map(from:table) device(0)
+    {
+        // Perform computation on device
+        computeExponentialTable(table);
+    }
+
+    // Synchronize threads
+    #pragma omp barrier
+
+    // Offload result back to host
+    #pragma omp target map(back:table) device(0)
+    {
+        // Copy result from device to host
+        cudaMemcpy(table->values_host, table->values, 2 * num_sources * sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&table->dx_host, table->dx, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&table->maxVal_host, table->maxVal, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(&table->N_host, table->N, sizeof(int), cudaMemcpyDeviceToHost);
+
+        // Free device memory
+        cudaFree(table->values);
+        cudaFree(table->dx);
+        cudaFree(table->maxVal);
+        cudaFree(table->N);
+    }
+
+    // Print result on host
+    printf("Exponential table values: ");
+    for (int i = 0; i < num_sources; i++) {
+        printf("%f %f ", table->values_host[2*i], table->values_host[2*i+1]);
+    }
+    printf("\n");
+
+    free(table);
+
+    return 0;
+}
+
+// Build exponential table function
+void buildExponentialTable(Table* table, int num_threads) {
+    // Define table values on device
+    float* values = (float*) malloc(2 * num_sources * sizeof(float));
+    for (int i = 0; i < 2 * num_sources; i++) {
+        values[i] = 0.0f;
+    }
+
+    // Copy data to device
+    cudaMemcpy(values, table->values_host, 2 * num_sources * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Perform computation on device
+    #pragma omp target map(to:values) device(0)
+    {
+        computeExponentialTable(table);
+    }
+}
+
+// Compute exponential table function
+void computeExponentialTable(Table* table) {
+    // Define number of elements in array
+    int N = table->N;
+
+    // Perform computation
+    for (int n = 0; n < N; n++) {
+        float dx = table->dx;
+        float exponential = exp(-n * dx);
+        table->values[2*n] = -exponential;
+        table->values[2*n+1] = 1 + (n * dx - 1) * exponential;
+    }
+}
+```
+
+Note that this translation requires the OpenMP library to be installed and configured properly. Additionally, this code assumes a CUDA-compatible GPU is available on the system.
+
+Please note that I made some assumptions about the original code to make it compatible with OpenMP-offload execution model:
+
+* The `buildExponentialTable` function was modified to take two arguments: `table` and `num_threads`.
+* A new function `computeExponentialTable` was introduced to perform the computation on device.
+* The `main` function was modified to offload data, computation, and result back to host using OpenMP directives.
+
+Please adjust the code according to your specific requirements.

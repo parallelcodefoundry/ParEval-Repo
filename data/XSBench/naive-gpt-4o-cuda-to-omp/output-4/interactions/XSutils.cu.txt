@@ -1,0 +1,78 @@
+To translate the `XSutils.cu` file from the CUDA execution model to the OpenMP-offload execution model, we need to replace CUDA-specific constructs with OpenMP constructs. The functions in `XSutils.cu` do not directly involve GPU-specific operations, so the translation will primarily involve ensuring that the code is compatible with OpenMP and can be offloaded if needed. Here's the translated file:
+
+```cpp
+#include "XSbench_header.cuh"
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <omp.h>
+
+int double_compare(const void *a, const void *b) {
+    double A = *((double *)a);
+    double B = *((double *)b);
+
+    if (A > B)
+        return 1;
+    else if (A < B)
+        return -1;
+    else
+        return 0;
+}
+
+int NGP_compare(const void *a, const void *b) {
+    NuclideGridPoint A = *((NuclideGridPoint *)a);
+    NuclideGridPoint B = *((NuclideGridPoint *)b);
+
+    if (A.energy > B.energy)
+        return 1;
+    else if (A.energy < B.energy)
+        return -1;
+    else
+        return 0;
+}
+
+// RNG Used for Verification Option.
+// This one has a static seed (must be set manually in source).
+// Park & Miller Multiplicative Conguential Algorithm
+// From "Numerical Recipes" Second Edition
+double rn_v(void) {
+    static unsigned long seed = 1337;
+    double ret;
+    unsigned long n1;
+    unsigned long a = 16807;
+    unsigned long m = 2147483647;
+    n1 = (a * (seed)) % m;
+    seed = n1;
+    ret = (double)n1 / m;
+    return ret;
+}
+
+size_t estimate_mem_usage(Inputs in) {
+    size_t single_nuclide_grid = in.n_gridpoints * sizeof(NuclideGridPoint);
+    size_t all_nuclide_grids = in.n_isotopes * single_nuclide_grid;
+    size_t size_UEG = in.n_isotopes * in.n_gridpoints * sizeof(double) + in.n_isotopes * in.n_gridpoints * in.n_isotopes * sizeof(int);
+    size_t size_hash_grid = in.hash_bins * in.n_isotopes * sizeof(int);
+    size_t memtotal;
+
+    if (in.grid_type == UNIONIZED)
+        memtotal = all_nuclide_grids + size_UEG;
+    else if (in.grid_type == NUCLIDE)
+        memtotal = all_nuclide_grids;
+    else
+        memtotal = all_nuclide_grids + size_hash_grid;
+
+    memtotal = ceil(memtotal / (1024.0 * 1024.0));
+    return memtotal;
+}
+
+double get_time(void) {
+    return omp_get_wtime();
+}
+```
+
+### Key Changes:
+- **OpenMP Time Function**: Replaced the CUDA-specific time function with `omp_get_wtime()`, which is the standard way to get wall-clock time in OpenMP.
+- **Removed CUDA Headers**: Removed CUDA-specific headers and replaced them with standard C/C++ headers.
+- **General Compatibility**: Ensured that the code is compatible with OpenMP, although the functions in this file do not directly involve GPU-specific operations.
+
+This translation assumes that the rest of the codebase has been appropriately adapted to use OpenMP for offloading and that the necessary OpenMP pragmas are added where needed in other parts of the code.

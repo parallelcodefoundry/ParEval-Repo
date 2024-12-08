@@ -1,0 +1,83 @@
+Here is the translated `GridInit.cu` file to the OpenMP Offload execution model:
+
+```cpp
+#include "XSbench_header.cuh"
+
+// Moves all required data structures to the GPU's memory space
+SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationData SD)
+{
+    if(mype == 0) printf("Allocating and moving simulation data to GPU memory space...\n");
+
+    // Shallow copy of CPU simulation data to GPU simulation data
+    SimulationData GSD = SD;
+
+    // Move data to GPU memory space
+    #pragma omp target data map(to: SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats], SD.nuclide_grid[0:SD.length_nuclide_grid]) \
+                             map(to: in.lookups) \
+                             map(from: GSD.verification[0:in.lookups])
+    {
+        size_t sz;
+        size_t total_sz = 0;
+
+        sz = GSD.length_num_nucs * sizeof(int);
+        #pragma omp target enter data map(to: GSD.num_nucs[0:SD.length_num_nucs])
+        #pragma omp target update to(GSD.num_nucs[0:SD.length_num_nucs]) 
+        total_sz += sz;
+
+        sz = GSD.length_concs * sizeof(double);
+        #pragma omp target enter data map(to: GSD.concs[0:SD.length_concs])
+        #pragma omp target update to(GSD.concs[0:SD.length_concs]) 
+        total_sz += sz;
+
+        sz = GSD.length_mats * sizeof(int);
+        #pragma omp target enter data map(to: GSD.mats[0:SD.length_mats])
+        #pragma omp target update to(GSD.mats[0:SD.length_mats]) 
+        total_sz += sz;
+
+        if (SD.length_unionized_energy_array != 0) {
+            sz = GSD.length_unionized_energy_array * sizeof(double);
+            #pragma omp target enter data map(to: GSD.unionized_energy_array[0:SD.length_unionized_energy_array])
+            #pragma omp target update to(GSD.unionized_energy_array[0:SD.length_unionized_energy_array]) 
+            total_sz += sz;
+        }
+
+        if (SD.length_index_grid != 0) {
+            sz = GSD.length_index_grid * sizeof(int);
+            #pragma omp target enter data map(to: GSD.index_grid[0:SD.length_index_grid])
+            #pragma omp target update to(GSD.index_grid[0:SD.length_index_grid]) 
+            total_sz += sz;
+        }
+
+        sz = GSD.length_nuclide_grid * sizeof(NuclideGridPoint);
+        #pragma omp target enter data map(to: GSD.nuclide_grid[0:SD.length_nuclide_grid])
+        #pragma omp target update to(GSD.nuclide_grid[0:SD.length_nuclide_grid]) 
+        total_sz += sz;
+
+        // Allocate verification array on device. This structure is not needed on CPU, so we don't
+        // have to copy anything over.
+        sz = in.lookups * sizeof(unsigned long);
+        #pragma omp target enter data map(alloc: GSD.verification[0:in.lookups])
+        total_sz += sz;
+        GSD.length_verification = in.lookups;
+
+        // Synchronize
+        #pragma omp target update to(GSD.verification[0:in.lookups])
+    }
+
+    if(mype == 0 ) printf("GPU Initialization complete. Allocated %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0 );
+
+    return GSD;
+}
+
+// Release device memory
+void release_device_memory(SimulationData GSD) {
+    #pragma omp target exit data map(release: GSD.num_nucs, GSD.concs, GSD.mats, GSD.unionized_energy_array, GSD.nuclide_grid, GSD.verification)
+}
+```
+
+### Key Changes:
+1. **OpenMP Target Directives**: The code now uses `#pragma omp target` directives to manage data movement between host and device.
+2. **Data Mapping**: The `map` clauses are used to specify which data should be transferred to and from the device.
+3. **Memory Release**: The `release_device_memory` function now uses `#pragma omp target exit data` to release device memory.
+
+This code assumes that the OpenMP environment is set up correctly to handle offloading to a compatible device.

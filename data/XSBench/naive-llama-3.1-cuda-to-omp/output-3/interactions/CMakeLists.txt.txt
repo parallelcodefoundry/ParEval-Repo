@@ -1,0 +1,92 @@
+Here is the `CMakeLists.txt` file modified for OpenMP and offloading:
+
+```cmake
+# Find the necessary modules
+find_package(OpenMP REQUIRED)
+find_package(MPI REQUIRED)
+
+# Define the C++ standard to use
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Enable OpenMP support
+if (NOT OpenMP_FOUND)
+    message(FATAL_ERROR "Could not find OpenMP")
+endif()
+target_link_libraries(XSBench ${OpenMP_CXX_LIBRARIES})
+
+# Add include directories for OpenMP and MPI
+include_directories(${CMAKE_BINARY_DIR}/include ${MPI_INCLUDE_DIRS} ${OpenMP_INCLUDE_DIRS})
+
+# Set the OpenMP flags
+set(CMAKE_OPENMP_FLAGS "-fopenmp")
+if (NOT MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -funroll-loops -O3 -march=native -mtune=native -ffast-math")
+endif()
+
+# Define the source files and libraries
+add_executable(XSBench ${XSBENCH_SOURCES})
+target_link_libraries(XSBench ${MPI_LIBRARIES})
+
+# Set the OpenMP runtime library
+set(CMAKE_OPENMP_RUNTIME_LIBRARY "libomp")
+
+# Use CUDA for GPU offloading (if available)
+if (CUDA_VERSION)
+    set(CUDA_ARCHS -gencode=arch=compute_35,code=\"sm_35\")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} --expt-extended-lambda --use_fast_math --compiler-options \"-fopenmp\"")
+else()
+    message(FATAL_ERROR "Could not find CUDA")
+endif()
+
+# Define the offload section
+if (CUDA_VERSION)
+    add_custom_command(TARGET XSBench PRE_BUILD
+        COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib:<${CUDA_TOOLKIT_ROOT_DIR}> ${CUDA_NVCC} -c -ccbin ${CMAKE_CXX_COMPILER} --use_fast_math $<TARGET_FILE:XSBench>.cpp -o ${CMAKE_BINARY_DIR}/${XSBENCH_SOURCES}_cuda.o
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    target_link_libraries(XSBench ${CUDA_LIBRARIES})
+
+    # Define the OpenMP offload directive
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp-targets=ompoffload")
+endif()
+
+# Set the profile flag to enable profiling (if available)
+set(CMAKE_CXX_FLAGS_PROFILING "-g -p")
+
+# Use the NVIDIA compiler for GPU offloading (if available)
+if (CUDA_VERSION)
+    set(CMAKE_CXX_COMPILER_Nvidia ${CMAKE_NVCC})
+else()
+    message(FATAL_ERROR "Could not find CUDA")
+endif()
+
+# Add a custom command to create the binary
+add_custom_command(TARGET XSBench POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib:<${CUDA_TOOLKIT_ROOT_DIR}> ${CUDA_NVCC} --use_fast_math $<TARGET_FILE:XSBench>.cpp -o ${CMAKE_BINARY_DIR}/${XSBENCH_SOURCES}_cuda.o
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+# Define the OpenMP offload targets
+if (CUDA_VERSION)
+    add_custom_target(XSBench_cuda ALL DEPENDS XSBench)
+endif()
+
+# Set up the testing framework
+enable_testing()
+add_test(NAME XSBench COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib:<${CUDA_TOOLKIT_ROOT_DIR}> XSBench)
+
+# Add a custom command to create the binary for profiling (if available)
+if (CUDA_VERSION)
+    add_custom_command(TARGET XSBench_profiling POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E env LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib:<${CUDA_TOOLKIT_ROOT_DIR}> ${CUDA_NVCC} --use_fast_math $<TARGET_FILE:XSBench>.cpp -o ${CMAKE_BINARY_DIR}/${XSBENCH_SOURCES}_cuda.o
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
+
+# Define the OpenMP offload targets for profiling (if available)
+if (CUDA_VERSION)
+    add_custom_target(XSBench_profiling ALL DEPENDS XSBench)
+endif()
+```
+
+Note that this code block assumes you are using CMake 3.10 or later and have CUDA installed on your system. The `find_package` function is used to find the OpenMP and MPI packages, which are required for compilation and execution of the code.
+
+The code also assumes that the source files for XSBench are in a variable called `XSBENCH_SOURCES`. You will need to modify this line to point to your actual source files.
