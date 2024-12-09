@@ -13,7 +13,7 @@ import contextlib
 import shutil
 
 # tpl imports
-from tqdm import tqdm
+from alive_progress import alive_bar
 import pandas as pd
 import tempfile
 
@@ -203,30 +203,28 @@ def main():
     code_repos = gather_code_repos(args, results)
 
     # Build and run each code repository
-    pbar = tqdm(total=len(code_repos)*2, desc="Building and running code repositories", disable=args.hide_progress)
-    for code_repo in code_repos:
-        with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
-            logging.debug(f"Temporary directory created: {tempdir}")
-            setup_tempdir(tempdir, code_repo)
+    with alive_bar(len(code_repos)*2, title="Building and running code repositories", max_cols=os.get_terminal_size().columns, disable=args.hide_progress) as pbar:
+        for code_repo in code_repos:
+            with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
+                logging.debug(f"Temporary directory created: {tempdir}")
+                setup_tempdir(tempdir, code_repo)
 
-            logging.debug(f"Building code repository: {code_repo['path']}")
-            results_row = build_repo(code_repo, system_config, args, tempdir)
-            update_results(results, results_row)
-            pbar.update(1)
+                logging.debug(f"Building code repository: {code_repo['path']}")
+                results_row = build_repo(code_repo, system_config, args, tempdir)
+                update_results(results, results_row)
+                pbar()
 
-            logging.debug(f"Running code repository: {code_repo['path']}")
-            results_row = run_repo(code_repo, system_config, args, tempdir)
-            update_results(results, results_row)
+                logging.debug(f"Running code repository: {code_repo['path']}")
+                results_row = run_repo(code_repo, system_config, args, tempdir)
+                update_results(results, results_row)
 
-            # Copy temporary directory to save_temps if provided
-            if args.save_temps:
-                tempdir_name = os.path.basename(tempdir)
-                tempdir_path = os.path.join(args.save_temps, tempdir_name)
-                logging.info(f"Saving temporary directory to {tempdir_path}.")
-                shutil.copytree(tempdir, tempdir_path)
-
-            pbar.update(1)
-    pbar.close()
+                # Copy temporary directory to save_temps if provided
+                if args.save_temps:
+                    tempdir_name = os.path.basename(tempdir)
+                    tempdir_path = os.path.join(args.save_temps, tempdir_name)
+                    logging.info(f"Saving temporary directory to {tempdir_path}.")
+                    shutil.copytree(tempdir, tempdir_path)
+                pbar()
 
     # Convert results dict to dataframe
     results_df = pd.DataFrame.from_dict(results)
