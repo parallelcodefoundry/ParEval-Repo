@@ -1,0 +1,17 @@
+```makefile
+# Makefile for OpenMP-Offload version of microXOR
+
+CXX ?= $(CXX_COMPILER)
+SM_VERSION ?= $(SM_VERSION)
+
+CXXFLAGS = -O3 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda --cuda-path=/usr/local/cuda
+LDFLAGS = -fopenmp -lm
+
+all: microXOR
+
+microXOR: main.cpp microXOR.hpp
+	$(CXX) $(CXXFLAGS) -DCUDA_VERSION=$(SM_VERSION) main.cpp -o microXOR $(LDFLAGS)
+
+clean:
+	rm -rf microXOR *.o
+```

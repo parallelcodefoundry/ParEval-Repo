@@ -1,0 +1,28 @@
+```c
+// microXOR kernel for OpenMP-Offload
+
+#include <omp.h>
+
+void cellsXOR(const int *input, int *output, size_t N) {
+  #pragma omp target teams distribute parallel for
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      output[i*N + j] = (count == 1) ? 1 : 0;
+    }
+  }
+}
+```
+In this translated code:
+
+* The `cellsXOR` function is defined with the same parameters as before.
+* We use OpenMP's `target teams distribute parallel for` directive to offload the computation to an accelerator device (if available).
+* Inside the loop, we perform the same computations as before to calculate the output values.
+
+Note that this code assumes that the input and output arrays are already allocated on the host device. To use OpenMP-Offload, you may need to add additional directives or pragmas to manage data transfer between the host and accelerator devices. 
+
+Also note that the translated code block is in C instead of CUDA, as OpenMP is designed for standard programming languages like C/C++. The `omp.h` header file provides the necessary declarations and definitions for using OpenMP directives.

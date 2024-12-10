@@ -1,0 +1,76 @@
+```makefile
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= clang
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+TABLE       ?= no
+SM_VERSION  ?= 80
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = SimpleMOC-kernel
+
+source = \
+main.c init.c io.c kernel.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -O3
+override LDFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -lm
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+	CFLAGS += -O3
+endif
+
+# Exponential Table Build
+ifeq ($(TABLE), yes)
+	CFLAGS += -DTABLE
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) SimpleMOC-kernel_header.h
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c
+	$(COMPILER) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) SimpleMOC-kernel_header.h
+
+run:
+	./$(program)
+```
+
+This Makefile is set up to compile the code using clang with OpenMP offloading to an NVIDIA GPU. The `SM_VERSION` variable is not used in this version of the Makefile, as it's not necessary when compiling for a specific architecture using OpenMP offloading.
+
+The `-fopenmp-targets=nvptx64-nvidia-cuda` flag tells the compiler to generate code for an NVIDIA GPU. This flag should be supported by clang and other compilers that support OpenMP offloading.
+
+Note: You may need to adjust the `CFLAGS` and `LDFLAGS` variables depending on your specific system configuration and requirements. Additionally, you may need to install additional libraries or tools to support OpenMP offloading on your system.

@@ -1,0 +1,178 @@
+```c
+#include "SimpleMOC-kernel_header.h"
+#include <omp.h>
+
+int main(int argc, char *argv[]) {
+    int version = 4;
+
+    srand(time(NULL));
+
+    Input I = set_default_input();
+    read_CLI(argc, argv, &I);
+
+    logo(version);
+
+    print_input_summary(I);
+
+    center_print("INITIALIZATION", 79);
+    border_print();
+
+    // Build Source Data
+    printf("Building Source Data Arrays...\n");
+    Source_Arrays SA_h;
+    Source *sources_h = initialize_sources(I, &SA_h);
+
+    // Build Exponential Table
+    Table *table_d = NULL;
+#ifdef TABLE
+    printf("Building Exponential Table...\n");
+    Table table = buildExponentialTable();
+#endif
+
+    // Allocate Some Flux State vectors to randomly pick from
+    printf("Setting up Flux State Vectors...\n");
+    float *flux_states;
+    int N_flux_states = 10000;
+    assert(I.segments >= N_flux_states);
+
+    // Setup OpenMP offload
+    #pragma omp target enter data map(to: I, sources_h[:I.source_3D_regions], SA_h.fine_source_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], \
+        SA_h.fine_flux_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], SA_h.sigT_arr[:I.source_3D_regions * I.egroups])
+    #pragma omp target enter data map(alloc: flux_states[N_flux_states * I.egroups])
+
+    // Initialize global flux states to random numbers
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < N_flux_states * I.egroups; i++) {
+        flux_states[i] = (float)rand() / RAND_MAX;
+    }
+
+    printf("Initialization Complete.\n");
+    border_print();
+    center_print("SIMULATION", 79);
+    border_print();
+    printf("Attentuating fluxes across segments...\n");
+
+    // Setup kernel call block parameters
+    assert(I.segments % I.seg_per_thread == 0);
+
+    double start_time = omp_get_wtime();
+
+    // Run Simulation Kernel Loop
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < I.segments / I.seg_per_thread; i++) {
+        int blockId = i;
+        curandState localState;
+        curand_init(1234, blockId, 0, &localState);
+
+        // Thread Local (i.e., specific to E group) variables
+        float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
+
+        for (int j = 0; j < I.seg_per_thread; j++) {
+            blockId++;
+
+            // Randomized variables (common accross all thread within block)
+            int state_flux_id = curand(&localState) % N_flux_states;
+            int QSR_id = curand(&localState) % I.source_3D_regions;
+            int FAI_id = curand(&localState) % I.fine_axial_intervals;
+
+            float *state_flux = &flux_states[state_flux_id * I.egroups];
+
+            // Attenuate Segment
+            float dz = 0.1f, zin = 0.3f, weight = 0.5f, mu = 0.9f, mu2 = 0.3f, ds = 0.7f;
+            const int egroups = I.egroups;
+
+            // load fine source region flux vector
+            float *FSR_flux = &SA_h.fine_flux_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
+
+            if (FAI_id == 0) {
+                float y2 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
+                float y3 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id + 1) * I.egroups];
+
+                // do linear "fitting"
+                float c0 = y2;
+                float c1 = (y3 - y2) / dz;
+
+                // calculate q0, q1, q2
+                q0 = c0 + c1 * zin;
+                q1 = c1;
+                q2 = 0;
+            } else if (FAI_id == I.fine_axial_intervals - 1) {
+                float y1 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id - 1) * I.egroups];
+                float y2 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
+
+                // do linear "fitting"
+                float c0 = y2;
+                float c1 = (y2 - y1) / dz;
+
+                // calculate q0, q1, q2
+                q0 = c0 + c1 * zin;
+                q1 = c1;
+                q2 = 0;
+            } else {
+                float y1 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id - 1) * I.egroups];
+                float y2 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
+                float y3 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id + 1) * I.egroups];
+
+                // do quadratic "fitting"
+                float c0 = y2;
+                float c1 = (y1 - y3) / (2 * dz);
+                float c2 = (y1 - 2 * y2 + y3) / (2 * dz * dz);
+
+                // calculate q0, q1, q2
+                q0 = c0 + c1 * zin + c2 * zin * zin;
+                q1 = c1 + 2 * c2 * zin;
+                q2 = c2;
+            }
+
+            sigT = SA_h.sigT_arr[QSR_id * I.egroups];
+
+            tau = sigT * ds;
+            sigT2 = sigT * sigT;
+
+#ifdef TABLE
+            // Interpolate table for exp(-x)
+            float slope, intercept;
+            int interval = (int)(tau / table.dx + 0.5 * table.dx);
+            interval *= 2;
+            slope = table.values[interval];
+            intercept = table.values[interval + 1];
+            expVal = slope * tau + intercept;
+#else
+            expVal = 1 - exp(-tau);
+#endif
+
+            // Flux Integral
+            reuse = tau * (tau - 2) + 2 * expVal / (sigT * sigT2);
+
+            flux_integral = (q0 * tau + (sigT * state_flux[0] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3) + 6) - 6 * expVal) / (3 * sigT2 * sigT2);
+
+            // Prepare tally
+            tally = weight * flux_integral;
+
+            FSR_flux[0] += tally;
+
+            t1 = q0 * expVal / sigT;
+            t2 = q1 * mu * (tau - expVal) / sigT2;
+            t3 = q2 * mu2 * reuse;
+            t4 = state_flux[0] * (1 - expVal);
+
+            state_flux[0] = t1 + t2 + t3 + t4;
+        }
+    }
+
+    double end_time = omp_get_wtime();
+
+    printf("Simulation Complete.\n");
+
+    border_print();
+    center_print("RESULTS SUMMARY", 79);
+    border_print();
+
+    double runtime = end_time - start_time;
+    printf("%-25s%.3f seconds\n", "Runtime:", runtime);
+
+    #pragma omp target exit data map(delete: flux_states[:N_flux_states * I.egroups])
+
+    return 0;
+}
+```
