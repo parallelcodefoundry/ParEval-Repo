@@ -31,10 +31,11 @@ def get_args():
     parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", "-d", action="store_true", help="Dry run the translation.")
     parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
+    parser.add_argument("--hide-progress", action="store_true", help="Hide the progress bar.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama-3.2", "llama-3.1", "gpt-4o"], default="gemini", help="The LLM to use for translation.")
+    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama-3.3", "llama-3.2", "llama-3.1", "gpt-4o"], default="gemini", help="The LLM to use for translation.")
     return parser.parse_args()
 
 
@@ -85,7 +86,8 @@ def main():
                                 args.app_name,
                                 args.naive_llm,
                                 args.config)
-    translator.translate(dry=args.dry, log_interactions=args.log_interactions)
+    translator.translate(dry=args.dry, log_interactions=args.log_interactions,
+                         hide_progress=args.hide_progress)
 
 
 

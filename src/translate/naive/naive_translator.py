@@ -130,12 +130,12 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
 
-    def translate(self, dry: bool = False, log_interactions: bool = False):
+    def translate(self, dry: bool = False, log_interactions: bool = False, hide_progress: bool = False):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
 
-        for fpath in alive_it(all_files, title="Translating files", max_cols=os.get_terminal_size().columns):
+        for fpath in alive_it(all_files, title="Translating files", max_cols=os.get_terminal_size().columns, disable=hide_progress):
             prompt = self.get_prompt(fpath)
 
             output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath))
