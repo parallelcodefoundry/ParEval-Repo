@@ -34,5 +34,5 @@ class Translator(ABC):
         self._dst_config = dst_config
 
     @abstractmethod
-    def translate(self, dry: bool = False, log_interactions: bool = False):
+    def translate(self, dry: bool = False, log_interactions: bool = False, hide_progress: bool = False):
         pass
