@@ -1,0 +1,33 @@
+```cpp
+// microXOR kernel for OpenMP offloading
+
+#include <omp.h>
+#include "microXOR.cuh"
+
+void cellsXOR(const int *input, int *output, size_t N) {
+  #pragma omp target teams distribute parallel for
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      output[i*N + j] = (count == 1) ? 1 : 0;
+    }
+  }
+}
+```
+
+Note: The `omp.h` header is included for OpenMP directives. The `cellsXOR` function now uses OpenMP's offloading model, where the computation is distributed across multiple teams on the target device using the `teams distribute parallel for` directive. This will automatically handle the data transfer and execution on the target device.
+
+Also note that this code assumes a compiler that supports OpenMP 4.5 or later, which provides the `target` directive for offloading to accelerators like GPUs. The specific syntax may vary depending on the compiler and its version. 
+
+To compile this code with GCC, you would use:
+```bash
+gcc -fopenmp -foffload=nvptx-none -o microXOR microXOR.c
+```
+For Intel compilers:
+```bash
+icc -qopenmp -offload-attribute=target=gpu -o microXOR microXOR.c
+```

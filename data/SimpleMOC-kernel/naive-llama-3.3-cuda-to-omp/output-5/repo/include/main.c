@@ -1,0 +1,249 @@
+#include "SimpleMOC-kernel_header.h"
+
+int main(int argc, char* argv[]) {
+    int version = 4;
+
+    srand(time(NULL));
+
+    Input I = set_default_input();
+    read_CLI(argc, argv, &I);
+
+    logo(version);
+
+    print_input_summary(I);
+
+    center_print("INITIALIZATION", 79);
+    border_print();
+
+    // Build Source Data
+    printf("Building Source Data Arrays...\n");
+    Source_Arrays SA_h;
+    Source* sources_h = initialize_sources(I, &SA_h);
+
+    // Build Exponential Table
+    Table* table_d = NULL;
+#ifdef TABLE
+    printf("Building Exponential Table...\n");
+    Table table = buildExponentialTable();
+#endif
+
+    // Setup OpenMP offload target
+    int device_id = 0; // Default to first available device
+    for (int i = 1; i < argc; i++) {
+        char* arg = argv[i];
+        if (strcmp(arg, "-d") == 0) {
+            if (++i < argc) {
+                device_id = atoi(argv[i]);
+            } else {
+                print_CLI_error();
+            }
+        }
+    }
+
+    // Allocate and initialize host data
+    float* flux_states_host = (float*)malloc(I.egroups * 10000 * sizeof(float));
+    init_flux_states_host(flux_states_host, 10000, I);
+
+    // Allocate device data
+    float* flux_states_device;
+    Source* sources_device;
+    Source_Arrays SA_d;
+    Table* table_h = NULL;
+
+#ifdef TABLE
+    table_h = &table;
+#endif
+
+    // Offload data to target device
+#pragma omp target enter data map(to: I, sources_h[:I.source_3D_regions], SA_h.fine_source_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], \
+                                   SA_h.fine_flux_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], SA_h.sigT_arr[:I.source_3D_regions * I.egroups]) \
+                               map(alloc: flux_states_device[0:I.egroups*10000], sources_device[0:I.source_3D_regions], SA_d.fine_source_arr[0:I.source_3D_regions * I.fine_axial_intervals * I.egroups], \
+                                   SA_d.fine_flux_arr[0:I.source_3D_regions * I.fine_axial_intervals * I.egroups], SA_d.sigT_arr[0:I.source_3D_regions * I.egroups]) \
+                               device(device_id)
+
+    // Copy host data to device
+    memcpy(sources_device, sources_h, I.source_3D_regions * sizeof(Source));
+    memcpy(SA_d.fine_source_arr, SA_h.fine_source_arr, I.source_3D_regions * I.fine_axial_intervals * I.egroups * sizeof(float));
+    memcpy(SA_d.fine_flux_arr, SA_h.fine_flux_arr, I.source_3D_regions * I.fine_axial_intervals * I.egroups * sizeof(float));
+    memcpy(SA_d.sigT_arr, SA_h.sigT_arr, I.source_3D_regions * I.egroups * sizeof(float));
+
+#pragma omp target exit data map(from: flux_states_device[0:I.egroups*10000]) device(device_id)
+
+    // Copy result from device to host
+    memcpy(flux_states_host, flux_states_device, I.egroups * 10000 * sizeof(float));
+
+    printf("Initialization Complete.\n");
+    border_print();
+    center_print("SIMULATION", 79);
+    border_print();
+
+    int n_blocks = sqrt(I.segments / I.seg_per_thread);
+    int block_size = I.seg_per_thread;
+
+#pragma omp target teams distribute parallel for num_teams(n_blocks) num_threads(block_size) \
+    map(to: I, sources_device[:I.source_3D_regions], SA_d.fine_source_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], \
+        SA_d.fine_flux_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], SA_d.sigT_arr[:I.source_3D_regions * I.egroups]) \
+    device(device_id)
+    for (int i = 0; i < n_blocks; i++) {
+        run_kernel_host(I, sources_device, SA_d, table_h, flux_states_host + i * block_size * I.egroups);
+    }
+
+    printf("Simulation Complete.\n");
+
+    border_print();
+    center_print("RESULTS SUMMARY", 79);
+    border_print();
+
+    double tpi = ((double)(clock() / (double)CLOCKS_PER_SEC) / (double)I.segments / (double)I.egroups) * 1.0e9;
+    printf("%-25s%.3f seconds\n", "Runtime:", (double)clock() / (double)CLOCKS_PER_SEC);
+    printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
+    border_print();
+
+    return 0;
+}
+
+void init_flux_states_host(float* flux_states, int N_flux_states, Input I) {
+    for (int i = 0; i < N_flux_states * I.egroups; i++) {
+        flux_states[i] = (float)rand() / RAND_MAX;
+    }
+}
+
+void run_kernel_host(Input I, Source* sources, Source_Arrays SA, Table* table, float* state_fluxes) {
+    // Thread Local (i.e., specific to E group) variables
+    float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
+
+    int blockId = omp_get_team_num();
+    int thread_id = omp_get_thread_num();
+
+    // Assign RNG state
+    curandState localState;
+    curand_init(1234, thread_id, 0, &localState);
+
+    for (int i = 0; i < I.seg_per_thread; i++) {
+        blockId += i;
+
+        float* state_flux = &state_fluxes[thread_id];
+
+        // Some placeholder constants - In the full app some of these are
+        // calculated based off position in geometry. This treatment
+        // shaves off a few FLOPS, but is not significant compared to the
+        // rest of the function.
+        float dz = 0.1f;
+        float zin = 0.3f;
+        float weight = 0.5f;
+        float mu = 0.9f;
+        float mu2 = 0.3f;
+        float ds = 0.7f;
+
+        const int egroups = I.egroups;
+
+        // load fine source region flux vector
+        float* FSR_flux = &SA.fine_flux_arr[sources[blockId % I.source_3D_regions].fine_flux_id + (blockId / I.source_3D_regions) * egroups];
+
+        if ((blockId / I.source_3D_regions) == 0) {
+            float* f2 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + (blockId / I.source_3D_regions) * egroups];
+            float* f3 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + ((blockId / I.source_3D_regions) + 1) * egroups];
+
+            // cycle over energy groups
+            // load neighboring sources
+            float y2 = f2[thread_id];
+            float y3 = f3[thread_id];
+
+            // do linear "fitting"
+            float c0 = y2;
+            float c1 = (y3 - y2) / dz;
+
+            // calculate q0, q1, q2
+            q0 = c0 + c1 * zin;
+            q1 = c1;
+            q2 = 0;
+        } else if ((blockId / I.source_3D_regions) == (I.fine_axial_intervals - 1)) {
+            float* f1 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + ((blockId / I.source_3D_regions) - 1) * egroups];
+            float* f2 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + (blockId / I.source_3D_regions) * egroups];
+
+            // cycle over energy groups
+            // load neighboring sources
+            float y1 = f1[thread_id];
+            float y2 = f2[thread_id];
+
+            // do linear "fitting"
+            float c0 = y2;
+            float c1 = (y2 - y1) / dz;
+
+            // calculate q0, q1, q2
+            q0 = c0 + c1 * zin;
+            q1 = c1;
+            q2 = 0;
+        } else {
+            float* f1 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + ((blockId / I.source_3D_regions) - 1) * egroups];
+            float* f2 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + (blockId / I.source_3D_regions) * egroups];
+            float* f3 = &SA.fine_source_arr[sources[blockId % I.source_3D_regions].fine_source_id + ((blockId / I.source_3D_regions) + 1) * egroups];
+
+            // cycle over energy groups
+            // load neighboring sources
+            float y1 = f1[thread_id];
+            float y2 = f2[thread_id];
+            float y3 = f3[thread_id];
+
+            // do quadratic "fitting"
+            float c0 = y2;
+            float c1 = (y1 - y3) / (2.f * dz);
+            float c2 = (y1 - 2.f * y2 + y3) / (2.f * dz * dz);
+
+            // calculate q0, q1, q2
+            q0 = c0 + c1 * zin + c2 * zin * zin;
+            q1 = c1 + 2.f * c2 * zin;
+            q2 = c2;
+        }
+
+        // load total cross section
+        sigT = SA.sigT_arr[sources[blockId % I.source_3D_regions].sigT_id + thread_id];
+
+        // calculate common values for efficiency
+        tau = sigT * ds;
+        sigT2 = sigT * sigT;
+
+#ifdef TABLE
+        interpolateTable_host(table, tau, &expVal);
+#else
+        expVal = 1.f - expf(-tau); // EXP function is faster than table lookup
+#endif
+
+        // Flux Integral
+
+        // Re-used Term
+        reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
+
+        // add contribution to new source flux
+        flux_integral = (q0 * tau + (sigT * state_flux[thread_id] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
+
+        // Prepare tally
+        tally = weight * flux_integral;
+
+        FSR_flux[thread_id] += tally;
+
+        // Term 1
+        t1 = q0 * expVal / sigT;
+        // Term 2
+        t2 = q1 * mu * (tau - expVal) / sigT2;
+        // Term 3
+        t3 = q2 * mu2 * reuse;
+        // Term 4
+        t4 = state_flux[thread_id] * (1.f - expVal);
+        // Total psi
+        state_flux[thread_id] = t1 + t2 + t3 + t4;
+    }
+}
+
+void interpolateTable_host(Table* table, float x, float* out) {
+    if (x > table->maxVal)
+        *out = 1.0f;
+    else {
+        int interval = (int)(x / table->dx + 0.5f * table->dx);
+        interval = interval * 2;
+        float slope = table->values[interval];
+        float intercept = table->values[interval + 1];
+        float val = slope * x + intercept;
+        *out = val;
+    }
+}

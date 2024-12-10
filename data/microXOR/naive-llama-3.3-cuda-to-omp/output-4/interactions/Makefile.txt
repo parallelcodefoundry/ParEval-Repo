@@ -1,0 +1,23 @@
+```makefile
+# Makefile for OpenMP-Offload microXOR
+
+ifndef CXX_COMPILER
+$(error CXX_COMPILER must be specified)
+endif
+
+ifndef SM_VERSION
+$(error SM_VERSION must be specified, e.g., 80 for NVIDIA GPU with compute capability 8.0)
+endif
+
+CXX = $(CXX_COMPILER)
+CXXFLAGS = -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda --offload-arch=sm_$(SM_VERSION) -O3
+LDFLAGS = -fopenmp
+
+microXOR: microXOR.cpp
+	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
+
+clean:
+	rm -rf microXOR *.o
+
+.PHONY: clean
+```
