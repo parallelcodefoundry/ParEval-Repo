@@ -1,0 +1,37 @@
+```cmake
+cmake_minimum_required(VERSION 3.21)
+
+project(
+    XSBench_OpenMP_Offload
+    VERSION 1.0
+    LANGUAGES CXX
+)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
+# Enable OpenMP Offload
+set(CMAKE_CXX_COMPILER "g++")
+set(OPENMP_OFFLOAD_FLAGS "-fopenmp -fopenmp-targets=nvptx64-nvidia-cuda")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPENMP_OFFLOAD_FLAGS}")
+
+set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+
+add_executable(XSBench_OpenMP_Offload ${SOURCE})
+
+install(TARGETS XSBench_OpenMP_Offload DESTINATION bin)
+```
+
+Note that I've made the following changes to translate the CMakeLists.txt file to the OpenMP-Offload execution model:
+
+1. Changed the `LANGUAGES` from `CXX CUDA` to just `CXX`, as we're no longer using CUDA.
+2. Set the `CMAKE_CXX_COMPILER` to `g++`, which supports OpenMP Offload.
+3. Added the `-fopenmp` and `-fopenmp-targets=nvptx64-nvidia-cuda` flags to enable OpenMP Offload for NVIDIA GPUs.
+4. Removed the `nvcc` compiler and related flags, as we're no longer using CUDA.
+
+Also, note that you'll need to modify your source files (e.g., `Main.cpp`, `io.cpp`, etc.) to use OpenMP Offload directives instead of CUDA kernels. This will involve replacing `__global__` functions with OpenMP Offload regions, and using OpenMP Offload directives to manage data transfer between the host and device.
