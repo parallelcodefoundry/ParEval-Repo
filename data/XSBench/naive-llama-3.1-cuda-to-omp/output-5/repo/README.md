@@ -1,19 +1,35 @@
-# XSBench: A Performance Abstraction for Monte Carlo Reactor Analysis
+===============================
+OpenMP-Offload XSBench
+===============================
 
-XSBench is a software package designed to measure and improve the performance of Monte Carlo reactor simulations. It provides a flexible and extensible framework for simulating various types of reactors, including pressurized water reactors (PWRs), boiling water reactors (BWRs), and small modular reactors (SMRs).
+[![XSBench](docs/img/logo.png)](https://github.com/ANL-CESAR/XSBench)
 
-## Key Features
+[![Latest Github release](https://img.shields.io/github/release/ANL-CESAR/XSBench.svg)](https://github.com/ANL-CESAR/XSBench/releases/latest)
+[![Build Status](https://travis-ci.com/ANL-CESAR/XSBench.svg?branch=master)](https://travis-ci.com/ANL-CESAR/XSBench)
+[![Published in Annals of Nuclear Energy](https://img.shields.io/badge/Published%20in-Annals%20of%20Nuclear%20Energy-167DA4.svg)](https://www.sciencedirect.com/science/article/pii/S0306454914004332)
 
-*   **OpenMP Offloading**: XSBench supports OpenMP offloading, which allows users to execute parallel regions on a GPU or other accelerator devices.
-*   **Unionized Grid**: The Unionized Grid is the default grid type used in XSBench. It provides efficient memory access and minimizes memory usage by storing only unique data points.
-*   **Nuclide Grid**: In addition to the Unionized Grid, XSBench also supports the Nuclide Grid, which stores all nuclide data for each particle in a separate array.
-*   **Hash-based Access**: XSBench uses hash-based access to improve performance when accessing large datasets.
-*   **Support for Various Simulation Methods**: XSBench supports multiple simulation methods, including Monte Carlo, Discrete-Ordinates, and Deterministic Transport.
+XSBench is a mini-app representing a key computational kernel of the Monte Carlo neutron transport algorithm. Specifically, XSBench represents the continuous energy macroscopic neutron cross section lookup kernel. XSBench serves as a lightweight stand-in for full neutron transport applications like [OpenMC](https://github.com/openmc-dev/openmc), and is a useful tool for performance analysis on high performance computing architectures.
 
-## Citing XSBench
+## Table of Contents
 
-Papers citing the XSBench program in general should refer to:
+1. [Compilation](#Compilation)
+2. [Running XSBench / Command Line Interface](#Running-XSBench)
+3. [Feature Discussion](#Feature-Discussion)
+	* [MPI Support](#MPI-Support)
+	* [Verification Support](#Verification-Support)
+	* [Binary File Support](#Binary-File-Support)
+4. [Theory & Algorithms](#Algorithms)
+	* [Transport Simulation Styles](#Transport-Simulation-Styles)
+		- [History-Based Transport](#History-Based-Transport)
+		- [Event-Based Transport](#Event-Based-Transport)
+	* [Cross Section Lookup Methods](#Cross-Section-Lookup-Methods)
+		- [Nuclide Grid](#Nuclide-Grid)
+		- [Unionized Energy Grid](#Unionized-Energy-Grid)
+		- [Logarithmic Hash Grid](#Logarithmic-Hash-Grid)
+5. [Optimized Kernels](#Optimized-Kernels)
+6. [Citing XSBench](#Citing-XSBench)
+7. [Development Team](#Development-Team) 
 
->J. R. Tramm, A. R. Siegel, T. Islam, and M. Schulz, ���XSBench - The Development and Verification of a Performance Abstraction for Monte Carlo Reactor Analysis,��� presented at PHYSOR 2014 - The Role of Reactor Physics toward a Sustainable Future, Kyoto. https://www.mcs.anl.gov/papers/P5064-0114.pdf
+## Compilation
 
-Bibtex Entry:
+To compile XSBench with default settings, navigate to your selected source directory and use the following command:

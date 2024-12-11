@@ -1,38 +1,24 @@
-cmake_minimum_required(VERSION 3.10)
-project(XSBench)
+cmake_minimum_required(VERSION 3.21)
 
-# Set compiler and flags
-set(CMAKE_CXX_COMPILER "nvcc")
-set(CMAKE_C_COMPILER "nvcc")
+project(
+    XSBench_OpenMP
+    VERSION 1.0
+    LANGUAGES CXX CUDA
+)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -device=cpu")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-# Set CUDA architecture for compilation
-set(CUDA_ARCH SMI)
+# Enable OpenMP for offloading
+set(CMAKE_C_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS "-fopenmp")
 
-# Include directories
-include_directories(${CMAKE_SOURCE_DIR}/src
-                     ${CMAKE_SOURCE_DIR}/src/utils
-                     ${CMAKE_SOURCE_DIR}/src/parallel
-                     ${CMAKE_SOURCE_DIR}/src/offload
-                     ${CMAKE_SOURCE_DIR}/src/offload/cpu
-                     ${CMAKE_SOURCE_DIR}/third_party/eigen)
+# Include necessary compiler flags and libraries
+include_directories(/usr/include/offload)
 
-# Link libraries
-link_directories(${CMAKE_SOURCE_DIR}/src/utils
-                 ${CMAKE_SOURCE_DIR}/src/parallel
-                 ${CMAKE_SOURCE_DIR}/src/offload
-                 ${CMAKE_SOURCE_DIR}/third_party/eigen)
-find_package(Eigen3 REQUIRED)
+add_executable(XSBench ${SOURCE})
 
-# Define OpenMP offload target
-add_library(offload_target OFFLOAD TARGET "offload_target.cu")
+target_link_libraries(XSBench pthread openmp offline-capable cuda)
 
-# Add OpenMP-offload compilation flags for device
-set(CMAKE_CUDA_FLAGS "-gencode arch=compute_80,code=sm_80 -std=c++14")
-
-# Create executable from kernels and utilities
-add_executable(${PROJECT_NAME} kernel.cu utils.cu parallel_utils.cu offload_cpu_kernel.cu)
-
-# Link OpenMP-offload target with executable
-target_link_libraries(${PROJECT_NAME} offload_target)
+install(TARGETS XSBench DESTINATION bin)

@@ -1,64 +1,119 @@
-// Copyright 2023 Argonne National Laboratory, Battelle Memorial Institute,
-// and The Regents of the University of California through Lawrence Berkeley
-// National Laboratory.
-//
-// See LICENSE for more details.
-
-#ifndef XSBENCH_HEADER_H
-#define XSBENCH_HEADER_H
+#ifndef __XSBENCH_HEADER_H__
+#define __XSBENCH_HEADER_H__
 
 #include <omp.h>
+#include <iostream>
 
-typedef struct{
-        int nthreads;
-        long n_isotopes;
-        long n_gridpoints;
-        int lookups;
-        char * HM;
-        int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
-        int hash_bins;
-        int particles;
-        int simulation_method;
-        int binary_mode;
-        int kernel_id;
-        int num_iterations;
-        int num_warmups;
-        char *filename;
-} Inputs;
+// Grid types
+#define UNIONIZED 0
+#define NUCLIDE 1
+#define HASH 2
 
-typedef struct{
-  double device_to_host_time;
-  double kernel_time;
-  double host_to_device_time;
-} Profile;
+// Simulation types
+#define HISTORY_BASED 1
+#define EVENT_BASED 2
 
-inline void print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    #pragma omp target data map(to:profile.device_to_host_time,profile.kernel_time,profile.host_to_device_time)
-      { 
-        FILE* output = fopen(in.filename, "w");
-        fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-        fprintf(output, "%f,%f,%f,%d,%d\n",
-                profile.device_to_host_time*1000,
-                profile.kernel_time*1000,
-                profile.host_to_device_time*1000,
-                in.num_iterations,
-                in.num_warmups);
-        fclose(output);
-      }
-  }
-  else {
-    #pragma omp target data map(to:profile.device_to_host_time,profile.kernel_time,profile.host_to_device_time)
-      { 
-        printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-        printf("%f,%f,%f,%d,%d\n",
-               profile.device_to_host_time*1000,
-               profile.kernel_time*1000,
-               profile.host_to_device_time*1000,
-               in.num_iterations,
-               in.num_warmups);
-      }
-  }
+// Binary Mode Type
+#define NONE 0
+#define READ 1
+#define WRITE 2
+
+#define STARTING_SEED 1070
+
+// Offload device type (CPU/GPU)
+#ifdef OFFLOAD
+#    define OMP_TARGET offload
+#else
+#    undef OMP_TARGET
+#endif
+
+// Structs and functions
+
+struct NuclideGridPoint {
+    double energy;
+    double total_xs;
+    double elastic_xs;
+    double absorbtion_xs;
+    double fission_xs;
+    double nu_fission_xs;
+};
+
+struct SimulationData {
+    int *num_nucs;                     // Length = length_num_nucs;
+    double *concs;                     // Length = length_concs
+    int *mats;                         // Length = length_mats
+    double *unionized_energy_array;    // Length = length_unionized_energy_array
+    int *index_grid;                   // Length = length_index_grid
+    NuclideGridPoint *nuclide_grid;    // Length = length_nuclide_grid
+    int length_num_nucs;
+    int length_concs;
+    int length_mats;
+    int length_unionized_energy_array;
+    long length_index_grid;
+    int length_nuclide_grid;
+    int max_num_nucs;
+    unsigned long *verification;
+    int length_verification;
+    double *p_energy_samples;
+    int length_p_energy_samples;
+    int *mat_samples;
+    int length_mat_samples;
+};
+
+// Macros
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+        if (code != cudaSuccess)
+        {
+                std::cerr << "GPUassert: " << cudaGetErrorString(code) << " " << file << " " << line << std::endl;
+                if (abort) exit(code);
+        }
 }
 
-#endif // XSBENCH_HEADER_H
+// Offload functions
+#ifdef OFFLOAD
+#    define OMP_TARGET_OFFLOAD CPU
+#else
+#    undef OMP_TARGET_OFFLOAD
+#endif
+
+#define gpuErrchk_offload(ans) { gpuAssert_offload((ans), __FILE__, __LINE__); }
+inline void gpuAssert_offload(cudaError_t code, const char *file, int line, bool abort=true)
+{
+        if (code != cudaSuccess)
+        {
+                std::cerr << "GPUassert: " << cudaGetErrorString(code) << " " << file << " " << line << std::endl;
+                if (abort) exit(code);
+        }
+}
+
+// Offload device memory allocation
+void* offload_malloc(size_t size)
+{
+    return omp_target_alloc(size, OMP_TARGET_OFFLOAD);
+}
+
+// Offload host-to-device copy
+void offload_memcpy(void *dst, const void *src, size_t count)
+{
+    #ifdef OFFLOAD
+        #pragma omp target data map(to: dst[0:count]) [from: src[0:count]]
+            cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
+    #else
+        cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice);
+    #endif
+}
+
+// Offload device-to-host copy
+void offload_memcpy_d2h(void *dst, const void *src, size_t count)
+{
+    #ifdef OFFLOAD
+        #pragma omp target data map(to: dst[0:count]) [from: src[0:count]]
+            cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);
+    #else
+        cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost);
+    #endif
+}
+
+#endif // __XSBENCH_HEADER_H__

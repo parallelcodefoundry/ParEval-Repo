@@ -1,75 +1,89 @@
-#pragma omp declare target
-#include "XSbench_shared_header.h"
-#pragma omp end declare target
+#include "XSbench_header_offload.h"
 
-// Offload declarations
-__host__ __device__ double xssort(double *x, int n) {
-    // Sort function implementation (not shown)
+int double_compare(const void * a, const void * b)
+{
+    double A = *((double *) a);
+    double B = *((double *) b);
+
+    if( A > B )
+        return 1;
+    else if( A < B )
+        return -1;
+    else
+        return 0;
 }
 
-__host__ __device__ void offload_sort(double *x, int n) {
-    #pragma omp target teams distribute parallel for if(n > 1000)
-    for(int i = 0; i < n; i++) {
-        x[i] = xssort(x + i, n - i);
-    }
+int NGP_compare(const void * a, const void * b)
+{
+    NuclideGridPoint A = *((NuclideGridPoint *) a);
+    NuclideGridPoint B = *((NuclideGridPoint *) b);
+
+    if( A.energy > B.energy )
+        return 1;
+    else if( A.energy < B.energy )
+        return -1;
+    else
+        return 0;
 }
 
-// Event kernel function
-__global__ void event_kernel(double *xs, double *ys, int n) {
-    // Kernel implementation (not shown)
+// RNG Used for Verification Option.
+// This one has a static seed (must be set manually in source).
+// Park & Miller Multiplicative Conguential Algorithm
+// From "Numerical Recipes" Second Edition
+double rn_v(void)
+{
+    static unsigned long seed = 1337;
+    double ret;
+    unsigned long n1;
+    unsigned long a = 16807;
+    unsigned long m = 2147483647;
+    n1 = ( a * (seed) ) % m;
+    seed = n1;
+    ret = (double) n1 / m;
+    return ret;
 }
 
-// Material kernel function
-__global__ void material_kernel(double *xs, double *ys, int n) {
-    // Kernel implementation (not shown)
+size_t estimate_mem_usage( Inputs in )
+{
+    size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );
+    size_t all_nuclide_grids   = in.n_isotopes * single_nuclide_grid;
+    size_t size_UEG		   = in.n_isotopes*in.n_gridpoints*sizeof(double) + in.n_isotopes*in.n_gridpoints*in.n_isotopes*sizeof(int);
+    size_t size_hash_grid	   = in.hash_bins * in.n_isotopes * sizeof(int);
+    size_t memtotal;
+
+    if( in.grid_type == UNIONIZED )
+        memtotal	  = all_nuclide_grids + size_UEG;
+    else if( in.grid_type == NUCLIDE )
+        memtotal	  = all_nuclide_grids;
+    else
+        memtotal	  = all_nuclide_grids + size_hash_grid;
+
+    memtotal	  = ceil(memtotal / (1024.0*1024.0));
+    return memtotal;
 }
 
-int main() {
-    Inputs in;
-    Profile profile;
+double get_time(void)
+{
+#ifdef MPI
+    return MPI_Wtime();
+#endif
 
-    // Initialize input parameters
-    in.filename = "output.txt";
-    in.nthreads = 4;
-    in.lookups = 10;
-    in.grid_type = 0; // Unionized Grid
-    in.hash_bins = 16;
-    in.particles = 100000;
-    in.simulation_method = 1; // Event-based simulation
+#ifdef OPENMP_OFFLOAD
+    return omp_get_wtime();
+#endif
 
-    // Create event kernel function pointer
-    void (*event_kernel_ptr)(double *, double *, int) = event_kernel;
+#ifdef __cplusplus
+    // If using C++, we can do this:
+    unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
+    return (double) us_since_epoch / 1.0e6;
+#else
+    struct timeval timecheck;
 
-    // Offload event kernel to device
-    #pragma omp target teams distribute parallel for if(in.particles > 1000)
-    for(int i = 0; i < in.particles; i++) {
-        event_kernel_ptr((double *)in.HM + i * (in.lookups + 1), NULL, in.lookups);
-    }
+    gettimeofday(&timecheck, NULL);
+    long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
 
-    // Sort particles by material and energy
-    #pragma omp target teams distribute parallel for if(in.particles > 1000)
-    for(int i = 0; i < in.particles; i++) {
-        offload_sort((double *)in.HM + i * (in.lookups + 1), in.lookups);
-    }
+    double time = (double) ms / 1000.0;
 
-    // Create material kernel function pointer
-    void (*material_kernel_ptr)(double *, double *, int) = material_kernel;
-
-    // Offload material kernel to device for each material
-    #pragma omp target teams distribute parallel if(in.simulation_method == 1)
-    for(int mat_id = 0; mat_id < in.nthreads; mat_id++) {
-        material_kernel_ptr((double *)in.HM + mat_id * (in.lookups + 1), NULL, in.lookups);
-    }
-
-    // Gather results from device
-    #pragma omp target teams distribute parallel if(in.simulation_method == 1)
-    for(int i = 0; i < in.particles; i++) {
-        // Assume HM is a large array on the device that holds the simulation data
-        double *result = (double *)in.HM + i * (in.lookups + 1);
-        profile.kernel_time += omp_get_wtime();
-    }
-
-    print_profile(profile, in);
-
-    return 0;
+    return time;
+#endif
 }

@@ -1,54 +1,108 @@
-Here is the translation of `XSbench_header.cuh` to the OpenMP-offload execution model:
+Here is the XSbench_header.cuh file translated to OpenMP-Offload:
 ```c
-#ifndef XS_BENCH_H
-#define XS_BENCH_H
+#ifndef __XSBENCH_HEADER_H__
+#define __XSBENCH_HEADER_H__
 
-// Header for XSBench
+#include <omp.h>
+#include <cuda_runtime_api.h>
 
-#ifdef __CUDA_ARCH__
-    #define CUDA_HOST_DEVICE
-#endif
+// Grid types
+#define UNIONIZED 0
+#define NUCLIDE 1
+#define HASH 2
 
-#if defined(ENABLE_PAPI) && defined(OPENMP_OFFLOAD)
-    #pragma offload target(mic:offload)
-    #include <omp.h>
-#else
-    #ifndef _OPENMP
-        #error OpenMP not found, please install it
-    #endif
-#endif
+// Simulation types
+#define HISTORY_BASED 1
+#define EVENT_BASED 2
 
-// Define functions to be used by host and device code
+// Binary Mode Type
+#define NONE 0
+#define READ 1
+#define WRITE 2
 
-__host__ __device__ double get_time();
+#define STARTING_SEED 1070
 
-inline void print_profile(Profile profile, Inputs in);
-
-typedef struct{
-    int nthreads;
-    long n_isotopes;
-    long n_gridpoints;
-    int lookups;
-    char * HM;
-    int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
-    int hash_bins;
-    int particles;
-    int simulation_method;
-    int binary_mode;
-    int kernel_id;
-    int num_iterations;
-    int num_warmups;
-    char *filename;
-} Inputs;
+#pragma offload_attribute push target(cuda)
+#pragma offload_attribute pop
 
 typedef struct{
-    double device_to_host_time;
-    double kernel_time;
-    double host_to_device_time;
-} Profile;
+        double energy;
+        double total_xs;
+        double elastic_xs;
+        double absorbtion_xs;
+        double fission_xs;
+        double nu_fission_xs;
+} NuclideGridPoint;
 
-#endif // XS_BENCH_H
+typedef struct{
+        int * num_nucs;                     // Length = length_num_nucs;
+        double * concs;                     // Length = length_concs
+        int * mats;                         // Length = length_mats
+        double * unionized_energy_array;    // Length = length_unionized_energy_array
+        int * index_grid;                   // Length = length_index_grid
+        NuclideGridPoint * nuclide_grid;    // Length = length_nuclide_grid
+        int length_num_nucs;
+        int length_concs;
+        int length_mats;
+        int length_unionized_energy_array;
+        long length_index_grid;
+        int length_nuclide_grid;
+        int max_num_nucs;
+        unsigned long * verification;
+        int length_verification;
+} SimulationData;
+
+#pragma offload_attribute push target(cuda)
+__global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
+{
+        // The lookup ID. Used to set the seed, and to store the verification value
+        const int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+        if( i >= in.lookups )
+                return;
+
+        double macro_xs_vector[5] = {0};
+
+        // Perform macroscopic Cross Section Lookup
+        calculate_macro_xs(
+                GSD.p_energy_samples[i],        // Sampled neutron energy (in lethargy)
+                GSD.mat_samples[i],             // Sampled material type index neutron is in
+                in.n_isotopes,   // Total number of isotopes in simulation
+                in.n_gridpoints, // Number of gridpoints per isotope in simulation
+                GSD.num_nucs,     // 1-D array with number of nuclides per material
+                GSD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
+                GSD.unionized_energy_array, // 1-D Unionized energy array
+                GSD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+                GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+                GSD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+                macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+                in.grid_type,    // Lookup type (nuclide, hash, or unionized)
+                in.hash_bins,    // Number of hash bins used (if using hash lookup type)
+                GSD.max_num_nucs  // Maximum number of nuclides present in any material
+        );
+
+        // For verification, and to prevent the compiler from optimizing
+        // all work out, we interrogate the returned macro_xs_vector array
+        // to find its maximum value index, then increment the verification
+        // value by that index. In this implementation, we have each thread
+        // write to its thread_id index in an array, which we will reduce
+        // with a thrust reduction kernel after the main simulation kernel.
+        double max = -1.0;
+        int max_idx = 0;
+        for(int j = 0; j < 5; j++ )
+        {
+                if( macro_xs_vector[j] > max )
+                {
+                        max = macro_xs_vector[j];
+                        max_idx = j;
+                }
+        }
+        GSD.verification[i] = max_idx+1;
+}
+#pragma offload_attribute pop
+
+// rest of the code...
 ```
-Note that the `#ifdef __CUDA_ARCH__` directive is used to define the `CUDA_HOST_DEVICE` macro only when compiling for a CUDA device. The `#if defined(ENABLE_PAPI) && defined(OPENMP_OFFLOAD)` directive checks if both PAPI and OpenMP-offload are enabled, and if so, includes the necessary directives for offloading code to the MIC accelerator.
+Note that I've used the `#pragma offload_attribute` directives to specify that the kernel should be executed on a CUDA device. The `__global__` keyword is still necessary to indicate that the function should be compiled as a kernel.
 
-The rest of the file is similar to the original `XSbench_header.cuh` file.
+Also, please note that this is just a translation of the original file and may not work without modifications to other parts of the codebase. You will need to ensure that all dependencies are properly set up for OpenMP-Offload execution.

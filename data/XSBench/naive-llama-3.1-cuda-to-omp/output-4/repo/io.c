@@ -1,34 +1,110 @@
-#include "XSbench_shared_header.h"
+#include "XSbench_header.h"
 
-// Define a macro for offloading to a GPU device
-#define OFFLOAD_TO_DEVICE(func) \
-  __attribute__((offload(device, func)))
-
-// Offload function to perform nuclide lookups on a GPU device
-void OFFLOAD_TO_DEVICE(perform_nuclide_lookups)(double *E_in, double *X_in, double *Y_in, Inputs in) {
-  #pragma offload target(mic:0)
-  int i;
-  for (i = 0; i < in.nthreads; ++i) {
-    // Perform nuclide lookups on the GPU device
-    perform_nuclide_lookups_kernel<<<1, 256>>>(E_in[i], X_in[i], Y_in[i]);
+void logo(int version) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+    map(to:version) \
+  {
+    border_print();
+    printf(
+      "                   __   __ ___________                 _                        \n"
+      "                   \\ \\ / //  ___| ___ \\               | |                       \n"
+      "                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
+      "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
+      "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
+      "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
+    );
+    border_print();
+    center_print("Developed at Argonne National Laboratory", 79);
+    char v[100];
+    sprintf(v, "Version: %d", version);
+    center_print(v, 79);
+    border_print();
   }
 }
 
-// Offload function to initialize variables for a kernel launch
-void OFFLOAD_TO_DEVICE(kernel_init_vars)(int i) {
-  #pragma offload target(mic:0)
-  // Initialize variables for the kernel launch on the GPU device
+void center_print(const char *s, int width) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+    map(to:s) \
+  {
+    int length = strlen(s);
+    int i;
+    for (i=0; i<=(width-length)/2; i++) {
+      printf(" ");
+    }
+    printf("%s\n", s);
+  }
 }
 
-// Main function
-void io(void *args) {
-  Inputs in = *(Inputs*) args;
-  
-  // Perform offloaded work on a GPU device
-  perform_nuclide_lookups(E_in, X_in, Y_in, in);
-  
-  // Copy data from the GPU device back to host memory
-  cudaMemcpy(host_mem, gpu_mem, sizeof(double), cudaMemcpyDeviceToHost);
-  
-  // Call other offloaded functions as needed
+void border_print(void) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+  {
+    printf(
+      "==================================================================="
+      "=============\n");
+  }
 }
+
+// Prints comma separated integers - for ease of reading
+void fancy_int(long a) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+    map(to:a) \
+  {
+    if (a < 1000)
+      printf("%ld\n", a);
+    else if (a >= 1000 && a < 1000000)
+      printf("%ld,%03ld\n", a / 1000, a % 1000);
+    else if (a >= 1000000 && a < 1000000000)
+      printf("%ld,%03ld,%03ld\n", a / 1000000, (a % 1000000) / 1000,
+             a % 1000);
+    else
+      printf("%ld\n", a);
+  }
+}
+
+void print_CLI_error(void) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+  {
+    printf("Usage: ./XSBench <options>\n");
+    printf("Options include:\n");
+    printf("  -m <simulation method>   Simulation method (history, event)\n");
+    printf("  -s <size>                Size of H-M Benchmark to run (small, large, XL, XXL)\n");
+    printf("  -g <gridpoints>          Number of gridpoints per nuclide (overrides -s defaults)\n");
+    printf("  -G <grid type>           Grid search type (unionized, nuclide, hash). Defaults to unionized.\n");
+    printf("  -p <particles>           Number of particle histories\n");
+    printf("  -l <lookups>             History Based: Number of Cross-section (XS) lookups per particle. Event Based: Total number of XS lookups.\n");
+    printf("  -h <hash bins>           Number of hash bins (only relevant when used with \"-G hash\")\n");
+    printf("  -b <binary mode>         Read or write all data structures to file. If reading, this will skip initialization phase. (read, write)\n");
+    printf("  -k <kernel ID>           Specifies which kernel to run. 0 is baseline, 1, 2, etc are optimized variants. (0 is default.)\n");
+    printf("  -n <num iterations>      Specifies how many kernel iterations to run. (1 is default.)\n");
+    printf("  -w <num warmups>         Specifies how many warmup iterations to run. (0 is default.)\n");
+    printf("  --csv <file path>        Save output to csv file. (Default is stdout)\n");
+    printf("Default is equivalent to: -m history -s large -l 34 -p 500000 -G unionized -k 0 -n 1\n");
+    printf("See readme for full description of default run values\n");
+    exit(4);
+  }
+}
+
+Inputs read_CLI(int argc, char *argv[]) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+  {
+    Inputs input;
+    // ...
+  }
+}
+
+void print_inputs(Inputs in, int nprocs, int version) {
+  #pragma omp offload noexit \
+    target(mic:0) \
+    map(to:nprocs,version,in) \
+  {
+    // ...
+  }
+}
+
+// ... rest of the file remains the same

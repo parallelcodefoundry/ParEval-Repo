@@ -1,52 +1,105 @@
-CC = clang++
-CUDA_ARCH = $(shell nvidia-smi --query-gpu=gpu_architecture --id=0 | tr 'n' '\n')
-CXXFLAGS=-g -Wall -std=c++11 -fopenmp
+#===============================================================================
+# User Options
+#===============================================================================
 
-# Allow user to override these variables from the command line.
-override COMPILER ?= clang++
-override CUDA_ARCH ?= $(shell nvidia-smi --query-gpu=gpu_architecture --id=0 | tr 'n' '\n')
-override SIMULATION_METHOD ?= 1
-override NUM_ITERATIONS ?= 10
+COMPILER    ?= nvidia
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+SM_VERSION  ?= 80
 
-# The following lines are used to determine the correct set of compiler flags.
-ifeq ($(COMPILER), clang++)
-  # If using Clang, we can use OpenMP offload and CUDA as is. We will also add a flag
-  # for OpenACC if it's available on this system.
-  CXXFLAGS += -DUSE_OPENMP_OFFLOAD -DCUDA_ARCH=$(CUDA_ARCH)
+CXX         = clang++
+LD          = clang++
+
+# OpenMP flags
+OPENMPFLAGS = -fopenmp -std=c++14
+
+# Offload flag
+OFFLOAD     = -fopenacc
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.cu \
+io.cu \
+Simulation.cu \
+GridInit.cu \
+XSutils.cu \
+Materials.cu
+
+obj = $(source:.cu=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -O3
+
+# OpenMP Compiler Flags
+OMP_CXXFLAGS = $(OPENMPFLAGS) -arch=sm_$(SM_VERSION)
+OMP_LDFLAGS  = $(OFFLOAD)
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -G
 endif
 
-# Now make sure that the user has CUDA available, and set up the proper flags.
-ifneq ($(shell which nvcc),)
-    # We're using OpenACC. Set it up properly so we can use all of its features.
-  CXXFLAGS += -DUSE_OPENACC
-else
-  # Otherwise, we're just going to use OpenMP offload and CUDA as is.
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
 endif
 
-# Now make sure that the user has a valid simulation method specified.
-ifeq ($(SIMULATION_METHOD), 1)
-    SIMULATION_METHOD = Monte Carlo
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
 endif
 
-ifeq ($(SIMULATION_METHOD), 2)
-    SIMULATION_METHOD = Deterministic
-endif
+#===============================================================================
+# Targets to Build
+#===============================================================================
 
-ifneq ($(filter 1 2,$(SIMULATION_METHOD)),)
-    CXXFLAGS += -DSIMULATION_METHOD=$(SIMULATION_METHOD)
-endif
+$(program): $(obj) XSbench_header.cuh Makefile
+	$(CXX) $(OMP_CXXFLAGS) $(CFLAGS) $(obj) -o $@ $(OMP_LDFLAGS)
 
-# The following lines are used to compile and link the code.
-all: $(EXECUTABLE)
-
-%.o: %.c
-    $(CC) $(CXXFLAGS) $< -o $@
-
-$(EXECUTABLE): main.o xsbench_shared.o
-    $(CC) $^ -o $@
-
-run:
-    ./$(EXECUTABLE) $(CUDA_ARCH) $(NUM_ITERATIONS)
+%.o: %.cu XSbench_header.cuh Makefile
+	$(CXX) $(OMP_CXXFLAGS) $(CFLAGS) -c $< -o $@
 
 clean:
-    rm -f *.o $(EXECUTABLE)
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.cuh
+
+run:
+	./$(program)
+
+
+io.cu:
+#include "XSbench_header.cuh"
+
+// Prints program logo
+void logo(int version)
+{
+	border_print();
+	printf(
+	"                   __   __ ___________                 _                        \n"
+	"                   \\ \\ / //  ___| ___ \\               | |                       \n"
+	"                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
+	"                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
+	"                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
+	"                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
+	       );
+	border_print();
+	center_print("Developed at Argonne National Laboratory", 79);
+	char v[100];
+	sprintf(v, "Version: %d", version);
+	center_print(v, 79);
+	border_print();
+}
+
+// ...

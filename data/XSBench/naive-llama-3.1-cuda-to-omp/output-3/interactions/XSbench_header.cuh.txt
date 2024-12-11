@@ -1,117 +1,123 @@
-Here is the XSbench_shared_header.h header file:
 ```c
-#ifndef XSBENCH_SHARED_HEADER_H
-#define XSBENCH_SHARED_HEADER_H
+#ifndef __XSBENCH_HEADER_H__
+#define __XSBENCH_HEADER_H__
 
-// Header for shared utilities across XSBench versions
+#include<stdio.h>
+#include<stdlib.h>
+#include<math.h>
+#include<assert.h>
+#include<omp.h>
+#include <openacc.h>
 
-typedef struct{
-        int nthreads;
-        long n_isotopes;
-        long n_gridpoints;
-        int lookups;
-        char * HM;
-        int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
-        int hash_bins;
-        int particles;
-        int simulation_method;
-        int binary_mode;
-        int kernel_id;
-        int num_iterations;
-        int num_warmups;
-        char *filename;
-} Inputs;
+// Grid types
+#define UNIONIZED 0
+#define NUCLIDE 1
+#define HASH 2
 
-typedef struct{
-  double device_to_host_time;
-  double kernel_time;
-  double host_to_device_time;
-} Profile;
+// Simulation types
+#define HISTORY_BASED 1
+#define EVENT_BASED 2
 
-inline void print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
-            profile.host_to_device_time*1000,
-            profile.kernel_time*1000,
-            profile.device_to_host_time*1000,
-            in.num_iterations,
-            in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
-  }
+// Binary Mode Type
+#define NONE 0
+#define READ 1
+#define WRITE 2
+
+#define STARTING_SEED 1070
+
+#pragma acc routine seq
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+        if (code != cudaSuccess)
+        {
+                fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+                if (abort) exit(code);
+        }
 }
 
-#endif // XSBENCH_SHARED_HEADER_H
-```
-
-To translate the XSbench_shared_header.h file to the OpenMP-offload execution model, we need to make some modifications. Here is the translated code:
-```c
-#ifndef XSBENCH_SHARED_HEADER_H
-#define XSBENCH_SHARED_HEADER_H
-
-// Header for shared utilities across XSBench versions
-
-#include <omp.h>
-
+// Structures
 typedef struct{
-        int nthreads;
-        long n_isotopes;
-        long n_gridpoints;
-        int lookups;
-        char * HM;
-        int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
-        int hash_bins;
-        int particles;
-        int simulation_method;
-        int binary_mode;
-        int kernel_id;
-        int num_iterations;
-        int num_warmups;
-        char *filename;
-} Inputs;
+        double energy;
+        double total_xs;
+        double elastic_xs;
+        double absorbtion_xs;
+        double fission_xs;
+        double nu_fission_xs;
+} NuclideGridPoint;
 
-typedef struct{
-  double device_to_host_time;
-  double kernel_time;
-  double host_to_device_time;
-} Profile;
+#pragma acc routine seq
+inline int double_compare(const void * a, const void * b)
+{
+	double A = *((double *) a);
+	double B = *((double *) b);
 
-inline void print_profile(Profile profile, Inputs in) {
-#pragma omp target data map(to:profile, in)
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
-            profile.host_to_device_time*1000,
-            profile.kernel_time*1000,
-            profile.device_to_host_time*1000,
-            in.num_iterations,
-            in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
-  }
+	if( A > B )
+		return 1;
+	else if( A < B )
+		return -1;
+	else
+		return 0;
 }
 
-#endif // XSBENCH_SHARED_HEADER_H
-```
-Note that we added the `#include <omp.h>` directive to include the OpenMP header file. We also modified the `print_profile` function to use OpenMP pragmas to map the `profile` and `in` variables to the device.
+#pragma acc routine seq
+inline int NGP_compare(const void * a, const void * b)
+{
+	NuclideGridPoint A = *((NuclideGridPoint *) a);
+	NuclideGridPoint B = *((NuclideGridPoint *) b);
 
-The `#pragma omp target data map(to:profile, in)` directive maps the `profile` and `in` variables to the device, allowing them to be accessed by the offloaded code. The `map(to)` clause specifies that the variables are being mapped from the host to the device.
+	if( A.energy > B.energy )
+		return 1;
+	else if( A.energy < B.energy )
+		return -1;
+	else
+		return 0;
+}
+
+// RNG Used for Verification Option.
+// This one has a static seed (must be set manually in source).
+// Park & Miller Multiplicative Conguential Algorithm
+// From "Numerical Recipes" Second Edition
+#pragma acc routine seq
+inline double rn_v(void)
+{
+	static unsigned long seed = 1337;
+	double ret;
+	unsigned long n1;
+	unsigned long a = 16807;
+	unsigned long m = 2147483647;
+	n1 = ( a * (seed) ) % m;
+	seed = n1;
+	ret = (double) n1 / m;
+	return ret;
+}
+
+#pragma acc routine seq
+inline size_t estimate_mem_usage( Inputs in )
+{
+	size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );
+	size_t all_nuclide_grids   = in.n_isotopes * single_nuclide_grid;
+	size_t size_UEG		   = in.n_isotopes*in.n_gridpoints*sizeof(double) + in.n_isotopes*in.n_gridpoints*in.n_isotopes*sizeof(int);
+	size_t size_hash_grid	   = in.hash_bins * in.n_isotopes * sizeof(int);
+	size_t memtotal;
+
+	if( in.grid_type == UNIONIZED )
+		memtotal	  = all_nuclide_grids + size_UEG;
+	else if( in.grid_type == NUCLIDE )
+		memtotal	  = all_nuclide_grids;
+	else
+		memtotal	  = all_nuclide_grids + size_hash_grid;
+
+	memtotal	  = ceil(memtotal / (1024.0*1024.0));
+	return memtotal;
+}
+
+#pragma acc routine seq
+inline double get_time(void)
+{
+        return omp_get_wtime();
+}
+
+#endif // __XSBENCH_HEADER_H__
+```
+
+Note: The above code has been modified to include the necessary OpenACC pragmas for offloading to a GPU accelerator.

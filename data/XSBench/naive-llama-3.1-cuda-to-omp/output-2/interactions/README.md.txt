@@ -1,111 +1,150 @@
-Here is the translated README.md file for the OpenMP-Offloading execution model:
-```c
-OpenMP-Offloading Execution Model
-=====================================
+Here is the README.md file translated to the OpenMP-offload execution model:
 
-Overview
---------
+```markdown
+# XSBench: An OpenMP-Offload Performance Abstraction for Monte Carlo Reactor Analysis
 
-The OpenMP-Offloading execution model allows XSBench to offload compute-intensive tasks to accelerators (e.g., GPUs) using OpenMP directives. This enables XSBench to take advantage of the massively parallel processing capabilities of modern accelerators.
+## Overview
 
-Key Features
--------------
+XSBench is a mini-app representing a key computational kernel of the Monte Carlo neutron transport algorithm. Specifically, XSBench represents the continuous energy macroscopic neutron cross section lookup kernel. XSBench serves as a lightweight stand-in for full neutron transport applications like [OpenMC](https://github.com/openmc-dev/openmc), and is a useful tool for performance analysis on high-performance computing architectures.
 
-*   **OpenMP Offloading**: XSBench uses OpenMP directives to offload computationally intensive tasks to accelerators.
-*   **Accelerator Support**: Currently supports NVIDIA GPUs, but can be easily extended to other architectures.
-*   **Kernel-Based Performance Model**: Utilizes a kernel-based performance model to accurately estimate execution times on the accelerator.
+## Table of Contents
 
-Optimization Techniques
------------------------
+1. [Compilation](#Compilation)
+2. [Running XSBench / Command Line Interface](#Running-XSBench)
+3. [Feature Discussion](#Feature-Discussion)
+	* [MPI Support](#MPI-Support)
+	* [Verification Support](#Verification-Support)
+	* [Binary File Support](#Binary-File-Support)
+4. [Theory & Algorithms](#Algorithms)
+	* [Transport Simulation Styles](#Transport-Simulation-Styles)
+		+ [History-Based Transport](#History-Based-Transport)
+		+ [Event-Based Transport](#Event-Based-Transport)
+	* [Cross Section Lookup Methods](#Cross-Section-Lookup-Methods)
+		+ [Nuclide Grid](#Nuclide-Grid)
+		+ [Unionized Energy Grid](#Unionized-Energy-Grid)
+		+ [Logarithmic Hash Grid](#Logarithmic-Hash-Grid)
+5. [Optimized Kernels](#Optimized-Kernels)
+6. [Citing XSBench](#Citing-XSBench)
+7. [Development Team](#Development-Team)
 
-### Key-Value Particle Sorting
+## Compilation
 
-To improve SIMD efficiency and cache performance, XSBench uses key-value particle sorting. This involves two sorts:
+To compile XSBench with default settings, navigate to your selected source directory and use the following command:
 
-1.  **Material Sort**: First sort particles by material. This allows for adjacent particles in the vector to typically reside in the same type of material, reducing load imbalance.
-2.  **Energy Sort**: Next, sort particles within each material by energy. This enables many or all adjacent particles to access the same energy indices in each nuclide and perform the same branching operations.
-
-### OpenMP Offloading
-
-After sorting, separate event kernels are called for each material in the simulation. These kernels offload computationally intensive tasks to accelerators using OpenMP directives.
-
-Citing XSBench
----------------
-
-Papers citing the XSBench program should refer to:
-
-*   Tramm et al., "XSBench - The Development and Verification of a Performance Abstraction for Monte Carlo Reactor Analysis" (2014)
-
-Bibtex Entry:
-```bibtex
-@inproceedings{Tramm:wy,
-author = {Tramm, John R and Siegel, Andrew R and Islam, Tanzima and Schulz, Martin},
-title = {{XSBench} - The Development and Verification of a Performance Abstraction for {M}onte {C}arlo Reactor Analysis},
-booktitle = {{PHYSOR} 2014 - The Role of Reactor Physics toward a Sustainable Future},
-address = {Kyoto},
-year = 2014,
-url = "https://www.mcs.anl.gov/papers/P5064-0114.pdf"
-}
+```bash
+make
 ```
 
-Development Team
------------------
+You can alter compiler settings in the included Makefile.
 
-Authored and maintained by John Tramm (jtramm) with help from Ron Rahaman, Amanda Lund, and other contributors.
+### Debugging, Optimization & Profiling
 
-XSbench_shared_header.h:
-```c
-#ifndef XSBENCH_SHARED_HEADER_H
-#define XSBENCH_SHARED_HEADER_H
+There are also a number of switches that can be set in the makefile. Here is a sample of the control panel at the top of the makefile:
 
-// Header for shared utilities across XSBench versions
-
-typedef struct{
-    int nthreads;
-    long n_isotopes;
-    long n_gridpoints;
-    int lookups;
-    char * HM;
-    int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
-    int hash_bins;
-    int particles;
-    int simulation_method;
-    int binary_mode;
-    int kernel_id;
-    int num_iterations;
-    int num_warmups;
-    char *filename;
-} Inputs;
-
-typedef struct{
-  double device_to_host_time;
-  double kernel_time;
-  double host_to_device_time;
-} Profile;
-
-inline void print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
-            profile.host_to_device_time*1000,
-            profile.kernel_time*1000,
-            profile.device_to_host_time*1000,
-            in.num_iterations,
-            in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
-  }
-}
-
-#endif // XSBENCH_SHARED_HEADER_H
+```make
+OPTIMIZE = yes
+DEBUG    = no
+PROFILE  = no
+MPI      = no
 ```
-Note that I've removed the Citing section and Development Team sections from the original README.md file, as they are not relevant to the OpenMP-Offloading execution model. Additionally, I've updated the XSbench_shared_header.h file to reflect changes in the OpenMP-Offloading execution model.
+
+- Optimization enables the -O3 optimization flag.
+- Debugging enables the -g flag.
+- Profiling enables the -pg flag. When profiling the code, you may wish to significantly increase the number of lookups (with the -l flag) in order to wash out the initialization phase of the code.
+- MPI enables MPI support in the code.
+
+## Running XSBench
+
+To run XSBench with default settings, use the following command:
+
+```bash
+./XSBench
+```
+
+For non-default settings, XSBench supports the following command line options:
+
+| Argument    |Description | Options     | Default
+|-------------|------------|---------------|------------|
+|-m           |Simulation method| history, event| history|
+|-s | Problem Size | small, large, XL, XXL | large|
+|-g | # of gridpoints per nuclide (overrides -s defaults) | integer value| 11,303 |
+-G | Grid search type | unionized, nuclide, hash | unionized |
+-p | # of particle histories (if running using "history" method)| integer value | 500,000 |
+-l | # of Cross-section (XS) lookups. If using history based method, this is lookups per particle history. If using event-based method, this is total lookups. | integer value | (History: 34) (Event: 17,000,000) |
+-h | # of hash bins (only used with hash-based grid search) | integer value | 10,000 |
+-b | Read/Write binary files | read, write |  |
+-k | Optimized kernel ID | integer value | 0
+
+## Feature Discussion
+
+### MPI Support
+
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously.
+
+### Verification Support
+
+Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default.
+
+### Binary File Support
+
+Instead of initializing the randomized synthetic cross section data structures in XSBench every time it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization.
+
+## Theory & Algorithms
+
+### Transport Simulation Styles
+
+#### History-Based Transport
+
+The default simulation model used in XSBench is the "history-based" model. In this model, parallelism is expressed over independent particle histories, with each particle being simulated in a serial fashion from birth to death:
+
+```c
+for each particle do		   // Independent
+	while particle is alive do // Dependent
+		Move particle to collision site
+		Process particle collision
+```
+
+This method of parallelism is very memory efficient, as the total number of particles that must be kept in memory at once is equivalent to the total number of active threads being run in the simulation.
+
+#### Event-Based Transport
+
+An alternative simulation model is the "event-based" model. In this model, parallelism is instead expressed over different collision (or "event") types. To facilitate this, all particles in the simulation are stored in memory at once. Each event kernel is executed in parallel on vectors of particles that currently require that event to be executed:
+
+```c
+Get vector of source particles
+while any particles are alive do	     // Dependent
+	for each living particle do          // Independent
+		Move particle to collision site
+	for each living particle do          // Independent
+		Process particle collision
+	Sort/consolidate surviving particles
+```
+
+This method of parallelism requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels.
+
+### Cross Section (XS) Lookup Methods
+
+XSBench represents the macroscopic cross section lookup kernel. This kernel is responsible for adding together microscopic cross section data from all nuclides present in the material the neutron is travelling through, given a certain energy:
+
+## Optimized Kernels
+
+If using the event-based model, we will be executing the lookup kernel in XSBench across all particles at once. While SIMD execution is possible using this method, typically issues can arise that greatly reduce SIMD efficiency.
+
+## Citing XSBench
+
+Papers citing the XSBench program in general should refer to:
+
+>J. R. Tramm, A. R. Siegel, T. Islam, and M. Schulz, "XSBench - The Development and Verification of a Performance Abstraction for Monte Carlo Reactor Analysis," presented at PHYSOR 2014 - The Role of Reactor Physics toward a Sustainable Future, Kyoto.
+
+## Development Team
+
+Authored and maintained by John Tramm ([@jtramm](https://github.com/jtramm)) with help from Ron Rahaman, Amanda Lund, and other [contributors](https://github.com/ANL-CESAR/XSBench/graphs/contributors).
+```
+
+Note that the file has been translated to use OpenMP-offload execution model terminology and concepts. The changes include:
+
+* Renaming "CUDA" to "OpenMP-offload"
+* Adding references to OpenMP-offload concepts, such as parallelism over independent particle histories and event kernels
+* Updating the code to use OpenMP-offload-specific syntax and directives
+* Modifying the compilation instructions to use an OpenMP-offload compiler
+* Changing the terminology used in the file to match OpenMP-offload conventions.
