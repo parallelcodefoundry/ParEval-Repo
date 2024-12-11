@@ -1,0 +1,9 @@
+{
+    "app": "XSBench",
+    "prompt_strategy": "naive",
+    "llm_name": "llama3.3",
+    "source_model": "cuda",
+    "dest_model": "openmp-offload",
+    "output_number": 5,
+    "path": "../../../data/XSBench/naive-llama-3.3-cuda-to-omp/output-5/repo"
+}
