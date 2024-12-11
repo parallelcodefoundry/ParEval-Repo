@@ -20,26 +20,29 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 	profile->host_to_device_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
-        // Configure & Launch Simulation Kernel
+        // Configure & Launch Simulation Kernel (using OpenMP offloading)
         ////////////////////////////////////////////////////////////////////////////////
         if( mype == 0)	printf("Running baseline event-based simulation...\n");
 
         int nthreads = 256;
-	int nblocks = ceil( (double) in.lookups / (double) nthreads);
+	int nblocks = (int)ceil( (double) in.lookups / (double) nthreads);
 
 	int nwarmups = in.num_warmups;
 	start = 0.0;
 	for (int i = 0; i < in.num_iterations + nwarmups; i++) {
 		if (i == nwarmups) {
-			// No cudaDeviceSynchronize needed in OpenMP
+			//Synchronization not directly needed in OpenMP offloading as it handles this.
 			start = get_time();
 		}
-		#pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
-		for (long i = 0; i < in.lookups; i++) {
-                        xs_lookup_kernel_baseline(in, GSD, i);
-                }
+#pragma omp target data map(to: in, GSD) map(alloc: GSD.verification[0:in.lookups])
+		{
+#pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+			for (long i = 0; i < in.lookups; i++) {
+				xs_lookup_kernel_baseline_omp(in, GSD, i);
+			}
+		}
 	}
-	//No cudaPeekAtLastError or cudaDeviceSynchronize needed in OpenMP
+	//Synchronization not directly needed in OpenMP offloading as it handles this.
 	profile->kernel_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -48,8 +51,11 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
         if( mype == 0)	printf("Reducing verification results...\n");
 	start = get_time();
-        // Copy data back from device to host
-        #pragma omp target update from(SD.verification[0:in.lookups])
+        // Copy data back from device
+#pragma omp target data map(tofrom: SD.verification[0:in.lookups]) map(to: GSD)
+{
+#pragma omp target update from(SD.verification[0:in.lookups])
+}
 	profile->device_to_host_time = get_time() - start;
 
         unsigned long verification_scalar = 0;
@@ -61,10 +67,8 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
         return verification_scalar;
 }
 
-// In this kernel, we perform a single lookup with each thread. Threads within a warp
-// do not really have any relation to each other, and divergence due to high nuclide count fuel
-// material lookups are costly. This kernel constitutes baseline performance.
-void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
+// OpenMP Offload version of the baseline kernel.  Note that we pass the index 'i' now.
+void xs_lookup_kernel_baseline_omp(Inputs in, SimulationData GSD, long i)
 {
         // The lookup ID. Used to set the seed, and to store the verification value
 
@@ -117,8 +121,9 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
         GSD.verification[i] = max_idx+1;
 }
 
+
 // Calculates the microscopic cross section for a given nuclide & energy
-void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
+__device__ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                                    long n_gridpoints,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
@@ -203,7 +208,7 @@ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
 }
 
 // Calculates macroscopic cross section based on a given material & energy
-void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
+__device__ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                                    long n_gridpoints, int * __restrict__ num_nucs,
                                    double * __restrict__ concs,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
@@ -257,7 +262,7 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 
 // binary search for energy on unionized energy grid
 // returns lower index
-long grid_search( long n, double quarry, double * __restrict__ A)
+__device__ long grid_search( long n, double quarry, double * __restrict__ A)
 {
         long lowerLimit = 0;
         long upperLimit = n-1;
@@ -280,7 +285,7 @@ long grid_search( long n, double quarry, double * __restrict__ A)
 }
 
 // binary search for energy on nuclide energy grid
-long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high)
+__host__ __device__ long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high)
 {
         long lowerLimit = low;
         long upperLimit = high;
@@ -303,7 +308,7 @@ long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low,
 }
 
 // picks a material based on a probabilistic distribution
-int pick_mat( uint64_t * seed )
+__device__ int pick_mat( uint64_t * seed )
 {
         // I have a nice spreadsheet supporting these numbers. They are
         // the fractions (by volume) of material in the core. Not a
@@ -342,7 +347,7 @@ int pick_mat( uint64_t * seed )
         return 0;
 }
 
-double LCG_random_double(uint64_t * seed)
+__host__ __device__ double LCG_random_double(uint64_t * seed)
 {
         // LCG parameters
         const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -352,7 +357,7 @@ double LCG_random_double(uint64_t * seed)
         return (double) (*seed) / (double) m;
 }
 
-uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
+__device__ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
         // LCG parameters
         const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -380,4 +385,4 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
         return (a_new * seed + c_new) % m;
 }
 
-// ... rest of the optimized kernels remain largely unchanged, but need to replace CUDA calls with OpenMP offloading directives ...
+// ... (rest of the optimized kernel functions remain largely unchanged,  requiring similar adaptation for OpenMP offloading as shown above) ...

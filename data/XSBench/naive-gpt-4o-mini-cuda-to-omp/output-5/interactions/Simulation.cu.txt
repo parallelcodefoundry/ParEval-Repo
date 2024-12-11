@@ -28,13 +28,13 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
         if (i == nwarmups) {
             start = get_time();
         }
-        
+
         #pragma omp target teams distribute parallel for num_threads(nthreads)
         for (int j = 0; j < in.lookups; j++) {
             xs_lookup_kernel_baseline(in, GSD, j);
         }
     }
-    
+
     profile->kernel_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -43,8 +43,7 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    // Copy verification results back to host
-    #pragma omp target update from GSD.verification[0:in.lookups]
+    #pragma omp target update from(GSD.verification[0:in.lookups])
     profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;
@@ -109,9 +108,10 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 // Other functions remain unchanged...
 ```
 
-### Key Changes Made:
-1. **Kernel Launching**: The CUDA kernel launch syntax has been replaced with OpenMP target directives. The `xs_lookup_kernel_baseline` function is now called within a parallel for loop using OpenMP.
-2. **Data Movement**: The data movement to and from the device is handled using OpenMP directives, specifically `#pragma omp target update`.
-3. **Function Signature**: The kernel function `xs_lookup_kernel_baseline` is now a regular function that takes an index as an argument instead of being defined as a CUDA kernel.
+### Key Changes:
+1. The CUDA kernel launch syntax has been replaced with OpenMP target directives.
+2. The `xs_lookup_kernel_baseline` function is now called within a parallel for loop using OpenMP's `#pragma omp target teams distribute parallel for` directive.
+3. Memory updates between host and device are managed using `#pragma omp target update`.
+4. The `__global__` and `__device__` qualifiers have been removed since they are not needed in OpenMP.
 
-Make sure to include the necessary OpenMP headers and compile with OpenMP support enabled in your build system.
+This translation assumes that the necessary OpenMP environment is set up and that the OpenMP Offload feature is supported by the compiler being used.

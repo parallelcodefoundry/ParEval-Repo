@@ -12,7 +12,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Offload Support](#OpenMP-Offload-Support)
+	* [MPI Support](#MPI-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -27,7 +27,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented using OpenMP Offload for use with various architectures. 
+XSBench has been implemented in OpenMP with offloading capabilities for use with various accelerator architectures. 
 
 ## Compilation
 
@@ -47,12 +47,14 @@ There are also a number of switches that can be set in the makefile. Here is a s
 OPTIMIZE = yes
 DEBUG    = no
 PROFILE  = no
+MPI      = no
 ```
-- Optimization enables the -O3 optimization flag.
-- Debugging enables the -g flag.
-- Profiling enables the -pg flag. When profiling the code, you may
-wish to significantly increase the number of lookups (with the -l
+- Optimization enables the `-O3` optimization flag.
+- Debugging enables the `-g` flag.
+- Profiling enables the `-pg` flag. When profiling the code, you may
+wish to significantly increase the number of lookups (with the `-l`
 flag) in order to wash out the initialization phase of the code.
+- MPI enables MPI support in the code.
 
 ## Running XSBench
 
@@ -103,9 +105,9 @@ There are several optimized variants of the main kernel. All source bases run ba
 
 ## Feature Discussion
 
-### OpenMP Offload Support
+### MPI Support
 
-XSBench has been implemented using OpenMP Offload, allowing it to run on various architectures, including CPUs and accelerators. The OpenMP Offload model allows for a more flexible execution model, where the code can be executed on the host or offloaded to a device as needed. This model is particularly useful for heterogeneous computing environments, where different types of processors can be utilized for different tasks.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the makefile flag "MPI". If you are not using the mpicc wrapper on your system, you may need to alter the makefile to make use of your desired compiler.
 
 ### Verification Support
 
@@ -113,7 +115,8 @@ Legacy versions of XSBench had a special "Verification" compiler flag option to 
 
 ### Binary File Support
 
-Instead of initializing the randomized synthetic cross section data structures in XSBench every time it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization. This process is controlled with the "-b (read, write)" command line argument. This feature may be extremely useful for users running on simulators where walltime minimization is critical for logistical purposes, or for users who are doing many sequential runs. Note that identical input parameters (problem size, solution method etc) must be used when reading and writing a binary file. The same file name and location will be used when reading. Note that as the file is binary, it may not be portable between compilers and computer systems. 
+Instead of initializing the randomized synthetic cross section data structres in XSBench everytime it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization. This process is controlled with the "-b (read, write)" command line argument. This feature may be extremely useful for users running on simulators where walltime minimization is critical for logistical purposes, or for users who are doing many sequential runs. Note that identical input parameters (problem size, solution method etc) must be used when reading and writing a binary file. No runtime checks are made to validate that the file correctly corresponds to the selected input parameters.
+
 
 ## Algorithms
 
@@ -145,7 +148,7 @@ while any particles are alive do	     // Dependent
 		Process particle collision
 	Sort/consolidate surviving particles
 ```
-This method of parallelism requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels. The benefit of this model is that kernels can potentially be executed in a SIMD manner and with higher cache efficiency due to the potential to sort particles by material and energy. On CPU architectures, the costs of sorting and buffering particles typically outweigh the benefits of the event-based model, but on accelerator architectures, the tradeoff has been found to usually be more favorable.
+This method of parallelism is requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels. The benefit of this model is that kernels can potentially be execute in a SIMD manner and with higher cache efficiency due to the potential to sort particles by material and energy. On CPU architectures, the costs of sorting and buffering particles typically outweigh the benefits of the event-based model, but on accelerator architectures the tradeoff has been found to usually be more favorable.
 
 ### Cross Section (XS) Lookup Methods
 
@@ -153,7 +156,7 @@ XSBench represents the macroscopic cross section lookup kernel. This kernel is r
 
 <p align="center"> <img src="docs/img/XS_equation.svg" alt="XS_Lookup_EQ" width="500"/> </p>
 
-Macroscopic cross section data is typically required for multiple reaction channels "c", such as the total cross section, fission cross section, etc. This data is typically stored in point-wise data form for each nuclide. There are multiple ways of accessing this data in an efficient manner which will be discussed in this section.
+Macroscopic cross section data is typically required for multiple reaction channels "c", such as the total cross section, fission cross section, etc. This data is typically stored in point-wise data form for each nuclide. There are multiple ways of accessesing this data in an efficient manner which will be discusses in this section.
 
 #### Nuclide Grid
 
@@ -180,7 +183,7 @@ This algorithm requires no extra memory usage beyond the minimum to represent th
 
 #### Unionized Energy Grid
 
-One way of speeding up the nuclide grid search is to form a separate acceleration structure to reduce the number of binary searches that need to be performed. In the Unionized Energy Grid (EUG) method, a second grid is created with columns corresponding to the **union** of all energy levels from the nuclide grid. For each energy level (column) in the unionized grid, each row stores an index corresponding to the closest location in the nuclide grid for each nuclide corresponding to that energy level:
+One way of speeding up the nuclide grid search is to form a separate acceleration structure to reduce the number of binary searches that need to be performed. In the Unionized Energy Grid (EUG) method, a second grid is created with columns corresponding to the **union** of all energy levels from the nuclide grid. For each energy level (column) in the unionized grid, each row stores an index corresponding to the closest location in the nuclide grid for each nuclide corresponding that energy level:
 
 <p align="center"> <img src="docs/img/UEG.png" alt="UEG" width="500"/> </p>
 
@@ -198,4 +201,4 @@ Unionized_Grid_Search( Energy E, Material M ):
 
 #### Logarithmic Hash Grid
 
-An alternative to the unionized energy grid is the logarithmic hash grid. This method takes into account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform manner in log space. Therefore, the nuclide grid is augmented with a separate acceleration structure similar to the unionized grid. However, the number of columns is capped at some number of bins spaced evenly in log space, with each row therefore corresponding to an approximate location within each nuclide's grid for that energy level. While the unionized grid points exactly to the correct index in the nuclide grid, the logarithmic hash grid points to only an approximate location below the true point -- meaning that a fast binary or iterative
+An alternative to the unionized energy grid is the logarithmic hash grid. This method takes in account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform maner in

@@ -55,4 +55,9 @@ inline void print_profile(Profile profile, Inputs in) {
 #endif // XSBENCH_SHARED_HEADER_H
 ```
 
-In this translation, the structure and function definitions remain the same, as they are compatible with both CUDA and OpenMP Offload models. The primary change in the implementation would occur in the source files where the actual offloading of data and execution of kernels would be handled using OpenMP directives instead of CUDA kernel launches.
+### Notes on Translation:
+- The structure definitions and function prototypes remain unchanged as they are compatible with both CUDA and OpenMP Offload.
+- The OpenMP Offload model does not require significant changes to the data structures or the way they are defined in the header file.
+- The inline function for printing the profile is also compatible with OpenMP Offload, so it remains the same. 
+
+This header file can now be used in the OpenMP Offload execution model without any modifications to its structure or function definitions.

@@ -3,10 +3,10 @@
 #===============================================================================
 
 COMPILER    ?= llvm
-CUDA_ARCH   ?= 80
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
+CUDA_ARCH  ?= 80
 
 #===============================================================================
 # Program name & source code list
@@ -29,17 +29,15 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=native -foffload=-mllvm -foffload=-mattr=+fp16,+fp64,+fma
+CFLAGS := -fopenmp -fno-stack-protector -march=native -ffast-math
 
 # Linker Flags
 LDFLAGS = -lm
 
-# Compiler
-ifeq ($(COMPILER),gcc)
-  CC = gcc
-endif
+# OpenMP Offloading Flags
 ifeq ($(COMPILER),llvm)
   CC = clang
+  CFLAGS += -fsycl -foffload=-march=nvptx64 -foffload=-m64 -foffload=-mavx2 -foffload=-ffast-math -foffload=-O3 -foffload=--cuda-gpu-arch=$(CUDA_ARCH)
 endif
 
 
@@ -60,19 +58,15 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-# CUDA Architecture Flags (passed to offloading compiler)
-CUDA_FLAGS = -foffload=$(CUDA_ARCH)
-
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
 $(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
-	$(CC) $(CFLAGS) $(CUDA_FLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
-	$(CC) $(CFLAGS) $(CUDA_FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

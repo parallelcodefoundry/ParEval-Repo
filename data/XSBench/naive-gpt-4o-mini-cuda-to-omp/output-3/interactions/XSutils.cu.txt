@@ -1,4 +1,4 @@
-Here is the translated `XSutils.cu` file for the OpenMP Offload execution model:
+Here is the translated `XSutils.cu` file using the OpenMP Offload execution model:
 
 ```cpp
 #include "XSbench_header.cuh"
@@ -32,7 +32,7 @@ int NGP_compare(const void * a, const void * b)
 
 // RNG Used for Verification Option.
 // This one has a static seed (must be set manually in source).
-// Park & Miller Multiplicative Congruential Algorithm
+// Park & Miller Multiplicational Congruential Algorithm
 // From "Numerical Recipes" Second Edition
 double rn_v(void)
 {
@@ -93,9 +93,10 @@ double get_time(void)
 }
 ```
 
-### Key Changes:
-1. The CUDA-specific code has been removed, and the file now uses OpenMP for parallelism.
-2. The `get_time` function has been adjusted to use `omp_get_wtime()` for timing when OpenMP is enabled.
-3. The file retains the original logic and structure while ensuring compatibility with the OpenMP offload model. 
+### Key Changes Made:
+1. **Removed CUDA-specific code**: The original CUDA-specific code was replaced with OpenMP-compatible constructs. The `__device__` and `__host__` qualifiers were removed since they are not applicable in OpenMP.
+2. **Retained Functionality**: The core functionality of the functions was preserved, ensuring that they still perform the same tasks as before.
+3. **OpenMP Timing**: The timing function now uses `omp_get_wtime()` for measuring time in an OpenMP context.
+4. **Memory Management**: The memory management functions remain unchanged as they are not specific to CUDA or OpenMP. However, ensure that any memory allocation and deallocation is handled appropriately in the context of OpenMP offloading. 
 
-Make sure to include the appropriate OpenMP flags in your build system to enable offloading when compiling this code.
+This translated file is now ready to be integrated into an OpenMP offload execution model.

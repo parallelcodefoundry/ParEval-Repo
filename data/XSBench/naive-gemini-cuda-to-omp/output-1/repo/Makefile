@@ -3,10 +3,10 @@
 #===============================================================================
 
 COMPILER    ?= llvm
-CUDA_ARCH   ?= 80
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
+CUDA_ARCH   ?= 80
 
 #===============================================================================
 # Program name & source code list
@@ -29,14 +29,18 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-lm -foffload=${COMPILER}-target=nvptx64-nvidia-cuda -mcpu=sm_${CUDA_ARCH}
+CFLAGS := -fopenmp -foffload=-m64 -foffload=targets=$(CUDA_ARCH)
 
 # Linker Flags
 LDFLAGS = -lm
 
 # Compiler
-CC = clang++
-
+ifeq ($(COMPILER),gcc)
+  CC = gcc
+endif
+ifeq ($(COMPILER),llvm)
+  CC = clang
+endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

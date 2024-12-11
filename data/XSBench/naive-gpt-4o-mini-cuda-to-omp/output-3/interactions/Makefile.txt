@@ -39,8 +39,8 @@ LDFLAGS = -lm
 
 # LLVM Compiler
 ifeq ($(COMPILER),llvm)
-  CC = clang++
-  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -O3 -std=c11 -D__OPENMP_OFFLOAD__ -D__NVPTX__ -D__CUDA_ARCH__=$(CUDA_ARCH)
+  CC = clang
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH) -std=c11
 endif
 
 # Debug Flags
@@ -78,8 +78,4 @@ run:
 	./$(program)
 ```
 
-### Key Changes:
-1. **Compiler Change**: The Makefile now uses `clang++` for compiling with OpenMP Offload support.
-2. **Flags for OpenMP Offload**: Added flags for OpenMP Offload compilation, specifically `-fopenmp` and `-fopenmp-targets=nvptx64-nvidia-cuda`.
-3. **CUDA Architecture**: The architecture is specified using `CUDA_ARCH` variable.
-4. **File Extensions**: Changed the file extensions from `.cu` to `.c` to reflect the C codebase for OpenMP Offload.
+This Makefile is set up to compile the code using the OpenMP Offload model with LLVM's clang compiler targeting NVIDIA GPUs. The flags are adjusted to enable OpenMP and specify the target architecture.

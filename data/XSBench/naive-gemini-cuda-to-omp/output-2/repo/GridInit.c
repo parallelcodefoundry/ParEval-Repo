@@ -29,7 +29,6 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
     // Shallow copy of CPU simulation data to GPU simulation data
     SimulationData GSD = SD;
 
-    // Move data to offload memory space
     #pragma omp target enter data map(alloc: GSD.num_nucs[0:GSD.length_num_nucs])
     sz = GSD.length_num_nucs * sizeof(int);
     #pragma omp target update to(GSD.num_nucs[0:GSD.length_num_nucs])
@@ -66,14 +65,14 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
 
     // Allocate verification array on device. This structure is not needed on CPU, so we don't
     // have to copy anything over.
-    #pragma omp target enter data map(alloc: GSD.verification[0:in.lookups])
     sz = in.lookups * sizeof(unsigned long);
+    #pragma omp target enter data map(alloc: GSD.verification[0:in.lookups])
     total_sz += sz;
     GSD.length_verification = in.lookups;
 
 
-    // Synchronize -  Not directly equivalent to CUDA synchronize, but ensures data is on device before proceeding.
-    //  The actual synchronization will depend on the OpenMP offloading implementation.
+    // Synchronize - Not directly equivalent, but ensures data is ready on the device.
+    // Could add an explicit omp target wait construct if needed based on execution behavior.
 
     if(mype == 0 ) printf("Offload Intialization complete. Allocated %.0lf MB of data on offload device.\n", total_sz/1024.0/1024.0 );
 
@@ -83,12 +82,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
 
 // Release device memory
 void release_device_memory(SimulationData GSD) {
-    #pragma omp target exit data map(delete: GSD.num_nucs)
-    #pragma omp target exit data map(delete: GSD.concs)
-    #pragma omp target exit data map(delete: GSD.mats)
-    if (GSD.length_unionized_energy_array > 0) #pragma omp target exit data map(delete: GSD.unionized_energy_array)
-    #pragma omp target exit data map(delete: GSD.nuclide_grid)
-    #pragma omp target exit data map(delete: GSD.verification)
+    #pragma omp target exit data map(delete: GSD.num_nucs, GSD.concs, GSD.mats, GSD.unionized_energy_array, GSD.index_grid, GSD.nuclide_grid, GSD.verification)
 }
 
 void release_memory(SimulationData SD) {

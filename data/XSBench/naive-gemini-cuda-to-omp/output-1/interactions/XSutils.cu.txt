@@ -91,4 +91,4 @@ double get_time(void)
 	#endif
 }
 ```
-  The changes made are minimal, as the `XSutils.cu` file primarily contains functions that are not kernel functions and do not rely on CUDA specific features.  The OpenMP offloading model would handle the data transfers and execution of these functions on the accelerator if appropriate pragmas were added in the calling functions.  No CUDA specific functions are used in this file.
+  The OpenMP offloading model doesn't directly replace CUDA's `__host__ __device__` keywords.  The CUDA functions are largely unchanged because they operate on host data in this translation, and OpenMP offloading is used for larger data structures in other files (like `GridInit.cu`).  The `get_time` function is already compatible with OpenMP's `omp_get_wtime()`. No changes are needed in this file for a basic OpenMP offload translation.  The significant changes will be in other files to manage data movement between host and (potentially) a device.

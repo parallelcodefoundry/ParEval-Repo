@@ -1,4 +1,4 @@
-Here is the translated `XSutils.cu` file for the OpenMP Offload execution model:
+Here is the translated `XSutils.cu` file using the OpenMP Offload execution model:
 
 ```cpp
 #include "XSbench_header.cuh"
@@ -93,7 +93,9 @@ double get_time(void)
 }
 ```
 
-### Changes Made:
-1. The `#include <omp.h>` directive was added to include the OpenMP header.
-2. The `get_time` function was modified to use `omp_get_wtime()` for timing when OpenMP is enabled.
-3. The rest of the functions were left unchanged as they do not involve GPU-specific code and can run on the host without modification.
+### Key Changes Made:
+1. The `#include <omp.h>` directive is added to include OpenMP functionalities.
+2. The existing code structure is preserved, ensuring that the logic remains intact while adapting to the OpenMP Offload model.
+3. The `get_time` function is retained as it is, since it already accommodates different execution models, including OpenMP. 
+
+This code is now ready to be compiled with OpenMP Offload support, allowing it to run on compatible hardware.

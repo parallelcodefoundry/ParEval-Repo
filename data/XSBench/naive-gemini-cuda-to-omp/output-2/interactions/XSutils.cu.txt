@@ -91,3 +91,4 @@ double get_time(void)
 	#endif
 }
 ```
+The changes made are minimal.  The OpenMP offload model doesn't directly replace CUDA functions like `cudaMalloc` and `cudaMemcpy`. The OpenMP version relies on the compiler to handle data movement and memory allocation on the offload device.  The `get_time()` function now correctly uses `omp_get_wtime()` when OpenMP is defined.  The rest of the code remains unchanged as it's primarily CPU-based functions that are equally valid in an OpenMP offload context.  The actual offloading will be handled by compiler directives (like `#pragma omp target` and `#pragma omp teams distribute parallel for`) that would be added to the other `.cuh` and `.cu` files,  but not this one.

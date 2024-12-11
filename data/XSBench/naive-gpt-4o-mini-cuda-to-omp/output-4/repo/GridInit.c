@@ -1,4 +1,5 @@
 #include "XSbench_header.cuh"
+#include <omp.h>
 
 // Moves all required data structures to the GPU's memory space
 SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationData SD)
@@ -9,53 +10,55 @@ SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationDat
     SimulationData GSD = SD;
 
     // Move data to GPU memory space
-    #pragma omp target data map(to: SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats], SD.nuclide_grid[0:SD.length_nuclide_grid], SD.index_grid[0:SD.length_index_grid], SD.unionized_energy_array[0:SD.length_unionized_energy_array]) \
+    #pragma omp target data map(to: SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats], SD.nuclide_grid[0:SD.length_nuclide_grid], SD.unionized_energy_array[0:SD.length_unionized_energy_array], SD.index_grid[0:SD.length_index_grid]) \
                              map(to: in.lookups) \
                              map(from: GSD.verification[0:in.lookups])
     {
-        size_t sz;
         size_t total_sz = 0;
+        size_t sz;
+
+        // Allocate memory on the device
+        #pragma omp target enter data map(to: GSD.num_nucs) map(to: GSD.concs) map(to: GSD.mats) map(to: GSD.unionized_energy_array) map(to: GSD.index_grid) map(to: GSD.nuclide_grid) map(to: GSD.verification)
 
         sz = GSD.length_num_nucs * sizeof(int);
-        #pragma omp target enter data map(to: GSD.num_nucs[0: GSD.length_num_nucs]) 
-        #pragma omp target update to(GSD.num_nucs[0: GSD.length_num_nucs]) 
+        gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
+        gpuErrchk(omp_target_memcpy(GSD.num_nucs, SD.num_nucs, sz, 0, omp_get_default_device()));
 
         sz = GSD.length_concs * sizeof(double);
-        #pragma omp target enter data map(to: GSD.concs[0: GSD.length_concs]) 
-        #pragma omp target update to(GSD.concs[0: GSD.length_concs]) 
+        gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
+        gpuErrchk(omp_target_memcpy(GSD.concs, SD.concs, sz, 0, omp_get_default_device()));
 
         sz = GSD.length_mats * sizeof(int);
-        #pragma omp target enter data map(to: GSD.mats[0: GSD.length_mats]) 
-        #pragma omp target update to(GSD.mats[0: GSD.length_mats]) 
+        gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
+        gpuErrchk(omp_target_memcpy(GSD.mats, SD.mats, sz, 0, omp_get_default_device()));
 
         if (SD.length_unionized_energy_array != 0) {
             sz = GSD.length_unionized_energy_array * sizeof(double);
-            #pragma omp target enter data map(to: GSD.unionized_energy_array[0: GSD.length_unionized_energy_array]) 
-            #pragma omp target update to(GSD.unionized_energy_array[0: GSD.length_unionized_energy_array]) 
+            gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
+            gpuErrchk(omp_target_memcpy(GSD.unionized_energy_array, SD.unionized_energy_array, sz, 0, omp_get_default_device()));
         }
 
         if (SD.length_index_grid != 0) {
             sz = GSD.length_index_grid * sizeof(int);
-            #pragma omp target enter data map(to: GSD.index_grid[0: GSD.length_index_grid]) 
-            #pragma omp target update to(GSD.index_grid[0: GSD.length_index_grid]) 
+            gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
+            gpuErrchk(omp_target_memcpy(GSD.index_grid, SD.index_grid, sz, 0, omp_get_default_device()));
         }
 
         sz = GSD.length_nuclide_grid * sizeof(NuclideGridPoint);
-        #pragma omp target enter data map(to: GSD.nuclide_grid[0: GSD.length_nuclide_grid]) 
-        #pragma omp target update to(GSD.nuclide_grid[0: GSD.length_nuclide_grid]) 
+        gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
+        gpuErrchk(omp_target_memcpy(GSD.nuclide_grid, SD.nuclide_grid, sz, 0, omp_get_default_device()));
 
         // Allocate verification array on device. This structure is not needed on CPU, so we don't
         // have to copy anything over.
         sz = in.lookups * sizeof(unsigned long);
-        #pragma omp target enter data map(alloc: GSD.verification[0: in.lookups]) 
-        total_sz += sz;
+        gpuErrchk(omp_target_alloc(sz, omp_get_default_device()));
         GSD.length_verification = in.lookups;
 
         // Synchronize
-        #pragma omp target update self(GSD.verification[0: in.lookups])
-    }
+        gpuErrchk(omp_target_memcpy(GSD.verification, SD.verification, sz, 0, omp_get_default_device()));
 
-    if (mype == 0) printf("GPU Initialization complete. Allocated %.0lf MB of data on GPU.\n", total_sz / 1024.0 / 1024.0);
+        if (mype == 0) printf("GPU Initialization complete. Allocated %.0lf MB of data on GPU.\n", total_sz / 1024.0 / 1024.0);
+    }
 
     return GSD;
 }

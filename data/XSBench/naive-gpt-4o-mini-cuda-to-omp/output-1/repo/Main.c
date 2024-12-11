@@ -57,32 +57,35 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification)
+    #pragma omp target data map(to: in, SD) map(from: verification, profile)
     {
-        if (in.simulation_method == EVENT_BASED) {
-            if (in.kernel_id == 0)
-                verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
-            else if (in.kernel_id == 1)
-                verification = run_event_based_simulation_optimization_1(in, SD, mype);
-            else if (in.kernel_id == 2)
-                verification = run_event_based_simulation_optimization_2(in, SD, mype);
-            else if (in.kernel_id == 3)
-                verification = run_event_based_simulation_optimization_3(in, SD, mype);
-            else if (in.kernel_id == 4)
-                verification = run_event_based_simulation_optimization_4(in, SD, mype);
-            else if (in.kernel_id == 5)
-                verification = run_event_based_simulation_optimization_5(in, SD, mype);
-            else if (in.kernel_id == 6)
-                verification = run_event_based_simulation_optimization_6(in, SD, mype);
-            else {
-                printf("Error: No kernel ID %d found!\n", in.kernel_id);
+        #pragma omp target
+        {
+            if (in.simulation_method == EVENT_BASED) {
+                if (in.kernel_id == 0)
+                    verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+                else if (in.kernel_id == 1)
+                    verification = run_event_based_simulation_optimization_1(in, SD, mype);
+                else if (in.kernel_id == 2)
+                    verification = run_event_based_simulation_optimization_2(in, SD, mype);
+                else if (in.kernel_id == 3)
+                    verification = run_event_based_simulation_optimization_3(in, SD, mype);
+                else if (in.kernel_id == 4)
+                    verification = run_event_based_simulation_optimization_4(in, SD, mype);
+                else if (in.kernel_id == 5)
+                    verification = run_event_based_simulation_optimization_5(in, SD, mype);
+                else if (in.kernel_id == 6)
+                    verification = run_event_based_simulation_optimization_6(in, SD, mype);
+                else {
+                    printf("Error: No kernel ID %d found!\n", in.kernel_id);
+                    exit(1);
+                }
+            } else {
+                printf(
+                    "History-based simulation not implemented in CUDA code. Instead,\nuse "
+                    "the event-based method with \"-m event\" argument.\n");
                 exit(1);
             }
-        } else {
-            printf(
-                "History-based simulation not implemented in CUDA code. Instead,\nuse "
-                "the event-based method with \"-m event\" argument.\n");
-            exit(1);
         }
     }
 

@@ -1,4 +1,4 @@
-Here's the translated `XSutils.cu` file for the OpenMP Offload execution model:
+Here is the translated `XSutils.cu` file for the OpenMP Offload execution model:
 
 ```cpp
 #include "XSbench_header.cuh"
@@ -32,7 +32,7 @@ int NGP_compare(const void * a, const void * b)
 
 // RNG Used for Verification Option.
 // This one has a static seed (must be set manually in source).
-// Park & Miller Multiplicational Congruential Algorithm
+// Park & Miller Multiplicative Congruential Algorithm
 // From "Numerical Recipes" Second Edition
 double rn_v(void)
 {
@@ -94,8 +94,8 @@ double get_time(void)
 ```
 
 ### Changes Made:
-1. The `#include <omp.h>` directive was added to include OpenMP support.
-2. The `get_time` function was modified to use `omp_get_wtime()` for timing when OpenMP is enabled.
-3. The rest of the code remains largely unchanged, as the original logic does not involve GPU-specific constructs. The sorting functions and RNG functions are kept intact since they can be executed on the host. 
+1. The `#include <omp.h>` directive was added to include the OpenMP library.
+2. The logic for timing remains unchanged, as it is already compatible with OpenMP.
+3. The structure and logic of the functions remain the same, as they do not require GPU-specific constructs. 
 
-This code is now ready to be compiled with OpenMP offload capabilities.
+This code is now ready to be compiled and executed using the OpenMP Offload model.

@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <omp.h>
 
-
 typedef struct{
         int nthreads;
         long n_isotopes;

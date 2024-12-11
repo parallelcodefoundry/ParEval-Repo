@@ -6,7 +6,7 @@ COMPILER    ?= llvm
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
-CUDA_ARCH  ?= 80
+CUDA_ARCH   ?= 80
 
 #===============================================================================
 # Program name & source code list
@@ -29,7 +29,7 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=native -foffload
+CFLAGS := -fopenmp -foffload=-march=sm_${CUDA_ARCH} -foffload
 
 # Linker Flags
 LDFLAGS = -lm
@@ -59,10 +59,6 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
-
-# CUDA Architecture
-CFLAGS += -foffload=$(CUDA_ARCH)
-
 
 #===============================================================================
 # Targets to Build

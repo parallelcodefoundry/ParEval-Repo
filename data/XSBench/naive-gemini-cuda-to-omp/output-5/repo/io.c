@@ -120,11 +120,26 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP-Offload\n"); // Changed line
-        #pragma omp target teams distribute parallel for simd
-        for (int i = 0; i < 10; ++i) {
-            // Code to be executed on the offload device
-        }
+	printf("Programming Model:            OpenMP offload\n");
+  #pragma omp target map(tofrom: mem_tot)
+  {
+	  #ifdef __CUDA_ARCH__
+		printf("CUDA Device:                  %s\n", "GPU");
+	  #else
+		printf("CUDA Device:                  N/A\n");
+	  #endif
+  }
+	if( in.simulation_method == EVENT_BASED )
+		printf("Simulation Method:            Event Based\n");
+	else
+		printf("Simulation Method:            History Based\n");
+	if( in.grid_type == NUCLIDE )
+		printf("Grid Type:                    Nuclide Grid\n");
+	else if( in.grid_type == UNIONIZED )
+		printf("Grid Type:                    Unionized Grid\n");
+	else
+		printf("Grid Type:                    Hash\n");
+
 	printf("Materials:                    %d\n", 12);
 	printf("H-M Benchmark Size:           %s\n", in.HM);
 	printf("Total Nuclides:               %ld\n", in.n_isotopes);

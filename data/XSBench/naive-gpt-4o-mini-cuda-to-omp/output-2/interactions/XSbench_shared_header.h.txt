@@ -1,4 +1,4 @@
-Here's the translated `XSbench_shared_header.h` file for the OpenMP Offload execution model:
+Here is the translated `XSbench_shared_header.h` file for the OpenMP Offload execution model:
 
 ```c
 #ifndef XSBENCH_SHARED_HEADER_H
@@ -55,8 +55,7 @@ inline void print_profile(Profile profile, Inputs in) {
 #endif // XSBENCH_SHARED_HEADER_H
 ```
 
-### Changes Made:
-1. The structure definitions and function signatures remain unchanged as they are compatible with OpenMP Offload.
-2. The file is structured to maintain compatibility with both host and device code, which is a requirement for OpenMP Offload. The existing code already adheres to this structure, so no additional changes were necessary. 
-
-This header file can be included in your OpenMP Offload codebase without any modifications to the structure or function definitions.
+### Notes on Translation:
+- The structure definitions and function prototypes remain unchanged as they are compatible with both CUDA and OpenMP Offload.
+- The OpenMP Offload model does not require significant changes to the header file itself, as it primarily affects how the code is compiled and executed rather than the data structures or function signatures. 
+- Ensure that the rest of the codebase is adapted to use OpenMP directives for offloading computations to the target device.

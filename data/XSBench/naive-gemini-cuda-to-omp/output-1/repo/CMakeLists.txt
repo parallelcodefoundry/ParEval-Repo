@@ -18,6 +18,6 @@ set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp
 
 add_executable(XSBench ${SOURCE})
 
-target_link_libraries(XSBench m) # Link the math library
+target_link_libraries(XSBench ${OpenMP_CXX_FLAGS})
 
 install(TARGETS XSBench DESTINATION bin)

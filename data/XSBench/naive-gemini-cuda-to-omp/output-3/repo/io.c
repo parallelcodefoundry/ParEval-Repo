@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -116,12 +116,24 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 void print_inputs(Inputs in, int nprocs, int version )
 {
 	// Calculate Estimate of Memory Usage
-	long mem_tot = estimate_mem_usage( in );
+	size_t mem_tot = estimate_mem_usage( in );
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP-Offload\n"); // Changed line
-	//Removed CUDA specific device information
+	printf("Programming Model:            OpenMP-Offload\n");
+	#pragma omp target data map(tofrom: mem_tot)
+	{
+		#pragma omp target
+		{
+			#pragma omp parallel
+			{
+				int device_id = omp_get_thread_num();
+				cudaDeviceProp prop;
+				cudaGetDeviceProperties(&prop, device_id);
+				printf("CUDA Device %d:                  %s\n", device_id, prop.name);
+			}
+		}
+	}
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -309,7 +321,7 @@ Inputs read_CLI( int argc, char * argv[] )
 			if( strcmp(sim_type, "history") == 0 )
 				input.simulation_method = HISTORY_BASED;
 			else if( strcmp(sim_type, "event") == 0 )
-		{
+			{
 				input.simulation_method = EVENT_BASED;
 				// Also resets default # of lookups
 				if( default_lookups && default_particles )

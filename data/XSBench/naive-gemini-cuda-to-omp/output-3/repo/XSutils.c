@@ -66,10 +66,6 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-	#ifdef MPI
-	return MPI_Wtime();
-	#endif
-
 	#ifdef OPENMP
 	return omp_get_wtime();
 	#endif

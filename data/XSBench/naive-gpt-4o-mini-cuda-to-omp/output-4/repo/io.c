@@ -104,7 +104,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
     if(mype == 0 )
     {
         if( is_invalid_result )
-            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", vhash);
+            printf("Verification checksum: %llu (WARNING - INVALID CHECKSUM!)\n", vhash);
         else
             printf("Verification checksum: %llu (Valid)\n", vhash);
         border_print();
@@ -121,10 +121,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     center_print("INPUT SUMMARY", 79);
     border_print();
     printf("Programming Model:            OpenMP Offload\n");
-    #pragma omp target
-    {
-        printf("OpenMP Device:                  %s\n", "OpenMP Device"); // Placeholder for actual device info
-    }
+    printf("CUDA Device:                  %s\n", "OpenMP Offload Target");
     if( in.simulation_method == EVENT_BASED )
         printf("Simulation Method:            Event Based\n");
     else
@@ -339,9 +336,7 @@ Inputs read_CLI( int argc, char * argv[] )
         else if( strcmp(arg, "-h") == 0 )
         {
             if( ++i < argc )
-            {
                 input.hash_bins = atoi(argv[i]);
-            }
             else
                 print_CLI_error();
         }

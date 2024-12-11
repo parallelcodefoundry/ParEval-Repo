@@ -29,17 +29,17 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=sm_${CUDA_ARCH}
+CFLAGS := -fopenmp -foffload=-march=sm_${CUDA_ARCH} -foffload=-mllvm -mattr=+sm_${CUDA_ARCH}
 
 # Linker Flags
 LDFLAGS = -lm
 
-# Compiler
-ifeq ($(COMPILER),gcc)
-  CC = gcc
-endif
+# Compiler selection
 ifeq ($(COMPILER),llvm)
   CC = clang
+endif
+ifeq ($(COMPILER),gcc)
+  CC = gcc
 endif
 
 

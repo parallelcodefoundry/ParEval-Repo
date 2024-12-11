@@ -55,39 +55,7 @@ int main(int argc, char *argv[]) {
     // Start Simulation Timer
     omp_start = get_time();
 
-    // Run simulation.  We'll use OpenMP offloading here.
-    #pragma omp target data map(to: in, SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats], \
-                                    SD.unionized_energy_array[0:SD.length_unionized_energy_array], SD.index_grid[0:SD.length_index_grid], \
-                                    SD.nuclide_grid[0:SD.length_nuclide_grid], SD.max_num_nucs) \
-                        map(from: profile, verification) map(alloc: SD.verification[0:in.lookups], SD.p_energy_samples[0:in.lookups], SD.mat_samples[0:in.lookups])
-    {
-        #pragma omp target teams distribute parallel for
-        for (int i = 0; i < in.num_iterations; i++) {
-            if (in.kernel_id == 0) {
-                #pragma omp target teams distribute parallel for
-                for (long i = 0; i < in.lookups; i++) {
-                  xs_lookup_kernel_baseline(in, SD);
-                }
-            } else if (in.kernel_id == 1) {
-                run_event_based_simulation_optimization_1(in, SD, mype);
-            } else if (in.kernel_id == 2) {
-                run_event_based_simulation_optimization_2(in, SD, mype);
-            } else if (in.kernel_id == 3) {
-                run_event_based_simulation_optimization_3(in, SD, mype);
-            } else if (in.kernel_id == 4) {
-                run_event_based_simulation_optimization_4(in, SD, mype);
-            } else if (in.kernel_id == 5) {
-                run_event_based_simulation_optimization_5(in, SD, mype);
-            } else if (in.kernel_id == 6) {
-                run_event_based_simulation_optimization_6(in, SD, mype);
-            } else {
-                printf("Error: No kernel ID %d found!\n", in.kernel_id);
-                exit(1);
-            }
-        }
-    }
-
-
+    // Run simulation
     if (in.simulation_method == EVENT_BASED) {
         if (in.kernel_id == 0)
             verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
@@ -123,7 +91,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory (this is handled by the target data directive)
+    // Release device memory
     release_memory(SD);
 
     // Final Hash Step

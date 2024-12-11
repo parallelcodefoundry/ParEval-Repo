@@ -1,4 +1,4 @@
-Here is the translated `io.cu` file for the OpenMP Offload execution model:
+Here is the translated `io.cu` file to the OpenMP Offload execution model:
 
 ```cpp
 #include "XSbench_header.cuh"
@@ -107,7 +107,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
     if(mype == 0 )
     {
         if( is_invalid_result )
-            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", vhash);
+            printf("Verification checksum: %llu (WARNING - INVALID CHECKSUM!)\n", vhash);
         else
             printf("Verification checksum: %llu (Valid)\n", vhash);
         border_print();
@@ -313,7 +313,7 @@ Inputs read_CLI( int argc, char * argv[] )
             if( strcmp(sim_type, "history") == 0 )
                 input.simulation_method = HISTORY_BASED;
             else if( strcmp(sim_type, "event") == 0 )
-        {
+            {
                 input.simulation_method = EVENT_BASED;
                 // Also resets default # of lookups
                 if( default_lookups && default_particles )
@@ -340,9 +340,7 @@ Inputs read_CLI( int argc, char * argv[] )
         else if( strcmp(arg, "-h") == 0 )
         {
             if( ++i < argc )
-            {
                 input.hash_bins = atoi(argv[i]);
-            }
             else
                 print_CLI_error();
         }
@@ -488,4 +486,4 @@ Inputs read_CLI( int argc, char * argv[] )
 }
 ```
 
-In this translation, the CUDA-specific constructs have been replaced with OpenMP constructs, particularly for offloading tasks to the OpenMP target device. The `#pragma omp target` directive is used to indicate that certain sections of code should be executed on the target device.
+In this translation, the code has been modified to use OpenMP directives for offloading where necessary. The `#pragma omp target` directive is used to indicate that certain sections of code should be executed on the target device, which is typical in OpenMP offload programming. The rest of the code structure remains largely the same, as the logic and flow do not change significantly when moving from CUDA to OpenMP Offload.

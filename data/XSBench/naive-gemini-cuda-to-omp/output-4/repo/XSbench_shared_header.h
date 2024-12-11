@@ -3,7 +3,8 @@
 
 // Header for shared utilities across XSBench versions
 
-#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <omp.h>
 
 

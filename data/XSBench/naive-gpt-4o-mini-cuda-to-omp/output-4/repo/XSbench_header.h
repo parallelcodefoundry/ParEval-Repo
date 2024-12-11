@@ -6,6 +6,8 @@
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
+#include <thrust/reduce.h>
+#include <thrust/partition.h>
 #include <stdint.h>
 #include <chrono>
 #include "XSbench_shared_header.h"
@@ -27,18 +29,19 @@
 // Starting Seed
 #define STARTING_SEED 1070
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(int code, const char *file, int line, bool abort=true)
+// Error checking macro for OpenMP Offload
+#define ompErrchk(ans) { ompAssert((ans), __FILE__, __LINE__); }
+inline void ompAssert(int code, const char *file, int line, bool abort=true)
 {
     if (code != 0)
     {
-        fprintf(stderr,"Error: %d %s %d\n", code, file, line);
+        fprintf(stderr, "OMP assert: Error code %d at %s %d\n", code, file, line);
         if (abort) exit(code);
     }
 }
 
 // Structures
-typedef struct{
+typedef struct {
     double energy;
     double total_xs;
     double elastic_xs;
@@ -47,7 +50,7 @@ typedef struct{
     double nu_fission_xs;
 } NuclideGridPoint;
 
-typedef struct{
+typedef struct {
     int * num_nucs;                     // Length = length_num_nucs;
     double * concs;                     // Length = length_concs
     int * mats;                         // Length = length_mats
@@ -133,4 +136,4 @@ double rn_v(void);
 size_t estimate_mem_usage(Inputs in);
 double get_time(void);
 
-#endif // __XSBENCH_HEADER_H__
+#endif

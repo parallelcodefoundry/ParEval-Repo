@@ -1,12 +1,8 @@
-To translate the `XSutils.cu` file from the CUDA execution model to the OpenMP Offload execution model, we need to replace CUDA-specific constructs with OpenMP Offload constructs. Here's the translated file:
+Here's the translated `XSutils.cu` file to the OpenMP Offload execution model:
 
 ```cpp
 #include "XSbench_header.cuh"
 #include <omp.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/time.h>
-#include <chrono>
 
 int double_compare(const void * a, const void * b)
 {
@@ -72,34 +68,10 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-    #ifdef MPI
-    return MPI_Wtime();
-    #endif
-
-    #ifdef OPENMP
     return omp_get_wtime();
-    #endif
-
-    #ifdef __cplusplus
-    // If using C++, we can do this:
-    unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
-    return (double) us_since_epoch / 1.0e6;
-    #else
-    struct timeval timecheck;
-
-    gettimeofday(&timecheck, NULL);
-    long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
-
-    double time = (double) ms / 1000.0;
-
-    return time;
-    #endif
 }
 ```
 
 ### Key Changes:
-1. **CUDA-specific constructs**: Removed CUDA-specific constructs like `__device__`, `__global__`, and `cudaMalloc`, as they are not applicable in OpenMP Offload.
-2. **OpenMP Offload**: The file doesn't directly use OpenMP Offload constructs because the functions here are utility functions that don't inherently require offloading. The offloading would occur in the main computational kernels, which would be marked with OpenMP directives like `#pragma omp target`.
-3. **Timing**: The timing function `get_time()` uses OpenMP's `omp_get_wtime()` if OpenMP is enabled, which is suitable for both host and device timing in OpenMP Offload.
-
-This translation assumes that the offloading of computational kernels is handled elsewhere in the codebase, as this file primarily contains utility functions that are not directly involved in the parallel computation.
+- The `get_time` function now uses `omp_get_wtime()` to get the current time, which is suitable for OpenMP.
+- The rest of the code remains largely unchanged as it doesn't directly involve CUDA-specific constructs that need translation to OpenMP. The functions are general utility functions that work with data structures and do not involve GPU-specific operations.

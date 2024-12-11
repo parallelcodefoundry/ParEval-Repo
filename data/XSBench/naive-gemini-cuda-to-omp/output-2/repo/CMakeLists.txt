@@ -16,9 +16,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
 
-
 add_executable(XSBench ${SOURCE})
 
-target_link_libraries(XSBench PRIVATE Threads::Threads) #Link against OpenMP runtime
+target_link_libraries(XSBench  gomp) # Link with OpenMP library
 
 install(TARGETS XSBench DESTINATION bin)
