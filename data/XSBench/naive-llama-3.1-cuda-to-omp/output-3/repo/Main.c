@@ -1,98 +1,103 @@
-#include "XSbench_shared_header.h"
-#include <omp.h>
-#include <stdio.h>
+#include "XSbench_header.cuh"
 
-#define BLOCK_SIZE 256
-#define MAX_GRID_SIZE (1 << 26)
-#define THREADS_PER_BLOCK 256
-#define SIMULATION_METHOD_EVENT 0
-#define SIMULATION_METHOD_NAIVE 1
+int main(int argc, char *argv[]) {
+        // =====================================================================
+        // Initialization & Command Line Read-In
+        // =====================================================================
+        int version = 20;
+        int mype = omp_get_num_threads();
+        double omp_start, omp_end;
+        int nprocs = 1;
+        unsigned long long verification;
 
-void print_usage() {
-    printf("Usage: ./XSBench [options]\n");
-    printf("Options:\n");
-    printf("-m <method> : Use the event-based (default) or naive simulation method\n");
-    printf("-s <size>   : Set input size (small, medium, large)\n");
-}
+        // Process CLI Fields -- store in "Inputs" structure
+        Inputs in = read_CLI(argc, argv);
 
-int main(int argc, char** argv) {
-    Inputs in;
-    Profile profile;
+        // Print-out of Input Summary
+        if (mype == 0)
+                print_inputs(in, nprocs, version);
 
-    // Parse command line arguments
-    int c;
-    while ((c = getopt(argc, argv, "m:s:")) != -1) {
-        switch (c) {
-            case 'm':
-                if (strcmp(optarg, "event") == 0) {
-                    in.simulation_method = SIMULATION_METHOD_EVENT;
-                } else if (strcmp(optarg, "naive") == 0) {
-                    in.simulation_method = SIMULATION_METHOD_NAIVE;
+        // =====================================================================
+        // Prepare Nuclide Energy Grids, Unionized Energy Grid, & Material Data
+        // This is not reflective of a real Monte Carlo simulation workload,
+        // therefore, do not profile this region!
+        // =====================================================================
+
+        SimulationData SD;
+
+        // If read from file mode is selected, skip initialization and load
+        // all simulation data structures from file instead
+        if (in.binary_mode == READ)
+                SD = binary_read(in);
+        else
+                SD = grid_init_do_not_profile(in, mype);
+
+        // If writing from file mode is selected, write all simulation data
+        // structures to file
+        if (in.binary_mode == WRITE && mype == 0)
+                binary_write(in, SD);
+
+	Profile profile;
+
+        // =====================================================================
+        // Cross Section (XS) Parallel Lookup Simulation
+        // This is the section that should be profiled, as it reflects a
+        // realistic continuous energy Monte Carlo macroscopic cross section
+        // lookup kernel.
+        // =====================================================================
+
+        #pragma omp parallel num_threads(nprocs)
+        {
+                int i = omp_get_thread_num();
+                if (i == 0) printf("Thread %d: ", i);
+                // Start Simulation Timer
+                omp_start = get_time();
+
+                // Run simulation
+                if (in.simulation_method == EVENT_BASED) {
+                        if (in.kernel_id == 0)
+                                verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+                        else if (in.kernel_id == 1)
+                                verification = run_event_based_simulation_optimization_1(in, SD, mype);
+                        else if (in.kernel_id == 2)
+                                verification = run_event_based_simulation_optimization_2(in, SD, mype);
+                        else if (in.kernel_id == 3)
+                                verification = run_event_based_simulation_optimization_3(in, SD, mype);
+                        else if (in.kernel_id == 4)
+                                verification = run_event_based_simulation_optimization_4(in, SD, mype);
+                        else if (in.kernel_id == 5)
+                                verification = run_event_based_simulation_optimization_5(in, SD, mype);
+                        else if (in.kernel_id == 6)
+                                verification = run_event_based_simulation_optimization_6(in, SD, mype);
+                        else {
+                                printf("Error: No kernel ID %d found!\n", in.kernel_id);
+                                exit(1);
+                        }
                 } else {
-                    print_usage();
-                    return -1;
+                        printf(
+                                "History-based simulation not implemented in CUDA code. Instead,\nuse "
+                                "the event-based method with \"-m event\" argument.\n");
+                        exit(1);
                 }
-                break;
-            case 's':
-                if (strcmp(optarg, "small") == 0) {
-                    in.lookups = 10;
-                    in.num_iterations = 10000;
-                    in.num_warmups = 100;
-                } else if (strcmp(optarg, "medium") == 0) {
-                    in.lookups = 25;
-                    in.num_iterations = 20000;
-                    in.num_warmups = 500;
-                } else if (strcmp(optarg, "large") == 0) {
-                    in.lookups = 50;
-                    in.num_iterations = 40000;
-                    in.num_warmups = 1000;
-                } else {
-                    print_usage();
-                    return -1;
+
+                // End Simulation Timer
+                omp_end = get_time();
+
+                // Release device memory
+                release_memory(SD);
+
+                // Final Hash Step
+                verification = verification % 999983;
+
+                #pragma omp critical
+                {
+                        if (i == 0) printf("\n");
+                        int is_invalid_result =
+                                print_results(in, mype, omp_end - omp_start, nprocs, verification);
+                        
+                        print_profile(profile, in);
                 }
-                break;
-            default:
-                print_usage();
-                return -1;
         }
-    }
 
-    // Initialize OpenMP variables
-    omp_set_num_threads(in.nthreads);
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        if (tid == 0) {
-            printf("Simulation method: %s\n", in.simulation_method == SIMULATION_METHOD_EVENT ? "event" : "naive");
-            printf("Input size: %s\n", in.lookups == 10 ? "small" : in.lookups == 25 ? "medium" : "large");
-        }
-    }
-
-    // Run simulation
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        if (tid == 0) {
-            profile.kernel_time = omp_get_wtime();
-        }
-        #pragma omp for schedule(static)
-        for (int i = 0; i < in.num_iterations; i++) {
-            // Simulation loop
-        }
-        if (tid == 0) {
-            profile.kernel_time = omp_get_wtime() - profile.kernel_time;
-        }
-    }
-
-    // Copy results to host and calculate performance metrics
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        if (tid == 0) {
-            printf("Kernel time: %f seconds\n", profile.kernel_time);
-            print_profile(profile, in);
-        }
-    }
-
-    return 0;
+        return is_invalid_result;
 }

@@ -1,139 +1,187 @@
-#include "XSbench_shared_header.h"
-#pragma offload_attribute(push)
-#pragma offload_attribute(alloc : Inputs, profile)
-__global__ void GridInit(
-    Inputs *in,
-    Profile *profile) {
-  extern __shared__ double shared[]; // Shared memory to hold all input data
+#include <omp.h>
+#include "XSbench_header.cuh"
 
-  // Initialize the grid and populate the shared memory
-  if (threadIdx.x == 0 && blockIdx.x == 0) {
-    // Initialize shared variables with some of the inputs
-    int num_iterations = in->num_iterations;
-    int num_warmups = in->num_warmups;
-    double device_to_host_time = profile->device_to_host_time;
-    double kernel_time = profile->kernel_time;
-    double host_to_device_time = profile->host_to_device_time;
+SimulationData grid_init_do_not_profile( Inputs in, int mype )
+{
+    // Structure to hold all allocated simuluation data arrays
+    SimulationData SD;
 
-    // Offload initialization to the GPU
-    #pragma offload target(mic:0) in (in, num_iterations, num_warmups)
-      {
-        // Initialize some of the variables on the device
-        __global__ void init_variables() {
-          int num_isotopes = in->n_isotopes;
-          double device_to_host_time = profile->device_to_host_time;
+    // Keep track of how much data we're allocating
+    size_t nbytes = 0;
 
-          // Perform some initialization tasks on the device
-          for (int i = 0; i < num_warmups; ++i) {
-            if (num_iterations > 1000 && blockIdx.x == 1 && threadIdx.x % 2 == 0)
-              continue;
-            else
-              // Initialize something that takes a lot of time...
-              __asm__ volatile(
-                  "wbinvlpd (%0), %%ymm15\n\t"
-                  "wbindvb (%0), %%ymm16\n\t"
-                  :
-                  : "r" (in->HM)
-                  :
-                  );
-          }
+    // Set the initial seed value
+    uint64_t seed = 42;
+
+    ////////////////////////////////////////////////////////////////////
+    // Initialize Nuclide Grids
+    ////////////////////////////////////////////////////////////////////
+
+    if(mype == 0) printf("Intializing nuclide grids...\n");
+
+    // First, we need to initialize our nuclide grid. This comes in the form
+    // of a flattened 2D array that hold all the information we need to define
+    // the cross sections for all isotopes in the simulation.
+    // The grid is composed of "NuclideGridPoint" structures, which hold the
+    // energy level of the grid point and all associated XS data at that level.
+    // An array of structures (AOS) is used instead of
+    // a structure of arrays, as the grid points themselves are accessed in
+    // a random order, but all cross section interaction channels and the
+    // energy level are read whenever the gridpoint is accessed, meaning the
+    // AOS is more cache efficient.
+
+    // Initialize Nuclide Grid
+    SD.length_nuclide_grid = in.n_isotopes * in.n_gridpoints;
+    SD.nuclide_grid     = (NuclideGridPoint *) malloc( SD.length_nuclide_grid * sizeof(NuclideGridPoint));
+    assert(SD.nuclide_grid != NULL);
+    nbytes += SD.length_nuclide_grid * sizeof(NuclideGridPoint);
+#pragma offload copyin(in: in) \
+               copyout(SD: SD) \
+               num_devices(1) \
+               device_num(mype)
+{
+        for( int i = 0; i < SD.length_nuclide_grid; i++ )
+        {
+            SD.nuclide_grid[i].energy        = LCG_random_double(&seed);
+            SD.nuclide_grid[i].total_xs      = LCG_random_double(&seed);
+            SD.nuclide_grid[i].elastic_xs    = LCG_random_double(&seed);
+            SD.nuclide_grid[i].absorbtion_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].fission_xs    = LCG_random_double(&seed);
+            SD.nuclide_grid[i].nu_fission_xs = LCG_random_double(&seed);
         }
-
-        // Initialize some variables on the host
-        int num_gridpoints = in->n_gridpoints;
-        double kernel_time = profile->kernel_time;
-
-        // Launch a thread block to initialize the variables on the device
-        __syncthreads();
-        init_variables<<<1, 256>>>();
-      }
-  }
-
-  // Copy input data to shared memory for use by each thread block
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i < in->particles) {
-    double particle_energy = in->HM[i];
-    double particle_weight = in->HM[in->n_isotopes + i];
-
-    // Initialize the grid and particle data for this thread block
-    if (threadIdx.y == 0 && blockIdx.y == 0)
-      shared[threadIdx.x] = particle_energy;
-
-    __syncthreads();
-
-    // Perform some calculations using the shared memory variables
-    double result = shared[threadIdx.x + blockDim.x * blockIdx.y];
-    profile->kernel_time -= clock() - startTime;
-  }
 }
+#pragma offload end
 
-// Define a kernel for each block
-__global__ void GridInitKernel(
-    Inputs *in,
-    Profile *profile) {
-  // Perform calculations using the input data and profile variables
-  double particle_energy = in->HM[blockIdx.x * blockDim.x + threadIdx.x];
-  double particle_weight = in->HM[in->n_isotopes + blockIdx.x * blockDim.x + threadIdx.x];
+    // Sort so that each nuclide has data stored in ascending energy order.
+    for( int i = 0; i < in.n_isotopes; i++ )
+        qsort( &SD.nuclide_grid[i*in.n_gridpoints], in.n_gridpoints, sizeof(NuclideGridPoint), NGP_compare);
 
-  profile->kernel_time -= clock() - startTime;
-}
-
-// Launch kernels for each block
-__global__ void launch_kernels(
-    Inputs *in,
-    Profile *profile) {
-  // Initialize some variables on the host before launching kernels
-  int num_gridpoints = in->n_gridpoints;
-  double kernel_time = profile->kernel_time;
-
-  // Launch a thread block to perform some calculations on each block
-  __syncthreads();
-  GridInitKernel<<<1, 256>>>();
-}
-
-int main() {
-  Inputs inputs;
-  Profile profile;
-
-  // Initialize some variables before starting the simulation
-  int num_iterations = inputs.num_iterations;
-  int num_warmups = inputs.num_warmups;
-  double device_to_host_time = profile.device_to_host_time;
-  double kernel_time = profile.kernel_time;
-  double host_to_device_time = profile.host_to_device_time;
-
-  // Offload initialization to the GPU
-  #pragma offload target(mic:0) in (inputs, num_iterations, num_warmups)
+    // error debug check
+    /*
+    for( int i = 0; i < in.n_isotopes; i++ )
     {
-      // Initialize some of the variables on the device
-      __global__ void init_variables() {
-        int num_isotopes = inputs.n_isotopes;
-        double device_to_host_time = profile.device_to_host_time;
+        printf("NUCLIDE %d ==============================\n", i);
+        for( int j = 0; j < in.n_gridpoints; j++ )
+            printf("E%d = %lf\n", j, SD.nuclide_grid[i * in.n_gridpoints + j].energy);
+    }
+    */
 
-        // Perform some initialization tasks on the device
-        for (int i = 0; i < num_warmups; ++i) {
-          if (num_iterations > 1000 && blockIdx.x == 1 && threadIdx.x % 2 == 0)
-            continue;
-          else
-            // Initialize something that takes a lot of time...
-            __asm__ volatile(
-                "wbinvlpd (%0), %%ymm15\n\t"
-                "wbindvb (%0), %%ymm16\n\t"
-                :
-                : "r" (inputs.HM)
-                :
-                );
-        }
-      }
+    // Allocate Verification Array
+    size_t sz = in.lookups * sizeof(unsigned long);
+    SD.verification = (unsigned long *) malloc(sz);
+    nbytes += sz;
 
-      // Initialize some variables on the host
-      int num_gridpoints = inputs.n_gridpoints;
-      double kernel_time = profile.kernel_time;
+    ////////////////////////////////////////////////////////////////////
+    // Initialize Acceleration Structure
+    ////////////////////////////////////////////////////////////////////
 
-      // Launch a thread block to initialize the variables on the device
-      __syncthreads();
-      init_variables<<<1, 256>>>();
+    if( in.grid_type == NUCLIDE )
+    {
+        SD.length_unionized_energy_array = 0;
+        SD.length_index_grid = 0;
     }
 
-  return 0;
+    if( in.grid_type == UNIONIZED )
+    {
+        if(mype == 0) printf("Intializing unionized grid...\n");
+
+        // Allocate space to hold the union of all nuclide energy data
+        SD.length_unionized_energy_array = in.n_isotopes * in.n_gridpoints;
+        SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
+        assert(SD.unionized_energy_array != NULL );
+        nbytes += SD.length_unionized_energy_array * sizeof(double);
+
+        // Copy energy data over from the nuclide energy grid
+        for( int i = 0; i < SD.length_unionized_energy_array; i++ )
+            SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
+
+        // Sort unionized energy array
+        qsort( SD.unionized_energy_array, SD.length_unionized_energy_array, sizeof(double), double_compare);
+
+        // Allocate space to hold the acceleration grid indices
+        SD.length_index_grid = SD.length_unionized_energy_array * in.n_isotopes;
+        SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+        assert(SD.index_grid != NULL);
+        nbytes += SD.length_index_grid * sizeof(int);
+
+        // Generates the double indexing grid
+        int * idx_low = (int *) calloc( in.n_isotopes, sizeof(int));
+        assert(idx_low != NULL );
+        double * energy_high = (double *) malloc( in.n_isotopes * sizeof(double));
+        assert(energy_high != NULL );
+
+        for( int i = 0; i < in.n_isotopes; i++ )
+            energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + 1].energy;
+
+        for( long e = 0; e < SD.length_unionized_energy_array; e++ )
+        {
+            double unionized_energy = SD.unionized_energy_array[e];
+            for( long i = 0; i < in.n_isotopes; i++ )
+            {
+                if( unionized_energy < energy_high[i]  )
+                    SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                else if( idx_low[i] == in.n_gridpoints - 2 )
+                    SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                else
+                {
+                    idx_low[i]++;
+                    SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                    energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
+                }
+            }
+        }
+
+        free(idx_low);
+        free(energy_high);
+    }
+
+    if( in.grid_type == HASH )
+    {
+        if(mype == 0) printf("Intializing hash grid...\n");
+        SD.length_unionized_energy_array = 0;
+        SD.length_index_grid  = in.hash_bins * in.n_isotopes;
+        SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+        assert(SD.index_grid != NULL);
+        nbytes += SD.length_index_grid * sizeof(int);
+
+        double du = 1.0 / in.hash_bins;
+
+        // For each energy level in the hash table
+        for( long e = 0; e < in.hash_bins; e++ )
+        {
+            double energy = e * du;
+
+            // We need to determine the bounding energy levels for all isotopes
+            for( long i = 0; i < in.n_isotopes; i++ )
+            {
+                SD.index_grid[e * in.n_isotopes + i] = grid_search_nuclide( in.n_gridpoints, energy, SD.nuclide_grid + i * in.n_gridpoints, 0, in.n_gridpoints-1);
+            }
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    // Initialize Materials and Concentrations
+    ////////////////////////////////////////////////////////////////////
+    if(mype == 0) printf("Intializing material data...\n");
+
+    // Set the number of nuclides in each material
+    SD.num_nucs  = load_num_nucs(in.n_isotopes);
+    SD.length_num_nucs = 12; // There are always 12 materials in XSBench
+
+    // Intialize the flattened 2D grid of material data. The grid holds
+    // a list of nuclide indices for each of the 12 material types. The
+    // grid is allocated as a full square grid, even though not all
+    // materials have the same number of nuclides.
+    SD.mats = load_mats(SD.num_nucs, in.n_isotopes, &SD.max_num_nucs);
+    SD.length_mats = SD.length_num_nucs * SD.max_num_nucs;
+
+    // Intialize the flattened 2D grid of nuclide concentration data. The grid holds
+    // a list of nuclide concentrations for each of the 12 material types. The
+    // grid is allocated as a full square grid, even though not all
+    // materials have the same number of nuclides.
+    SD.concs = load_concs(SD.num_nucs, SD.max_num_nucs);
+    SD.length_concs = SD.length_mats;
+
+    if(mype == 0) printf("Intialization complete. Allocated %.0lf MB of data on CPU.\n", nbytes/1024.0/1024.0 );
+
+    return SD;
 }

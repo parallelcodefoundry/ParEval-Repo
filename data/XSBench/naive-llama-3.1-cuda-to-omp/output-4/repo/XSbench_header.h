@@ -1,24 +1,54 @@
-#ifndef XSBENCH_SHARED_HEADER_H
-#define XSBENCH_SHARED_HEADER_H
+#ifndef __XSBENCH_HEADER_H__
+#define __XSBENCH_HEADER_H__
 
-// Header for shared utilities across XSBench versions
+#include<stdio.h>
+#include<stdlib.h>
+#include<math.h>
+#include<assert.h>
+#include <omp.h>
+#include <clc/clc.h>
+#include "XSbench_shared_header.h"
 
+// Grid types
+#define UNIONIZED 0
+#define NUCLIDE 1
+#define HASH 2
+
+// Simulation types
+#define HISTORY_BASED 1
+#define EVENT_BASED 2
+
+// Binary Mode Type
+#define NONE 0
+#define READ 1
+#define WRITE 2
+
+#pragma omp declare target device
+
+// Starting Seed
+#define STARTING_SEED 1070
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+        if (code != cudaSuccess)
+        {
+                fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+                if (abort) exit(code);
+        }
+}
+
+// Structures
 typedef struct{
-        int nthreads;
-        long n_isotopes;
-        long n_gridpoints;
-        int lookups;
-        char * HM;
-        int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
-        int hash_bins;
-        int particles;
-        int simulation_method;
-        int binary_mode;
-        int kernel_id;
-        int num_iterations;
-        int num_warmups;
-        char *filename;
-} Inputs;
+        double energy;
+        double total_xs;
+        double elastic_xs;
+        double absorbtion_xs;
+        double fission_xs;
+        double nu_fission_xs;
+} NuclideGridPoint;
+
+#pragma omp declare target data
 
 typedef struct{
   double device_to_host_time;
@@ -26,8 +56,6 @@ typedef struct{
   double host_to_device_time;
 } Profile;
 
-#pragma offload_attribute(push)
-#pragma offload_attribute(allocations)
 inline void print_profile(Profile profile, Inputs in) {
   if (in.filename) {
     FILE* output = fopen(in.filename, "w");
@@ -50,6 +78,5 @@ inline void print_profile(Profile profile, Inputs in) {
            in.num_warmups);
   }
 }
-#pragma offload_attribute(pop)
 
-#endif // XSBENCH_SHARED_HEADER_H
+#endif // __XSBENCH_HEADER_H__

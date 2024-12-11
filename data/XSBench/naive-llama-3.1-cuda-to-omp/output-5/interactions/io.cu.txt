@@ -1,53 +1,441 @@
-Here is the modified `io.cu` file translated for OpenMP-offload:
+Here is the translated `io.cu` file using OpenMP and Offloading:
+
 ```c
-// io.cu - offloaded with OpenMP and CUDA
+#include "XSbench_header.cuh"
 
-#include "XSbench_shared_header.h"
-#include <omp.h>
+void logo(int version)
+{
+    // Add OpenMP pragmas for parallelization
+    #pragma omp parallel
+    {
+        int num_threads = omp_get_num_threads();
+        printf("                   __   __ ___________                 _                        \n");
+        printf("                   \\ \\ / //  ___| ___ \\               | |                       \n");
+        printf("                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n");
+        printf("                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n");
+        printf("                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n");
+        printf("                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n");
 
-#pragma omp declare target
+        // Synchronize threads
+        #pragma omp barrier
 
-extern __global__ void kernel_lookup(double *d_x, double *d_grid, Inputs in) {
-  // kernel_lookup function remains the same as before
+        int i;
+        for (i = 0; i < num_threads; i++)
+            printf("\n");
+    }
+
+    center_print("Developed at Argonne National Laboratory", 79);
+    char v[100];
+    sprintf(v, "Version: %d", version);
+    center_print(v, 79);
 }
 
-#pragma omp end target
+// Prints Section titles in center of 80 char terminal
+void center_print(const char *s, int width)
+{
+    #pragma omp parallel
+    {
+        int num_threads = omp_get_num_threads();
+        int length = strlen(s);
+        int i;
+        for (i=0; i<=(width-length)/2; i++) {
+            printf(" ");
+        }
+        printf("%s\n", s);
 
-int main() {
-  // Initialize inputs
-  Inputs in;
-  in.nthreads = 1; // Assuming single-threaded for OpenMP-offload
-  in.lookups = 1000; // Number of lookups to perform
-  in.HM = "my_hash_table"; // Hash table name (not used in this example)
+        // Synchronize threads
+        #pragma omp barrier
 
-  // Allocate host memory for x and grid arrays
-  double *h_x;
-  double *h_grid;
+        for(i = 0; i < num_threads; i++)
+            printf("\n");
+    }
+}
 
-  // Initialize OpenMP offload directives
-  #pragma omp target data map(to: h_x[:in.lookups], h_grid[:in.ngridpoints])
-  {
-    // Set up kernel arguments and execute on the GPU
-    double *d_x, *d_grid;
-    cudaMalloc((void **)&d_x, in.lookups*sizeof(double));
-    cudaMalloc((void **)&d_grid, in.ngridpoints*sizeof(double));
-    cudaMemcpy(d_x, h_x, in.lookups*sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_grid, h_grid, in.ngridpoints*sizeof(double), cudaMemcpyHostToDevice);
+int print_results( Inputs in, int mype, double runtime, int nprocs,
+                   unsigned long long vhash )
+{
+    // Calculate Lookups per sec
+    int lookups = 0;
+    if (in.simulation_method == HISTORY_BASED)
+        lookups = in.lookups * in.particles;
+    else if (in.simulation_method == EVENT_BASED)
+        lookups = in.lookups;
+    int lookups_per_sec = (int) ((double) lookups / runtime);
 
-    kernel_lookup<<<1, 256>>>(d_x, d_grid, in);
+    // If running in MPI, reduce timing statistics and calculate average
+    #ifdef MPI
+    int total_lookups = 0;
+    #pragma omp parallel
+    {
+        int num_threads = omp_get_num_threads();
+        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_INT,
+                   MPI_SUM, 0, MPI_COMM_WORLD);
 
-    // Synchronize device memory
-    cudaDeviceSynchronize();
+        // Synchronize threads
+        #pragma omp barrier
+    }
+    #endif
 
-    // Copy results back to host memory
-    double *result;
-    cudaMalloc((void **)&result, in.lookups*sizeof(double));
-    cudaMemcpy(result, d_x, in.lookups*sizeof(double), cudaMemcpyDeviceToHost);
-  }
+    int is_invalid_result = 1;
 
-  return 0;
+    // Print output
+    if (mype == 0)
+    {
+        logo(20);
+        center_print("RESULTS", 79);
+        printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
+        #ifdef MPI
+        printf("MPI ranks:   %d\n", nprocs);
+        #endif
+
+        // Synchronize threads
+        #pragma omp barrier
+
+        int i;
+        for (i = 0; i < num_threads; i++)
+            printf("\n");
+
+        // Print the results
+        printf("Runtime:     %.3lf seconds\n", runtime);
+        printf("Lookups:     "); fancy_int(lookups);
+        printf("Lookups/s:   ");
+        fancy_int(lookups_per_sec);
+    }
+
+    unsigned long long large = 0;
+    unsigned long long small = 0;
+    if (in.simulation_method == EVENT_BASED)
+    {
+        small = 945990;
+        large = 952131;
+    }
+    else if (in.simulation_method == HISTORY_BASED)
+    {
+        small = 941535;
+        large = 954318;
+    }
+    if (strcasecmp(in.HM, "large") == 0)
+    {
+        if (vhash == large)
+            is_invalid_result = 0;
+    }
+    else if (strcasecmp(in.HM, "small") == 0)
+    {
+        if (vhash == small)
+            is_invalid_result = 0;
+    }
+
+    if(mype == 0 )
+    {
+        if (is_invalid_result)
+            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", vhash);
+        else
+            printf("Verification checksum: %llu (Valid)\n", vhash);
+    }
+
+    return is_invalid_result;
+}
+
+void print_CLI_error(void)
+{
+    #pragma omp parallel
+    {
+        int num_threads = omp_get_num_threads();
+        printf("Usage: ./XSBench <options>\n");
+        printf("Options include:\n");
+        printf("  -m <simulation method>   Simulation method (history, event)\n");
+        printf("  -s <size>                Size of H-M Benchmark to run (small, large, XL, XXL)\n");
+        printf("  -g <gridpoints>          Number of gridpoints per nuclide (overrides -s defaults)\n");
+        printf("  -G <grid type>           Grid search type (unionized, nuclide, hash). Defaults to unionized.\n");
+        printf("  -p <particles>           Number of particle histories\n");
+        printf("  -l <lookups>             History Based: Number of Cross-section (XS) lookups per particle. Event Based: Total number of XS lookups.\n");
+        printf("  -h <hash bins>           Number of hash bins used (if using hash lookup type)\n");
+        printf("  -b <binary mode>         Read or write all data structures to file. If reading, this will skip initialization phase. (read, write)\n");
+        printf("  -k <kernel ID>           Specifies which kernel to run. 0 is baseline, 1, 2, etc are optimized variants. (0 is default.)\n");
+        printf("  -n <num iterations>      Specifies how many kernel iterations to run. (1 is default.)\n");
+        printf("  -w <num warmups>         Specifies how many warmup iterations to run. (0 is default.)\n");
+        printf("  --csv <file path>        Save output to csv file. (Default is stdout)\n");
+        printf("Default is equivalent to: -m history -s large -l 34 -p 500000 -G unionized -k 0 -n 1\n");
+        printf("See readme for full description of default run values\n");
+    }
+
+    // Synchronize threads
+    #pragma omp barrier
+
+    exit(4);
+}
+
+Inputs read_CLI( int argc, char * argv[] )
+{
+    Inputs input;
+
+    // defaults to the history based simulation method
+    input.simulation_method = HISTORY_BASED;
+
+    // defaults to max threads on the system
+    input.nthreads = 1;
+
+    // defaults to 355 (corresponding to H-M Large benchmark)
+    input.n_isotopes = 355;
+
+    // defaults to 11303 (corresponding to H-M Large benchmark)
+    input.n_gridpoints = 11303;
+
+    // defaults to 500,000
+    input.particles = 500000;
+
+    // defaults to 34
+    input.lookups = 34;
+
+    // default to unionized grid
+    input.grid_type = UNIONIZED;
+
+    // default to unionized grid
+    input.hash_bins = 10000;
+
+    // default to no binary read/write
+    input.binary_mode = NONE;
+
+    // defaults to baseline kernel
+    input.kernel_id = 0;
+
+    // default to one kernel iteration
+    input.num_iterations = 1;
+
+    // default to zero warmup iterations
+    input.num_warmups = 1;
+
+    // defaults to stdout
+    input.filename = NULL;
+
+    // Check if user sets these
+    int user_g = 0;
+
+    int default_lookups = 1;
+    int default_particles = 1;
+
+    // Collect Raw Input
+    for (int i = 1; i < argc; i++)
+    {
+        char * arg = argv[i];
+
+        // n_gridpoints (-g)
+        if (strcmp(arg, "-g") == 0)
+        {
+            if (++i < argc)
+            {
+                user_g = 1;
+                input.n_gridpoints = atol(argv[i]);
+            }
+            else
+                print_CLI_error();
+        }
+
+        // Simulation Method (-m)
+        else if (strcmp(arg, "-m") == 0)
+        {
+            char * sim_type;
+            if (++i < argc)
+                sim_type = argv[i];
+            else
+                print_CLI_error();
+
+            if (strcasecmp(sim_type, "history") == 0)
+                input.simulation_method = HISTORY_BASED;
+            else if (strcasecmp(sim_type, "event") == 0)
+            {
+                input.simulation_method = EVENT_BASED;
+                // Also resets default # of lookups
+                if (default_lookups && default_particles)
+                {
+                    input.lookups = input.lookups * input.particles;
+                    input.particles = 0;
+                }
+            }
+            else
+                print_CLI_error();
+        }
+
+        // lookups (-l)
+        else if (strcmp(arg, "-l") == 0)
+        {
+            if (++i < argc)
+            {
+                input.lookups = atoi(argv[i]);
+                default_lookups = 0;
+            }
+            else
+                print_CLI_error();
+        }
+
+        // hash bins (-h)
+        else if (strcmp(arg, "-h") == 0)
+        {
+            if (++i < argc)
+                input.hash_bins = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+
+        // particles (-p)
+        else if (strcmp(arg, "-p") == 0)
+        {
+            if (++i < argc)
+            {
+                input.particles = atoi(argv[i]);
+                default_particles = 0;
+            }
+            else
+                print_CLI_error();
+        }
+
+        // HM (-s)
+        else if (strcmp(arg, "-s") == 0)
+        {
+            if (++i < argc)
+                input.HM = argv[i];
+            else
+                print_CLI_error();
+        }
+
+        // grid type (-G)
+        else if (strcmp(arg, "-G") == 0)
+        {
+            char * grid_type;
+            if (++i < argc)
+                grid_type = argv[i];
+            else
+                print_CLI_error();
+
+            if (strcasecmp(grid_type, "unionized") == 0)
+                input.grid_type = UNIONIZED;
+            else if (strcasecmp(grid_type, "nuclide") == 0)
+                input.grid_type = NUCLIDE;
+            else if (strcasecmp(grid_type, "hash") == 0)
+                input.grid_type = HASH;
+            else
+                print_CLI_error();
+        }
+
+        // binary mode (-b)
+        else if (strcmp(arg, "-b") == 0)
+        {
+            char * binary_mode;
+            if (++i < argc)
+                binary_mode = argv[i];
+            else
+                print_CLI_error();
+
+            if (strcasecmp(binary_mode, "read") == 0)
+                input.binary_mode = READ;
+            else if (strcasecmp(binary_mode, "write") == 0)
+                input.binary_mode = WRITE;
+            else
+                print_CLI_error();
+        }
+
+        // kernel optimization selection (-k)
+        else if (strcmp(arg, "-k") == 0)
+        {
+            if (++i < argc)
+            {
+                input.kernel_id = atoi(argv[i]);
+            }
+            else
+                print_CLI_error();
+        }
+
+        // number of kernel iterations (-n)
+        else if (strcmp(arg, "-n") == 0)
+        {
+            if (++i < argc)
+            {
+                input.num_iterations = atoi(argv[i]);
+            }
+            else
+                print_CLI_error();
+        }
+
+        else if (strcmp(arg, "--csv") == 0)
+        {
+            if (++i < argc) {
+                input.filename = (char *)malloc(strlen(argv[i]) + 1);
+                strcpy(input.filename, argv[i]);
+            }
+            else
+                print_CLI_error();
+        }
+
+        // Warmup iterations (-w)
+        else if (strcmp(arg, "-w") == 0)
+        {
+            if (++i < argc)
+            {
+                input.num_warmups = atoi(argv[i]);
+            }
+            else
+                print_CLI_error();
+        }
+    }
+
+    // Validate Input
+
+    // Validate nthreads
+    if (input.nthreads < 1)
+        print_CLI_error();
+
+    // Validate n_isotopes
+    if (input.n_isotopes < 1)
+        print_CLI_error();
+
+    // Validate n_gridpoints
+    if (input.n_gridpoints < 1)
+        print_CLI_error();
+
+    // Validate lookups
+    if (input.lookups < 1)
+        print_CLI_error();
+
+    // Validate Hash Bins
+    if (input.hash_bins < 1)
+        print_CLI_error();
+
+    // Validate number of iterations
+    if (input.num_iterations < 1)
+        print_CLI_error();
+
+    // Validate HM size
+    if (strcasecmp(input.HM, "small") != 0 &&
+        strcasecmp(input.HM, "large") != 0 &&
+        strcasecmp(input.HM, "XL") != 0 &&
+        strcasecmp(input.HM, "XXL") != 0)
+        print_CLI_error();
+
+    // Set HM size specific parameters
+    // (defaults to large)
+    if (strcasecmp(input.HM, "small") == 0)
+        input.n_isotopes = 68;
+    else if (strcasecmp(input.HM, "XL") == 0 && user_g == 0)
+        input.n_gridpoints = 238847; // sized to make 120 GB XS data
+    else if (strcasecmp(input.HM, "XXL") == 0 && user_g == 0)
+        input.n_gridpoints = 238847 * 2.1; // 252 GB XS data
+
+    // Return input struct
+    return input;
 }
 ```
-Note that this is a simplified version of the `io.cu` file and assumes that the kernel_lookup function remains the same as before. The OpenMP-offload directives are used to offload the computation to the GPU, and the host memory allocations and copy operations are performed within the `omp target data` region.
 
-Also note that this is just an example translation of the `io.cu` file for OpenMP-offload, and you may need to modify it further depending on your specific use case.
+Note that OpenMP pragmas have been added to the file to enable parallelization of certain sections of code, such as the logo function and the print_results function. Additionally, offloading directives have not been explicitly specified in this translated version of the `io.cu` file since it is primarily a data input/output file, but they could be used if necessary for performance optimization.
+
+Please note that OpenMP and Offloading are separate compilation flags that should be enabled in the Makefile or at compile-time to take advantage of parallelization and offloading features. The following lines can be added to the Makefile to enable OpenMP and Offloading:
+
+```make
+CFLAGS += -fopenmp
+```
+
+or
+
+```c
+nvcc ... -fopenmp
+```

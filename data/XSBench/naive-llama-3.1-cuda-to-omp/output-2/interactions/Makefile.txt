@@ -1,29 +1,65 @@
-Here is the Makefile converted to compile as OpenMP-offload code:
-```makefile
-# Makefile for XSBench shared utilities
+Here is the translated Makefile:
 
-CXX = clang++
-CUDA_CXX = nvcc
-NVCC_ARCH = $(CUDA_ARCH)
-COMPILE = COMPILER=$(COMPILER)
+```make
+# User Options
+CUDA_ARCH ?=
+COMPILER    ?= llvm
 
-default: all
+# Program name & source code list
+program = XSBench
 
-all: xsbench_shared.o
+source = \
+Main.cu \
+io.cu \
+Simulation.cu \
+GridInit.cu \
+XSutils.cu \
+Materials.cu
 
-xsbench_shared.o: $(XSBECH_SHARED_HEADER_H) $(XSBECH_SHARED_SOURCE_FILE).c
-    @echo "Compiling $<"
-    $(CXX) -c -g3 -std=c++11 -O0 -Wall -Wno-deprecated-gpu-targets -fPIC -DUSE_OFFLOAD=$(CUDA_ARCH) \
-        $(NVCC_CXXFLAGS) $(COMPILE) $(XSBECH_SHARED_SOURCE_FILE).c -o xsbench_shared.o
+obj = $(source:.cu=.o)
+
+# Sets Flags
+CFLAGS := -Wall -Wextra
+LDFLAGS = -lm
+
+# NVIDIA Compiler
+ifeq ($(COMPILER),llvm)
+  CC = clang++
+  CFLAGS += -g -O3 -std=c++14 -fopenmp-targets=nvptx64-nvidia-cuda=8.0 -DCUDA_ARCH=$(CUDA_ARCH)
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+# Targets to Build
+$(program): $(obj) XSbench_header.cuh Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cu XSbench_header.cuh Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-    rm -rf *.o
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.cuh
+
+run:
+	./$(program)
 ```
-Note that I have assumed the following:
 
-* The C++ compiler is `clang++` by default, but can be overridden with the `COMPILER` variable.
-* The CUDA compiler is `nvcc` and the architecture is specified with the `CUDA_ARCH` variable.
-* The header file is named `XSBECH_SHARED_HEADER_H` (note: I added a typo in the original filename) and the source file is named `$(XSBECH_SHARED_SOURCE_FILE).c`.
-* The Makefile uses the `-fPIC` flag to compile position-independent code, which is required for OpenMP-offload.
+Note that I've added the `-fopenmp-targets=nvptx64-nvidia-cuda=8.0` flag to enable OpenMP offloading to NVIDIA GPUs with CUDA 8.0 compatibility. You may need to adjust this flag depending on your specific GPU and compiler versions.
 
-To use this Makefile, you can run `make CUDA_ARCH=80 COMPILER=clang++` (or any other valid combination of flags) to build the shared utilities.
+Also, make sure to set `CUDA_ARCH` and `COMPILER` variables when compiling the code, for example: `make CUDA_ARCH=80 COMPILER=llvm`.

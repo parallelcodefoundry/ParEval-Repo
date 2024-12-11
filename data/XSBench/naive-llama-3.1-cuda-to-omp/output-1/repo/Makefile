@@ -1,17 +1,68 @@
-# Translated from original Makefile
+# User Options
+COMPILER ?= clang
+OPTIMIZE ?= yes
+DEBUG ?= no
+PROFILE ?= no
+CUDA_ARCH ?=
 
-# Default target
-all: xsbench_shared.o xsbench_kernel.o xsbench_offload.o
-    nvcc -o xsbench -O3 --offload-architecture=compute_80 xsbench_shared.o xsbench_kernel.o xsbench_offload.o $(CUDAFLAGS)
+# Program name & source code list
+program = XSBench
 
-# Rule for building xsbench_shared.o
-xsbench_shared.o: xsbench_shared.c xsbench_shared.h
-    ${COMPILER} -c -O3 -o $@ $<
+source = \
+Main.cu \
+io.cu \
+Simulation.cu \
+GridInit.cu \
+XSutils.cu \
+Materials.cu
 
-# Rule for building xsbench_kernel.o
-xsbench_kernel.o: xsbench_kernel.c xsbench_shared.h
-    ${COMPILER} -c -O3 -o $@ $<
+obj = $(source:.cu=.o)
 
-# Rule for building xsbench_offload.o
-xsbench_offload.o: xsbench_offload.c xsbench_shared.h
-    ${COMPILER} -fopenmp-offload -c -O3 -o $@ $<
+# Sets Flags
+CFLAGS := 
+LDFLAGS = -lm
+
+# LLVM Compiler
+ifeq ($(COMPILER),clang)
+  CC = clang++-offload
+  CXX = clang++
+  CFLAGS += -Xcudarc --cuda-generate-code-for-all-gpus
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+  LDFLAGS  += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+# CUDA Architecture
+ifneq ($(CUDA_ARCH),)
+  CFLAGS += --cuda-gencode=$(CUDA_ARCH)
+endif
+
+# Targets to Build
+$(program): $(obj) XSbench_header.cuh Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cu XSbench_header.cuh Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.cuh
+
+run:
+	./$(program)

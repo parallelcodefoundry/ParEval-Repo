@@ -1,10 +1,29 @@
 #ifndef XSBENCH_SHARED_HEADER_H
 #define XSBENCH_SHARED_HEADER_H
 
-// Header for shared utilities across XSBench versions
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+#include "omp_offload.h"
 
-#pragma offload_attribute(push)
-#pragma offload_attribute(allow_device_pointers)
+// Grid types
+#define UNIONIZED 0
+#define NUCLIDE 1
+#define HASH 2
+
+// Simulation types
+#define HISTORY_BASED 1
+#define EVENT_BASED 2
+
+// Binary Mode Type
+#define NONE 0
+#define READ 1
+#define WRITE 2
+
+#define STARTING_SEED 1070
+
 typedef struct{
         int nthreads;
         long n_isotopes;
@@ -21,8 +40,6 @@ typedef struct{
         int num_warmups;
         char *filename;
 } Inputs;
-
-#pragma offload_attribute(pop)
 
 typedef struct{
   double device_to_host_time;

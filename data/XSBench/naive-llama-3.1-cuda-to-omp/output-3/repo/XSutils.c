@@ -1,42 +1,82 @@
-// XSutils.cu (translated)
+#include "XSbench_header.cuh"
 
-#include "XSutils.h"
-#include "openmp_offload.h"
+int double_compare(const void * a, const void * b)
+{
+    double A = *((double *) a);
+    double B = *((double *) b);
 
-#define MAX_THREADS 1024
-
-extern "C" {
-    void xsbench_utils_kernel(Inputs in, float *output);
+    if( A > B )
+        return 1;
+    else if( A < B )
+        return -1;
+    else
+        return 0;
 }
 
-int main(int argc, char **argv) {
-    Inputs in;
-    // Initialize inputs
-    // ...
+int NGP_compare(const void * a, const void * b)
+{
+    NuclideGridPoint A = *((NuclideGridPoint *) a);
+    NuclideGridPoint B = *((NuclideGridPoint *) b);
 
-    // Set OpenMP offload environment variables
-    setenv("KMP_AFFINITY", "granularity=fine, compact,1,0");
-    setenv("OMP_PLACES", "cores");
-
-    #pragma omp parallel num_threads(MAX_THREADS)
-    {
-        int tid = omp_get_thread_num();
-        // Set up OpenMP offload target
-        #pragma omp target data map(to: in) device(omp_offload_device)
-        {
-            // Execute kernel on device
-            xsbench_utils_kernel(in, NULL);
-        }
-    }
-
-    return 0;
+    if( A.energy > B.energy )
+        return 1;
+    else if( A.energy < B.energy )
+        return -1;
+    else
+        return 0;
 }
 
-void xsbench_utils_kernel(Inputs in, float *output) {
-    // Kernel implementation using OpenMP offload
-    #pragma omp parallel for num_threads(MAX_THREADS)
-    for (int i = 0; i < in.num_particles; i++) {
-        // Perform calculations on device using OpenMP offload
-        // ...
-    }
+#pragma omp declare target
+
+double rn_v(void)
+{
+    static unsigned long seed = 1337;
+    double ret;
+    unsigned long n1;
+    unsigned long a = 16807;
+    unsigned long m = 2147483647;
+    #pragma omp atomic update
+    seed = ( a * (seed) ) % m;
+    #pragma omp target update from(seed)
+    n1 = seed;
+    ret = (double) n1 / m;
+    return ret;
+}
+
+#pragma omp end declare target
+
+size_t estimate_mem_usage( Inputs in )
+{
+    size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );
+    size_t all_nuclide_grids   = in.n_isotopes * single_nuclide_grid;
+    size_t size_UEG		   = in.n_isotopes*in.n_gridpoints*sizeof(double) + in.n_isotopes*in.n_gridpoints*in.n_isotopes*sizeof(int);
+    size_t size_hash_grid	   = in.hash_bins * in.n_isotopes * sizeof(int);
+    size_t memtotal;
+
+    if( in.grid_type == UNIONIZED )
+        memtotal	  = all_nuclide_grids + size_UEG;
+    else if( in.grid_type == NUCLIDE )
+        memtotal	  = all_nuclide_grids;
+    else
+        memtotal	  = all_nuclide_grids + size_hash_grid;
+
+    memtotal	  = ceil(memtotal / (1024.0*1024.0));
+    return memtotal;
+}
+
+double get_time(void)
+{
+    #ifdef OPENMP_OFFLOAD
+    // If using OpenMP-offload, we can use the default timer function provided by OpenACC
+    double tstart = omp_get_wtime();
+    #else
+    struct timeval timecheck;
+
+    gettimeofday(&timecheck, NULL);
+    long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+
+    double time = (double) ms / 1000.0;
+    #endif
+
+    return time;
 }

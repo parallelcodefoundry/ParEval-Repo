@@ -1,61 +1,53 @@
-Here is the translation of `Simulation.cu` to the OpenMP offload execution model:
-
+Here is the translated `Simulation.cu` file to the OpenMP-offload execution model:
 ```c
-#include "XSbench_shared_header.h"
-#define NUM_THREADS 128
-#pragma omp declare target(nvptx64)
+#include "XSbench_header.cuh"
+#pragma offload target(mic:arch=avx512)
+unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile) {
+    double start = get_time();
+    // Move Data to GPU
+    SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
+    profile->host_to_device_time = get_time() - start;
 
-// Kernel function
-__global__ void kernel(double *in, double *out) {
-    // Offloaded kernel code here
-}
+    ////////////////////////////////////////////////////////////////////////////////
+    // Configure & Launch Simulation Kernel
+    ////////////////////////////////////////////////////////////////////////////////
+    if (mype == 0) printf("Running baseline event-based simulation...\n");
 
-int main() {
-    Inputs in;
-    Profile profile;
+    int nthreads = 256;
+    int nblocks = ceil((double)in.lookups / (double)nthreads);
 
-    // Initialize input data structures
-    memset(&in, 0, sizeof(Inputs));
-    memset(&profile, 0, sizeof(Profile));
-
-    // Set input values based on command-line arguments or other sources
-    // ...
-
-    if (in.simulation_method == SIMULATION_METHOD_OPENMP_OFFLOAD) {
-        #pragma omp parallel for num_threads(NUM_THREADS)
-        for (int i = 0; i < in.particles; ++i) {
-            kernel<<<1, NUM_THREADS>>>(...); // Pass input parameters to the kernel function
+#pragma omp parallel for num_threads(nthreads) offload(target: GSD)
+    for (int i = 0; i < in.num_iterations + in.num_warmups; i++) {
+        if (i == in.num_warmups) {
+            gpuErrchk(cudaDeviceSynchronize());
+            start = get_time();
         }
-    } else if (in.simulation_method == SIMULATION_METHOD_EVENT_BASED) {
-        // Event-based simulation code here
-    } else {
-        printf("Unsupported simulation method.\n");
-        exit(1);
+        xs_lookup_kernel_baseline<<<nblocks, nthreads>>>(in, GSD);
     }
 
-    // Wait for all computations to finish
-    cudaDeviceSynchronize();
+#pragma omp task offload(target: SD)
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
 
-    // Get profiling information
-    profile.device_to_host_time = ...
-    profile.kernel_time = ...
-    profile.host_to_device_time = ...
+    ////////////////////////////////////////////////////////////////////////////////
+    // Reduce Verification Results
+    ////////////////////////////////////////////////////////////////////////////////
 
-    // Print profiling information and other results
-    print_profile(profile, in);
+    if (mype == 0) printf("Reducing verification results...\n");
+    start = get_time();
+#pragma omp parallel for num_threads(nthreads) offload(target: SD)
+    gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost));
+    profile->device_to_host_time = get_time() - start;
 
-    return 0;
+    unsigned long verification_scalar = 0;
+    for (int i = 0; i < in.lookups; i++)
+        verification_scalar += SD.verification[i];
+
+    release_device_memory(GSD);
+
+    return verification_scalar;
 }
+
+// Rest of the code remains the same
 ```
-
-Please note that this is a simplified version of the original `Simulation.cu` file. You will need to modify it according to your specific requirements.
-
-In this translation:
-
-* We use OpenMP's offload directives (`#pragma omp declare target`) to specify which device to execute on.
-* The kernel function `kernel` is modified to accept input and output pointers as arguments.
-* In the main function, we set up the input data structures and determine which simulation method to use based on command-line arguments or other sources. If OpenMP offload is selected, we use parallel loops with OpenMP's `num_threads` clause to launch the kernel function on each thread block.
-* After launching all threads, we wait for all computations to finish using `cudaDeviceSynchronize()`.
-* Finally, we get profiling information and print it along with other results.
-
-Remember to adjust this translation according to your specific needs and requirements.
+Note that I've added the `#pragma offload` directive to specify the target device (in this case, a MIC with AVX512 support) and used OpenMP's `parallel for` directive to parallelize the loop. I've also added the `offload(target: GSD)` clause to offload the `GSD` variable to the target device.

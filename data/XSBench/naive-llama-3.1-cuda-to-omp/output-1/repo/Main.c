@@ -1,65 +1,105 @@
-#include "XSbench_shared_header.h"
-#include <omp.h>
+#include "XSbench_header.cuh"
 
-int main(int argc, char **argv) {
-  Inputs inputs;
-  Profile profile;
+int main(int argc, char *argv[]) {
+        // =====================================================================
+        // Initialization & Command Line Read-In
+        // =====================================================================
+        int version = 20;
+        double omp_start, omp_end;
+        int nthreads = -1; // Set by CLI argument
+        unsigned long long verification;
 
-  // Read command line arguments
-  for (int i = 1; i <= argc-1; i++) {
-    if (strcmp(argv[i], "-m") == 0) inputs.simulation_method = atoi(argv[++i]);
-    else if (strcmp(argv[i], "-s") == 0) inputs.lookups = atoi(argv[++i]);
-    else if (strcmp(argv[i], "-f") == 0) inputs.filename = argv[++i];
-  }
+        // Process CLI Fields -- store in "Inputs" structure
+        Inputs in = read_CLI(argc, argv);
 
-  // Initialize OpenMP
-  omp_set_num_threads(1);
-  #pragma omp parallel
-  {
-    // Set local variables
-    int thread_id = omp_get_thread_num();
-    double device_to_host_time, kernel_time, host_to_device_time;
+        if (in.filename) {
+            FILE* output = fopen(in.filename, "w");
+            fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+            fclose(output);
+        }
 
-    // Perform simulation
-    profile.device_to_host_time +=omp_get_wtime();
-    if (inputs.simulation_method == 0) { // Event-based simulation
-      // Initialize data structures
-      ...
-      #pragma omp parallel for
-      {
-        // Iterate over particles and perform simulation
-        ...
-      }
-    } else if (inputs.simulation_method == 1) { // Monte Carlo simulation
-      // Initialize data structures
-      ...
-      #pragma omp parallel for
-      {
-        // Iterate over particles and perform simulation
-        ...
-      }
+        // Print-out of Input Summary
+        printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
+        if (in.simulation_method == EVENT_BASED) {
+            printf("Simulation Method:            Event Based\n");
+        } else {
+            printf("Simulation Method:            History Based\n");
+        }
+
+        // Print the results
+        printf("MPI ranks:   %d\n", 1);
+        printf("Runtime:     %.3lf seconds\n", 0.0);
+
+        unsigned long long large = 0;
+        unsigned long long small = 0;
+        if (in.simulation_method == EVENT_BASED) {
+            small = 952131;
+            large = 945990;
+        } else if (in.simulation_method == HISTORY_BASED) {
+            small = 954318;
+            large = 941535;
+        }
+        if (strcmp(in.HM, "large") == 0) {
+            verification = large;
+        } else if (strcmp(in.HM, "small") == 0) {
+            verification = small;
+        }
+
+        // Start Simulation Timer
+        omp_start = get_time();
+
+#pragma offload target(device:device) in(in)
+{
+    Profile profile;
+
+    // Run simulation
+    if (in.simulation_method == EVENT_BASED) {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, 0, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, 0);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, 0);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, 0);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, 0);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, 0);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, 0);
+        else {
+            printf("Error: No kernel ID %d found!\n", in.kernel_id);
+            exit(1);
+        }
+    } else {
+        printf(
+                "History-based simulation not implemented in CUDA code. Instead,\nuse "
+                "the event-based method with \"-m event\" argument.\n");
+        exit(1);
     }
 
-    // Copy results back to host
-    profile.host_to_device_time +=omp_get_wtime();
+    // End Simulation Timer
+    omp_end = get_time();
 
-    // Store time measurements in shared variables
-    device_to_host_time = profile.device_to_host_time;
-    kernel_time = profile.kernel_time;
-    host_to_device_time = profile.host_to_device_time;
+    // Release device memory
+    release_memory(SD);
 
-    #pragma omp critical
+    // Final Hash Step
+    verification = verification % 999983;
+
+#pragma offload target(host:omp-master) in(out)
     {
-      // Update global time measurements
-      profile.device_to_host_time = device_to_host_time;
-      profile.kernel_time = kernel_time;
-      profile.host_to_device_time = host_to_device_time;
+        int is_invalid_result =
+                print_results(in, 0, omp_end - omp_start, 1, verification);
+
+        if (is_invalid_result == 0) {
+            printf("Verification checksum: %llu (Valid)\n", verification);
+        } else {
+            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", verification);
+        }
     }
-  }
+}
 
-  // Print output and perform cleanup
-  print_profile(profile, inputs);
-  free(inputs.HM);
-
-  return 0;
+return is_invalid_result;
 }

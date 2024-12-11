@@ -1,69 +1,23 @@
-cmake_minimum_required(VERSION 3.10)
-project(XSBench)
+cmake_minimum_required(VERSION 3.21)
 
-# Set up OpenMP and Offloading
-set(CMAKE_CXX_COMPILER "omp++")
-set(CMAKE_C_COMPILER "ompcc")
+project(
+    XSBench_OpenMP
+    VERSION 1.0
+    LANGUAGES CXX OFFLOAD
 
-find_package(OpenMP REQUIRED)
-find_package(MetaOpenACC REQUIRED)
+)
 
-# Set up compile flags for offload to GPU
-if (${CMAKE_CXX_COMPILER_ID} MATCHES "Intel")
-  set(OFFLOAD_COMPILE_FLAGS "-fopenacc -fopenmp-targets=nvptx64-nvidia-cuda11.0")
-else()
-  set(OFFLOAD_COMPILE_FLAGS "-fopenmp-targets=gpu --cuda-gpu-arch=compute_70")
-endif()
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-# Set up compile flags for OpenMP
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OFFLOAD_COMPILE_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OFFLOAD_COMPILE_FLAGS}")
+set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
 
-# Include the shared header file
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/shared_header.h)
+add_executable(XSBench ${SOURCE})
 
-# Define source files and executables
-add_executable(XSBench main.cpp ${XSBENCH_SOURCE_FILES})
-target_link_libraries(XSBench ${OpenMP_LIBRARIES})
+target_link_libraries(XSBench OpenMP::OpenMP_CXX_OFFLOAD)
 
-# Set up offload flags for each executable
-foreach(exec XSBench)
-  set_target_properties(${exec} PROPERTIES OFFLOAD_COMPILE_FLAGS "${OFFLOAD_COMPILE_FLAGS}")
-endforeach()
+# Define offload targets
+set_target_properties(XSBench PROPERTIES OFFLOAD_TARGETS nvidia)
 
-# Define custom build rule to print timing information at the end of each run
-add_custom_command(TARGET XSBench POST_BUILD
-                   COMMAND ${CMAKE_CXX_COMPILER} ${XSBENCH_SOURCE_FILES} -o $<TARGET_FILE:XSBL> --offload-architecture=gpu --offload-exec=xsbench_gnu
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   DEPENDS ${XSBENCH_SOURCE_FILES})
-
-# Print timing information at the end of each run
-add_custom_command(TARGET XSBench POST_BUILD
-                   COMMAND ${CMAKE_CXX_COMPILER} ${XSBENCH_SOURCE_FILES} -o $<TARGET_FILE:XSBL> --offload-architecture=gpu --offload-exec=xsbench_gnu
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   COMMAND ${CMAKE_CXX_COMPILER} ${XSBENCH_SOURCE_FILES} -o xsbench_host.exe
-                   COMMAND ${CMAKE_CXX_COMPILER} ${XSBENCH_SOURCE_FILES} -o $<TARGET_FILE:XSBL> --offload-architecture=gpu --offload-exec=xsbench_gnu
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   DEPENDS ${XSBENCH_SOURCE_FILES})
-
-# Print profiling information at the end of each run
-add_custom_command(TARGET XSBench POST_BUILD
-                   COMMAND ${CMAKE_CXX_COMPILER} ${XSBENCH_SOURCE_FILES} -o $<TARGET_FILE:XSBL> --offload-architecture=gpu --offload-exec=xsbench_gnu
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   COMMAND print_profile(${PROFILE}, ${in})
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   DEPENDS ${XSBENCH_SOURCE_FILES})
-
-# Print profiling information at the end of each run (alternative method)
-add_custom_command(TARGET XSBench POST_BUILD
-                   COMMAND ${CMAKE_CXX_COMPILER} ${XSBENCH_SOURCE_FILES} -o $<TARGET_FILE:XSBL> --offload-architecture=gpu --offload-exec=xsbench_gnu
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   COMMAND profile_print(${PROFILE}, ${in})
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   DEPENDS ${XSBENCH_SOURCE_FILES})
-
-# Define custom build rule to run the executable and collect timing information
-add_custom_command(TARGET XSBench PRE_BUILD
-                   COMMAND ${CMAKE_CXX_COMPILER} xsbench_host.exe --offload-architecture=gpu --offload-exec=xsbench_gnu
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                   DEPENDS ${XSBENCH_SOURCE_FILES})
+include_directories(/usr/local/cuda/include /usr/lib/x86_64-linux-gnu/openmp)

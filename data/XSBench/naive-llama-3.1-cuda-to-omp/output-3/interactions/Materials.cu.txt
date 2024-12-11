@@ -1,68 +1,159 @@
-Here is the translation of the `Materials.cu` file from CUDA/OpenACC to OpenMP-Offload:
+Here's the translation of the `Materials.cu` file from CUDA to OpenMP offloading:
+
 ```c
-// Translate Materials.cu to OpenMP-Offload
-#include <omp.h>
-#include "XSbench_shared_header.h"
+#include "XSbench_header.cuh"
 
-__attribute__((noinline))
-void material_lookup_kernel(double *lookup_table, Inputs inputs) {
-  int i;
-#pragma omp offload target(mic)
-  for (i = 0; i < inputs.nthreads; i++) {
-    // Simulate work here
-    #pragma omp task
-    material_lookup(lookup_table + i*inputs.n_gridpoints, &inputs);
-  }
+// Material data is hard coded into the functions in this file.
+// Note that there are 12 materials present in H-M (large or small)
+
+int * load_num_nucs(long n_isotopes)
+{
+    int num_mats = 12;
+#pragma omp offload target(mynodes) allocate(num_nucs[0:1])
+    {
+        int * num_nucs = (int*)malloc(12*sizeof(int));
+
+        // Material 0 is a special case (fuel). The H-M small reactor uses
+        // 34 nuclides, while H-M larges uses 300.
+        if( n_isotopes == 68 )
+            num_nucs[0]  = 34; // HM Small is 34, H-M Large is 321
+        else
+            num_nucs[0]  = 321; // HM Small is 34, H-M Large is 321
+
+        num_nucs[1]  = 5;
+        num_nucs[2]  = 4;
+        num_nucs[3]  = 4;
+        num_nucs[4]  = 27;
+        num_nucs[5]  = 21;
+        num_nucs[6]  = 21;
+        num_nucs[7]  = 21;
+        num_nucs[8]  = 21;
+        num_nucs[9]  = 21;
+        num_nucs[10] = 9;
+        num_nucs[11] = 9;
+
+        // Allocate memory for material 0 on host and device
+#pragma omp target map(to: num_nucs[0]) map(from: num_nucs[0])
+        {
+            if( n_isotopes == 68 )
+                memcpy(num_nucs, mats0_Sml,  num_nucs[0]  * sizeof(int) );	
+            else
+                memcpy(num_nucs,  mats0_Lrg,  num_nucs[0]  * sizeof(int) );
+        }
+
+        // Copy other materials
+#pragma omp target map(to: num_nucs[1:12]) map(from: num_nucs[1:12])
+        {
+            memcpy( num_nucs + num_nucs[0],  mats1,  num_nucs[1]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*2,  mats2,  num_nucs[2]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*3,  mats3,  num_nucs[3]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*4,  mats4,  num_nucs[4]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*5,  mats5,  num_nucs[5]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*6,  mats6,  num_nucs[6]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*7,  mats7,  num_nucs[7]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*8,  mats8,  num_nucs[8]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*9,  mats9,  num_nucs[9]  * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*10, mats10, num_nucs[10] * sizeof(int) );	
+            memcpy( num_nucs + num_nucs[0]*11, mats11, num_nucs[11] * sizeof(int) );
+        }
+    }
+#pragma omp target update to(num_nucs)
+    return num_nucs;
 }
 
-void material_lookup(double *lookup_table, Inputs *in) {
-  double energy;
-  int isotopeloop;
-  for (isotopeloop = 0; isotopeloop < in->n_isotopes; isotopeloop++) {
-    energy = lookup_table[in->nthreads*isotopeloop + in->binary_mode];
-    // Perform material lookup operations here
-  }
+// Assigns an array of nuclide ID's to each material
+int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs )
+{
+    int num_mats = 12;
+#pragma omp offload target(mynodes) allocate(mats[0:11])
+    {
+        *max_num_nucs = 0;
+        for( int m = 0; m < num_mats; m++ )
+            if( num_nucs[m] > *max_num_nucs )
+                *max_num_nucs = num_nucs[m];
+
+        // Small H-M has 34 fuel nuclides
+        int mats0_Sml[] =  { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
+                8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53, 
+                54, 55, 56, 18, 23, 41 }; //fuel
+        // Large H-M has 300 fuel nuclides
+        int mats0_Lrg[321] =  { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
+                8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53,
+                54, 55, 56, 18, 23, 41 }; //fuel
+        for( int i = 0; i < 321-34; i++ )
+            mats0_Lrg[34+i] = 68 + i; // H-M large adds nuclides to fuel only
+
+        // These are the non-fuel materials	
+        int mats1[] =  { 63, 64, 65, 66, 67 }; // cladding
+        int mats2[] =  { 24, 41, 4, 5 }; // cold borated water
+        int mats3[] =  { 24, 41, 4, 5 }; // hot borated water
+        int mats4[] =  { 19, 20, 21, 22, 35, 36, 37, 38, 39, 25, 27, 28, 29,
+                30, 31, 32, 26, 49, 50, 51, 11, 12, 13, 14, 6, 16,
+        17 }; // RPV
+        int mats5[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                49, 50, 51, 11, 12, 13, 14 }; // lower radial reflector
+        int mats6[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                49, 50, 51, 11, 12, 13, 14 }; // top reflector / plate
+        int mats7[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                49, 50, 51, 11, 12, 13, 14 }; // bottom plate
+        int mats8[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                49, 50, 51, 11, 12, 13, 14 }; // bottom nozzle
+        int mats9[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                49, 50, 51, 11, 12, 13, 14 }; // top nozzle
+        int mats10[] = { 24, 41, 4, 5, 63, 64, 65, 66, 67 }; // top of FA's
+        int mats11[] = { 24, 41, 4, 5, 63, 64, 65, 66, 67 }; // bottom FA's
+
+        // H-M large v small dependency
+        if( n_isotopes == 68 )
+            memcpy( mats,  mats0_Sml,  num_nucs[0]  * sizeof(int) );	
+        else
+            memcpy( mats,  mats0_Lrg,  num_nucs[0]  * sizeof(int) );
+
+        // Copy other materials
+#pragma omp target map(to: mats[1:11]) map(from: mats[1:11])
+        {
+            memcpy( mats + num_nucs[0],  mats1,  num_nucs[1]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*2,  mats2,  num_nucs[2]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*3,  mats3,  num_nucs[3]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*4,  mats4,  num_nucs[4]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*5,  mats5,  num_nucs[5]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*6,  mats6,  num_nucs[6]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*7,  mats7,  num_nucs[7]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*8,  mats8,  num_nucs[8]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*9,  mats9,  num_nucs[9]  * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*10, mats10, num_nucs[10] * sizeof(int) );	
+            memcpy( mats + num_nucs[0]*11, mats11, num_nucs[11] * sizeof(int) );
+        }
+    }
+#pragma omp target update to(mats)
+    return mats;
 }
 
-int main() {
-  Inputs inputs;
-  Profile profile;
+// Randomizes the concentrations of all nuclides in a variety of materials
+double * load_concs( int * num_nucs, int max_num_nucs )
+{
+    uint64_t seed = STARTING_SEED * STARTING_SEED;
 
-  // Initialize inputs
-  inputs.nthreads = 16; // Example value for number of threads
-  inputs.n_isotopes = 1000; // Example value for number of isotopes
-  inputs.n_gridpoints = 1024; // Example value for grid points
-  inputs.lookups = 10; // Example value for lookups per thread
-  inputs.grid_type = 0; // Unionized Grid (default)
-  inputs.hash_bins = 128; // Example value for hash bins
-  inputs.particles = 10000000; // Example value for particles
-  inputs.simulation_method = 1; // Event-based simulation
-  inputs.binary_mode = 1; // Use binary search
-  inputs.kernel_id = 0; // Example kernel ID
-  inputs.num_iterations = 10; // Example number of iterations
-  inputs.num_warmups = 5; // Example number of warmups
+#pragma omp offload target(mynodes) allocate(concs[0:11])
+    {
+        double * concs = (double *) malloc( 12 * max_num_nucs * sizeof( double ) );
 
-  // Allocate memory for lookup table and inputs
-  double *lookup_table;
-  size_t size = inputs.nthreads*inputs.n_isotopes*sizeof(double);
-  lookup_table = (double*)malloc(size);
+        for( int i = 0; i < 12; i++ )
+            for( int j = 0; j < num_nucs[i]; j++ )
+                concs[i * max_num_nucs + j] = LCG_random_double(&seed);
 
-  // Initialize inputs structure
-  strcpy(inputs.filename, "example.txt");
-
-  // Create OpenMP-offload region
-  #pragma omp offload target(mic)
-  {
-    material_lookup_kernel(lookup_table, inputs);
-  }
-
-  // Free memory and print profile
-  free(lookup_table);
-  print_profile(profile, inputs);
-
-  return 0;
+        // test
+        /*
+    for( int i = 0; i < 12; i++ )
+        for( int j = 0; j < num_nucs[i]; j++ )
+            printf("concs[%d][%d] = %lf\n", i, j, concs[i][j] );
+        */
+    }
+#pragma omp target update to(concs)
+    return concs;
 }
 ```
-Note that I had to make some assumptions about the original CUDA/OpenACC code, such as the structure of the `Inputs` struct and the contents of the `material_lookup_kernel` function. You may need to modify the translation to match your specific use case.
 
-Also note that OpenMP-Offload is still an experimental feature in GCC and other compilers, so you may encounter issues with compilation or execution. Be sure to check the documentation for your compiler and platform for more information on using OpenMP-Offload.
+Note that the offload clauses (`#pragma omp offload`) are used to transfer data between the host and device. The `target` clause specifies the nodes (i.e., accelerators) where the computation should be performed, while the `allocate` and `update` clauses specify how the data should be allocated and updated on those nodes.
+
+Also note that this is just one possible way to translate the code from CUDA to OpenMP offloading. Depending on the specific requirements of your application, you may need to use different offload clauses or optimize the code further.

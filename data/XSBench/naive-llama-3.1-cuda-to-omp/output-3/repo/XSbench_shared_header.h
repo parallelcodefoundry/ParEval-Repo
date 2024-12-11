@@ -3,6 +3,9 @@
 
 // Header for shared utilities across XSBench versions
 
+#include <omp.h>
+#include <omp_offload.h>
+
 typedef struct{
         int nthreads;
         long n_isotopes;
@@ -26,15 +29,7 @@ typedef struct{
   double host_to_device_time;
 } Profile;
 
-#ifdef __OPENMP
-#pragma omp declare target
-#endif
-
 inline void print_profile(Profile profile, Inputs in) {
-  #ifdef __OPENMP
-  #pragma omp target enter data map(to:profile, in)
-  #endif
-  
   if (in.filename) {
     FILE* output = fopen(in.filename, "w");
     fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
@@ -46,10 +41,6 @@ inline void print_profile(Profile profile, Inputs in) {
             in.num_warmups);
     fclose(output);
   }
-  #ifdef __OPENMP
-  #pragma omp target exit data map(delete:profile, in)
-  #endif
-  
   else {
     printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
     printf("%f,%f,%f,%d,%d\n",
@@ -60,9 +51,5 @@ inline void print_profile(Profile profile, Inputs in) {
            in.num_warmups);
   }
 }
-
-#ifdef __OPENMP
-#pragma omp declare target
-#endif
 
 #endif // XSBENCH_SHARED_HEADER_H

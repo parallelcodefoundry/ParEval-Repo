@@ -1,109 +1,81 @@
-// Translation of XSutils.cu to OpenMP-Offload Execution Model
+#include "XSbench_header.h"
 
-#include <omp.h>
-#include "XSbench_shared_header.h"
+int double_compare(const void * a, const void * b)
+{
+    double A = *((double *) a);
+    double B = *((double *) b);
 
-#define DEVICE_HOSTING 1
-#define USE_OPENACC 0 // Not used in this translation
-
-__device__ double __xsbench_device_to_host_time = 0.0;
-__device__ double __xsbench_kernel_time = 0.0;
-__device__ double __xsbench_host_to_device_time = 0.0;
-
-__global__ void kernel_omp_offload(void *d_xsb_data) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx < in.particles) {
-        // Perform device-to-host communication
-        __syncthreads();
-
-        // Perform kernel computations
-        // ...
-
-        // Update profiling variables
-        __xsbench_device_to_host_time += in.device_to_host_time;
-        __xsbench_kernel_time += in.kernel_time;
-        __xsbench_host_to_device_time += in.host_to_device_time;
-
-        // Update profile array
-        Profile *profile_ptr = (Profile *)d_xsb_data;
-        profile_ptr[idx].device_to_host_time = in.device_to_host_time;
-        profile_ptr[idx].kernel_time = in.kernel_time;
-        profile_ptr[idx].host_to_device_time = in.host_to_device_time;
-    }
+    if( A > B )
+        return 1;
+    else if( A < B )
+        return -1;
+    else
+        return 0;
 }
 
-void xsbench_profile_kernel(void *d_xsb_data, Inputs in) {
-    // Launch kernel
-    int num_threads = in.particles / in.nthreads + 1;
-    int block_size = (in.particles % num_threads == 0 ? num_threads : num_threads + 1);
-    int num_blocks = (in.particles + block_size - 1) / block_size;
+int NGP_compare(const void * a, const void * b)
+{
+    NuclideGridPoint A = *((NuclideGridPoint *) a);
+    NuclideGridPoint B = *((NuclideGridPoint *) b);
 
-#pragma omp parallel num_threads(in.nthreads)
-    {
-        int tid = omp_get_thread_num();
-        if (tid < in.hash_bins) {
-            // Perform hash operations on this thread
-            // ...
-
-            // Launch kernel for each material
-            for (int i = 0; i < in.materials; i++) {
-                kernel_omp_offload<<<num_blocks, block_size>>>(d_xsb_data);
-            }
-        }
-    }
-
-    // Update profiling variables
-    __xsbench_device_to_host_time += in.device_to_host_time;
-    __xsbench_kernel_time += in.kernel_time;
-    __xsbench_host_to_device_time += in.host_to_device_time;
-
-    // Synchronize threads
-    #pragma omp barrier
-
-    // Update profile array
-    Profile *profile_ptr = (Profile *)d_xsb_data;
-    for (int i = 0; i < in.particles; i++) {
-        profile_ptr[i].device_to_host_time = __xsbench_device_to_host_time / in.nthreads;
-        profile_ptr[i].kernel_time = __xsbench_kernel_time / in.nthreads;
-        profile_ptr[i].host_to_device_time = __xsbench_host_to_device_time / in.nthreads;
-    }
+    if( A.energy > B.energy )
+        return 1;
+    else if( A.energy < B.energy )
+        return -1;
+    else
+        return 0;
 }
 
-void xsbench_profile_host_kernel(void *d_xsb_data, Inputs in) {
-    // Update profiling variables
-    Profile *profile_ptr = (Profile *)d_xsb_data;
-
-    for (int i = 0; i < in.particles; i++) {
-        profile_ptr[i].device_to_host_time = in.device_to_host_time;
-        profile_ptr[i].kernel_time = in.kernel_time;
-        profile_ptr[i].host_to_device_time = in.host_to_device_time;
-    }
-
-    // Synchronize threads
-    #pragma omp barrier
-
-    // Update profile array
-    for (int i = 0; i < in.particles; i++) {
-        profile_ptr[i].device_to_host_time += __xsbench_device_to_host_time / in.nthreads;
-        profile_ptr[i].kernel_time += __xsbench_kernel_time / in.nthreads;
-        profile_ptr[i].host_to_device_time += __xsbench_host_to_device_time / in.nthreads;
-    }
+// RNG Used for Verification Option.
+// This one has a static seed (must be set manually in source).
+// Park & Miller Multiplicative Conguential Algorithm
+// From "Numerical Recipes" Second Edition
+double rn_v(void)
+{
+    static unsigned long seed = 1337;
+    double ret;
+    unsigned long n1;
+    unsigned long a = 16807;
+    unsigned long m = 2147483647;
+    n1 = ( a * (seed) ) % m;
+    seed = n1;
+    ret = (double) n1 / m;
+    return ret;
 }
 
-void xsbench_profile(void *d_xsb_data, Inputs in) {
-    // Launch kernel
-    xsbench_profile_kernel(d_xsb_data, in);
+size_t estimate_mem_usage( Inputs in )
+{
+    size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );
+    size_t all_nuclide_grids   = in.n_isotopes * single_nuclide_grid;
+    size_t size_UEG		   = in.n_isotopes*in.n_gridpoints*sizeof(double) + in.n_isotopes*in.n_gridpoints*in.n_isotopes*sizeof(int);
+    size_t size_hash_grid	   = in.hash_bins * in.n_isotopes * sizeof(int);
+    size_t memtotal;
 
-    // Synchronize threads
-    #pragma omp barrier
+    if( in.grid_type == UNIONIZED )
+        memtotal	  = all_nuclide_grids + size_UEG;
+    else if( in.grid_type == NUCLIDE )
+        memtotal	  = all_nuclide_grids;
+    else
+        memtotal	  = all_nuclide_grids + size_hash_grid;
 
-    // Update profiling variables
-    Profile *profile_ptr = (Profile *)d_xsb_data;
+    memtotal	  = ceil(memtotal / (1024.0*1024.0));
+    return memtotal;
+}
 
-    for (int i = 0; i < in.particles; i++) {
-        profile_ptr[i].device_to_host_time += __xsbench_device_to_host_time / in.nthreads;
-        profile_ptr[i].kernel_time += __xsbench_kernel_time / in.nthreads;
-        profile_ptr[i].host_to_device_time += __xsbench_host_to_device_time / in.nthreads;
-    }
+double get_time(void)
+{
+#ifdef __cplusplus
+    // If using C++, we can do this:
+    unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
+    return (double) us_since_epoch / 1.0e6;
+#else
+    struct timeval timecheck;
+
+    gettimeofday(&timecheck, NULL);
+    long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+
+    double time = (double) ms / 1000.0;
+
+    return time;
+#endif
 }

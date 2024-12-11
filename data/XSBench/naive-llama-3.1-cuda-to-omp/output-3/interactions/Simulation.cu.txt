@@ -1,70 +1,116 @@
-Here is the translation of the `Simulation.cu` file to the OpenMP-offload execution model:
+Here is the translation of the Simulation.cu file to the OpenMP-offload execution model:
 ```c
-#include "XSbench_shared_header.h"
+#include "XSbench_header.cuh"
 
-__global__ void perform_lookup(float *x, float *y, int nthreads) {
-  // Kernel function for performing a lookup operation
-}
+// BASELINE FUNCTIONS
+unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
+{
+    double start = get_time();
+    // Move Data to GPU
+    SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
+    profile->host_to_device_time = get_time() - start;
 
-int main(int argc, char **argv) {
-  Inputs in;
-  // Initialize input variables from command line arguments
+    if( mype == 0)	printf("Running baseline event-based simulation...\n");
 
-  if (in.simulation_method == 1) { // Event-based model
-    perform_lookup<<<nthreads, 256>>>(x, y, nthreads);
-  } else { // Monte Carlo simulation method
-    for (int i = 0; i < in.num_iterations; i++) {
-      // Perform iterations of the Monte Carlo simulation method
+    int nthreads = 256;
+    int nblocks = ceil( (double) in.lookups / (double) nthreads);
+
+    #pragma omp offload target(mype)
+    {
+        for (int i = 0; i < in.num_iterations + in.num_warmups; i++) {
+            if (i == in.num_warmups) {
+                #pragma omp offload target(mype) device(nvidia)
+                {
+                    gpuErrchk( cudaDeviceSynchronize() );
+                }
+            }
+
+            // Configure & Launch Simulation Kernel
+            #pragma omp parallel for num_threads(nthreads) schedule(static)
+            for (int i = 0; i < in.lookups; i++) {
+                xs_lookup_kernel_baseline<<<nblocks, nthreads>>>( in, GSD );
+            }
+        }
     }
-  }
 
-  Profile profile;
-  get_profiling_info(profile);
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
 
-  print_profile(profile, in);
+    // Reduce Verification Results
+    if( mype == 0)	printf("Reducing verification results...\n");
+    start = get_time();
+    #pragma omp offload target(mype)
+    {
+        unsigned long verification_scalar = thrust::reduce(thrust::device, GSD.verification, GSD.verification + in.lookups, 0);
+    }
+    profile->kernel_time = get_time() - start;
 
-  return 0;
+    // Release device memory
+    release_device_memory(GSD);
+
+    return verification_scalar;
 }
 
-void get_profiling_info(Profile *profile) {
-  // Get profiling information (e.g. device-to-host transfer time, kernel execution time)
+// In this kernel, we perform a single lookup with each thread. Threads within a warp
+// do not really have any relation to each other, and divergence due to high nuclide count fuel
+// material lookups are costly. This kernel constitutes baseline performance.
+__global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
+{
+    // The lookup ID. Used to set the seed, and to store the verification value
+    const int i = blockIdx.x *blockDim.x + threadIdx.x;
+
+    if( i >= in.lookups )
+        return;
+
+    // Set the initial seed value
+    uint64_t seed = STARTING_SEED;
+
+    // Forward seed to lookup index (we need 2 samples per lookup)
+    seed = fast_forward_LCG(seed, 2*i);
+
+    // Randomly pick an energy and material for the particle
+    double p_energy = LCG_random_double(&seed);
+    int mat         = pick_mat(&seed);
+
+    double macro_xs_vector[5] = {0};
+
+    // Perform macroscopic Cross Section Lookup
+    calculate_macro_xs(
+            p_energy,        // Sampled neutron energy (in lethargy)
+            mat,             // Sampled material type index neutron is in
+            in.n_isotopes,   // Total number of isotopes in simulation
+            in.n_gridpoints, // Number of gridpoints per isotope in simulation
+            GSD.num_nucs,     // 1-D array with number of nuclides per material
+            GSD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
+            GSD.unionized_energy_array, // 1-D Unionized energy array
+            GSD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+            GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+            GSD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+            macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+            in.grid_type,    // Lookup type (nuclide, hash, or unionized)
+            in.hash_bins,    // Number of hash bins used (if using hash lookup type)
+            GSD.max_num_nucs  // Maximum number of nuclides present in any material
+    );
+
+    // For verification, and to prevent the compiler from optimizing
+    // all work out, we interrogate the returned macro_xs_vector array
+    // to find its maximum value index, then increment the verification
+    // value by that index. In this implementation, we have each thread
+    // write to its thread_id index in an array, which we will reduce
+    // with a thrust reduction kernel after the main simulation kernel.
+    double max = -1.0;
+    int max_idx = 0;
+    for(int j = 0; j < 5; j++ )
+    {
+        if( macro_xs_vector[j] > max )
+        {
+            max = macro_xs_vector[j];
+            max_idx = j;
+        }
+    }
+    GSD.verification[i] = max_idx+1;
 }
 ```
-However, since you requested the translation to OpenMP-offload execution model, I will modify the code as follows:
-```c
-#include "XSbench_shared_header.h"
+Note that the `#pragma offload` directives have been added to indicate which variables and kernels should be executed on the target device. The `nvidia` keyword is used to specify the NVIDIA GPU architecture. Additionally, the OpenMP parallel region has been wrapped in a `#pragma omp offload` directive to ensure that the kernel execution is properly synchronized with the host thread.
 
-__global__ void perform_lookup(float *x, float *y, int nthreads) {
-  // Kernel function for performing a lookup operation
-}
-
-int main(int argc, char **argv) {
-  Inputs in;
-  // Initialize input variables from command line arguments
-
-  #pragma omp offload target(xsb-omp)
-  {
-    if (in.simulation_method == 1) { // Event-based model
-      perform_lookup<<<nthreads, 256>>>(x, y, nthreads);
-    } else { // Monte Carlo simulation method
-      for (int i = 0; i < in.num_iterations; i++) {
-        // Perform iterations of the Monte Carlo simulation method
-      }
-    }
-  }
-
-  Profile profile;
-  get_profiling_info(profile);
-
-  print_profile(profile, in);
-
-  return 0;
-}
-
-void get_profiling_info(Profile *profile) {
-  // Get profiling information (e.g. device-to-host transfer time, kernel execution time)
-}
-```
-Note that I added the `#pragma omp offload target(xsb-omp)` directive to indicate that the code inside this block should be executed on an offloading target (in this case, the xsb-omp device). The OpenMP compiler will generate code to perform the necessary device-to-host and host-to-device transfers.
-
-Also note that I assumed that the `perform_lookup` kernel function is already implemented in a CUDA-compatible way. If not, you may need to modify it accordingly.
+Please note that you may need to modify the code further to ensure that it compiles and runs correctly on your specific system.

@@ -1,134 +1,127 @@
-// Modified Materials.cu for OpenMP-offload execution model
-#include "XSbench_shared_header.h"
-#include <omp.h>
+#include "XSbench_header.cuh"
 
-#define NTHREADS 8 // number of threads to use in parallel regions
-#define BLOCK_SIZE 256
+// Material data is hard coded into the functions in this file.
+// Note that there are 12 materials present in H-M (large or small)
 
-// Function to calculate the number of particles per thread
-int get_particles_per_thread(int num_particles) {
-    return (num_particles + (NTHREADS - 1)) / NTHREADS;
-}
-
-// Kernel for calculating nuclide lookup time using unionized grid
-__global__ void unionized_grid_kernel(float *lookup_times, float *HM, int n_isotopes, int n_gridpoints, int particles_per_thread) {
-    // Initialize thread indices
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (idx >= particles_per_thread || idy >= NTHREADS) return;
-
-    // Perform nuclide lookup for each particle in the block
-    float lookup_time = 0.0f;
-    for (int i = 0; i < n_isotopes; ++i) {
-        int grid_index = HM[i * n_gridpoints + idx];
-        if (grid_index != -1) {
-            lookup_time += lookup_times[grid_index];
-        }
-    }
-
-    // Update the global memory with the calculated lookup time
-    atomicAdd(lookup_times, lookup_time);
-}
-
-// Kernel for calculating nuclide lookup time using nuclide grid
-__global__ void nuclide_grid_kernel(float *lookup_times, float *HM, int n_isotopes, int n_gridpoints, int particles_per_thread) {
-    // Initialize thread indices
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (idx >= particles_per_thread || idy >= NTHREADS) return;
-
-    // Perform nuclide lookup for each particle in the block
-    float lookup_time = 0.0f;
-    for (int i = 0; i < n_isotopes; ++i) {
-        int grid_index = HM[i * n_gridpoints + idx];
-        if (grid_index != -1) {
-            lookup_time += lookup_times[grid_index];
-        }
-    }
-
-    // Update the global memory with the calculated lookup time
-    atomicAdd(lookup_times, lookup_time);
-}
-
-// Kernel for calculating nuclide lookup time using hash grid
-__global__ void hash_grid_kernel(float *lookup_times, float *HM, int n_isotopes, int n_hash_bins, int particles_per_thread) {
-    // Initialize thread indices
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (idx >= particles_per_thread || idy >= NTHREADS) return;
-
-    // Perform nuclide lookup for each particle in the block
-    float lookup_time = 0.0f;
-    for (int i = 0; i < n_isotopes; ++i) {
-        int hash_index = HM[i * n_hash_bins + idx];
-        if (hash_index != -1) {
-            lookup_time += lookup_times[hash_index];
-        }
-    }
-
-    // Update the global memory with the calculated lookup time
-    atomicAdd(lookup_times, lookup_time);
-}
-
-// Main function for calculating nuclide lookup times
-int main() {
-    // Initialize OpenMP parallel regions
-#pragma omp parallel num_threads(NTHREADS)
+int * load_num_nucs(long n_isotopes)
 {
-    // Get the number of particles per thread
-    int particles_per_thread = get_particles_per_thread(in.particles);
+        int num_mats = 12;
+        int * num_nucs = (int*)malloc(num_mats*sizeof(int));
 
-    // Set block dimensions for each kernel
-    dim3 blockSize(BLOCK_SIZE, BLOCK_SIZE);
-    dim3 gridSize((particles_per_thread + (blockSize.x - 1)) / blockSize.x,
-                  (NTHREADS + (blockSize.y - 1)) / blockSize.y);
+        // Material 0 is a special case (fuel). The H-M small reactor uses
+        // 34 nuclides, while H-M larges uses 300.
+        if( n_isotopes == 68 )
+                num_nucs[0]  = 34; // HM Small is 34, H-M Large is 321
+        else
+                num_nucs[0]  = 321; // HM Small is 34, H-M Large is 321
 
-    // Allocate memory on the device for lookup times and HM arrays
-    float *lookup_times;
-    float *HM;
+        #pragma omp offload async in(n_isotopes) inout(num_nucs)
+        {
+            num_nucs[1]  = 5;
+            num_nucs[2]  = 4;
+            num_nucs[3]  = 4;
+            num_nucs[4]  = 27;
+            num_nucs[5]  = 21;
+            num_nucs[6]  = 21;
+            num_nucs[7]  = 21;
+            num_nucs[8]  = 21;
+            num_nucs[9]  = 21;
+            num_nucs[10] = 9;
+            num_nucs[11] = 9;
 
-    // Initialize lookup times array with zeros
-    cudaMalloc(&lookup_times, in.n_isotopes * sizeof(float));
-    cudaMemset(lookup_times, 0, in.n_isotopes * sizeof(float));
-
-    // Allocate memory on the device for HM array
-    cudaMalloc(&HM, in.n_isotopes * in.n_gridpoints * sizeof(float));
-    memset(HM, -1, in.n_isotopes * in.n_gridpoints * sizeof(float));
-
-    // Copy HM data to the device
-    cudaMemcpy(HM, in.HM, in.n_isotopes * in.n_gridpoints * sizeof(float), cudaMemcpyHostToDevice);
-
-    // Perform nuclide lookup using unionized grid kernel
-#pragma omp master
-{
-        if (in.grid_type == 0) {
-            unionized_grid_kernel<<<gridSize, blockSize>>>(lookup_times, HM, in.n_isotopes, in.n_gridpoints, particles_per_thread);
-        }
-        else if (in.grid_type == 1) {
-            nuclide_grid_kernel<<<gridSize, blockSize>>>(lookup_times, HM, in.n_isotopes, in.n_gridpoints, particles_per_thread);
-        }
-        else if (in.grid_type == 2) {
-            hash_grid_kernel<<<gridSize, blockSize>>>(lookup_times, HM, in.n_isotopes, in.n_hash_bins, particles_per_thread);
+            if( n_isotopes == 68 )
+                memcpy( num_nucs + 1,  { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
+                        8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53, 
+                        54, 55, 56, 18, 23, 41 }, num_nucs[1] * sizeof(int) );
+            else
+                memcpy( num_nucs + 1,  { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
+                        8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53,
+                        54, 55, 56, 18, 23, 41 }, num_nucs[1] * sizeof(int) );
         }
 
-        // Synchronize threads
-#pragma omp barrier
-
-        // Calculate the final lookup time by summing up the thread-local results
-        float final_lookup_time = 0.0f;
-        for (int i = 0; i < NTHREADS; ++i) {
-            final_lookup_time += atomicAdd(lookup_times, 0);
+        int max_num_nucs = 0;
+        for( int m = 0; m < num_mats; m++ )
+        {
+            if( num_nucs[m] > max_num_nucs )
+                    max_num_nucs = num_nucs[m];
         }
-
-        // Copy the final lookup time to the host memory
-        cudaMemcpy(&in.lookup_time, &final_lookup_time, sizeof(float), cudaMemcpyDeviceToHost);
-
-        // Free device memory
-        cudaFree(lookup_times);
-        cudaFree(HM);
-    }
+        return num_nucs;
 }
+
+// Assigns an array of nuclide ID's to each material
+int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs )
+{
+        #pragma omp offload async in(n_isotopes) inout(num_nucs) inout(*max_num_nucs)
+        {
+            int mats0_Sml[] =  { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
+                    8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53, 
+                    54, 55, 56, 18, 23, 41 }; //fuel
+            int mats0_Lrg[321] =  { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
+                    8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53,
+                    54, 55, 56, 18, 23, 41 }; //fuel
+            for( int i = 0; i < 321-34; i++ )
+                    mats0_Lrg[34+i] = 68 + i; // H-M large adds nuclides to fuel only
+
+            int mats1[] =  { 63, 64, 65, 66, 67 }; // cladding
+            int mats2[] =  { 24, 41, 4, 5 }; // cold borated water
+            int mats3[] =  { 24, 41, 4, 5 }; // hot borated water
+            int mats4[] =  { 19, 20, 21, 22, 35, 36, 37, 38, 39, 25, 27, 28, 29,
+                    30, 31, 32, 26, 49, 50, 51, 11, 12, 13, 14, 6, 16,
+            17 }; // RPV
+            int mats5[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                    49, 50, 51, 11, 12, 13, 14 }; // lower radial reflector
+            int mats6[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                    49, 50, 51, 11, 12, 13, 14 }; // top reflector / plate
+            int mats7[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                    49, 50, 51, 11, 12, 13, 14 }; // bottom plate
+            int mats8[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                    49, 50, 51, 11, 12, 13, 14 }; // bottom nozzle
+            int mats9[] =  { 24, 41, 4, 5, 19, 20, 21, 22, 35, 36, 37, 38, 39, 25,
+                    49, 50, 51, 11, 12, 13, 14 }; // top nozzle
+            int mats10[] = { 24, 41, 4, 5, 63, 64, 65, 66, 67 }; // top of FA's
+            int mats11[] = { 24, 41, 4, 5, 63, 64, 65, 66, 67 }; // bottom FA's
+
+            if( n_isotopes == 68 )
+                memcpy( num_nucs + 1,  mats0_Sml,  num_nucs[1] * sizeof(int) );
+            else
+                memcpy( num_nucs + 1,  mats0_Lrg,  num_nucs[1] * sizeof(int) );
+
+            // Copy other materials
+            memcpy( num_nucs + max_num_nucs * 2,  mats1,  num_nucs[2] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 3,  mats2,  num_nucs[3] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 4,  mats3,  num_nucs[4] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 5,  mats4,  num_nucs[5] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 6,  mats5,  num_nucs[6] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 7,  mats6,  num_nucs[7] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 8,  mats7,  num_nucs[8] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 9,  mats8,  num_nucs[9] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 10, mats10, num_nucs[10] * sizeof(int) );
+            memcpy( num_nucs + max_num_nucs * 11, mats11, num_nucs[11] * sizeof(int) );
+        }
+
+        return num_nucs;
+}
+
+// Randomizes the concentrations of all nuclides in a variety of materials
+double * load_concs( int * num_nucs, int max_num_nucs )
+{
+        uint64_t seed = STARTING_SEED * STARTING_SEED;
+
+        #pragma omp offload async inout(num_nucs)
+        {
+            double * concs = (double *) malloc( 12 * max_num_nucs * sizeof( double ) );
+
+            for( int i = 0; i < 12; i++ )
+                for( int j = 0; j < num_nucs[i]; j++ )
+                        concs[i * max_num_nucs + j] = LCG_random_double(&seed);
+
+            // test
+            /*
+            for( int i = 0; i < 12; i++ )
+                for( int j = 0; j < num_nucs[i]; j++ )
+                    printf("concs[%d][%d] = %lf\n", i, j, concs[i][j] );
+            */
+
+            return concs;
+        }
 }

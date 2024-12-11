@@ -3,7 +3,12 @@
 
 // Header for shared utilities across XSBench versions
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <omp.h>
+#include <immintrin.h>
 
 typedef struct{
         int nthreads;
@@ -20,9 +25,6 @@ typedef struct{
         int num_iterations;
         int num_warmups;
         char *filename;
-
-        #pragma omp declare target // Declare the device target for offloading computations
-
 } Inputs;
 
 typedef struct{
@@ -32,28 +34,30 @@ typedef struct{
 } Profile;
 
 inline void print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
-            profile.host_to_device_time*1000,
-            profile.kernel_time*1000,
-            profile.device_to_host_time*1000,
-            in.num_iterations,
-            in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
-  }
+    if (in.filename) {
+        FILE* output = fopen(in.filename, "w");
+        fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+        fprintf(output, "%f,%f,%f,%d,%d\n",
+                profile.host_to_device_time*1000,
+                profile.kernel_time*1000,
+                profile.device_to_host_time*1000,
+                in.num_iterations,
+                in.num_warmups);
+        fclose(output);
+    }
+    else {
+        printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+        printf("%f,%f,%f,%d,%d\n",
+               profile.host_to_device_time*1000,
+               profile.kernel_time*1000,
+               profile.device_to_host_time*1000,
+               in.num_iterations,
+               in.num_warmups);
+    }
 }
 
-#pragma omp end target // End the device target declaration
+#ifdef __cplusplus
+}
+#endif
 
 #endif // XSBENCH_SHARED_HEADER_H
