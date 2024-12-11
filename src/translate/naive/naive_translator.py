@@ -31,13 +31,13 @@ Here is the code for each file in the codebase:
 
 {all_files}
 
-Translate the {filename} file to the {dst_model} execution model. Output the translated file in one code block.
+Translate the {filename} file to the {dst_model} execution model. Output the translated file in one code block. Assume {exts} filenames whenever referring to other files as this will be a {filename_desc} code.
 """
 
     MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
 """
 
-    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume {exts_set} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
+    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume {exts} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
 """
 
     # Dicts of file extension mappings
@@ -76,13 +76,15 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         prompt_config_src = self._input_repo.get_meta_dict()
         prompt_config_dst = json.load(open(self._dst_config, 'r'))
 
+        exts_str = ", ".join(v for v in self._type_to_ext[prompt_config_dst["filename_desc"].lower()].values())
         base_prompt = self.PROMPT_TEMPLATE.format(
             src_model=self._src_model,
             dst_model=self._dst_model,
             file_tree=file_tree,
             all_files=all_files_str,
-            filename=fname
-        )
+            filename=fname,
+            exts=exts_str,
+            filename_desc=prompt_config_dst["filename_desc"])
 
         if fname == prompt_config_src["main_filename"]:
             base_prompt += ("\n" + self.MAIN_ADDENDUM.format(
@@ -91,10 +93,9 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 ex_run_desc=prompt_config_dst["ex_run_desc"]))
 
         if fname == prompt_config_src["build_filename"]:
-            exts_set = self._type_to_ext[prompt_config_dst["filename_desc"].lower()].values()
             base_prompt += ("\n" + self.MAKEFILE_ADDENDUM.format(
                 dst_model=self._dst_model,
-                exts_set=", ".join(v for v in exts_set),
+                exts=exts_str,
                 filename_desc=prompt_config_dst["filename_desc"],
                 ex_build_cmd=prompt_config_dst["ex_build_cmd"],
                 ex_build_desc=prompt_config_dst["ex_build_desc"]))
@@ -135,7 +136,14 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
 
-        for fpath in alive_it(all_files, title="Translating files", max_cols=os.get_terminal_size().columns, disable=hide_progress):
+        try:
+            max_cols = os.get_terminal_size().columns
+        except OSError as error:
+            if error.errno == 25:
+                max_cols = 80
+            else:
+                raise error
+        for fpath in alive_it(all_files, title="Translating files", max_cols=max_cols, disable=hide_progress):
             prompt = self.get_prompt(fpath)
 
             output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath))
