@@ -52,33 +52,12 @@ inline void print_profile(Profile profile, Inputs in) {
   }
 }
 
-// OpenMP Offload specific functions
-#pragma omp declare target
-void offload_print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
-            profile.host_to_device_time*1000,
-            profile.kernel_time*1000,
-            profile.device_to_host_time*1000,
-            in.num_iterations,
-            in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
-  }
-}
-#pragma omp end declare target
-
 #endif // XSBENCH_SHARED_HEADER_H
 ```
 
-In this translation, I've added an OpenMP Offload specific function `offload_print_profile` that can be executed on the target device. The original `print_profile` function remains for host execution. The `#pragma omp declare target` directive is used to indicate that the function can be offloaded to the target device.
+### Changes Made:
+1. The structure definitions remain the same since they are not specific to CUDA or OpenMP.
+2. The function `print_profile` is unchanged as it deals with file I/O and printing, which is not dependent on the execution model.
+3. The overall structure and logic of the header file are preserved, as they are compatible with both CUDA and OpenMP Offload. 
+
+This header file can be used in an OpenMP Offload context without modification to the core logic. The actual offloading of computations would occur in the implementation files where the kernels are defined.

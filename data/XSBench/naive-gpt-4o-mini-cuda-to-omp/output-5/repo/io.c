@@ -12,7 +12,7 @@ void logo(int version)
     "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
     "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
     "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
-    );
+           );
     border_print();
     center_print("Developed at Argonne National Laboratory", 79);
     char v[100];
@@ -121,7 +121,10 @@ void print_inputs(Inputs in, int nprocs, int version )
     center_print("INPUT SUMMARY", 79);
     border_print();
     printf("Programming Model:            OpenMP Offload\n");
-    printf("OpenMP Device:                %s\n", "OpenMP Compatible Device");
+    #pragma omp target
+    {
+        printf("OpenMP Device:                  %s\n", "OpenMP Offload Device");
+    }
     if( in.simulation_method == EVENT_BASED )
         printf("Simulation Method:            Event Based\n");
     else
@@ -169,8 +172,6 @@ void print_inputs(Inputs in, int nprocs, int version )
     else
         printf("Write\n");
     border_print();
-    center_print("INITIALIZATION - DO NOT PROFILE", 79);
-    border_print();
 }
 
 void border_print(void)
@@ -185,10 +186,13 @@ void fancy_int( long a )
 {
     if( a < 1000 )
         printf("%ld\n",a);
+
     else if( a >= 1000 && a < 1000000 )
         printf("%ld,%03ld\n", a / 1000, a % 1000);
+
     else if( a >= 1000000 && a < 1000000000 )
         printf("%ld,%03ld,%03ld\n",a / 1000000,(a % 1000000) / 1000,a % 1000 );
+
     else if( a >= 1000000000 )
         printf("%ld,%03ld,%03ld,%03ld\n",
                a / 1000000000,
@@ -333,9 +337,7 @@ Inputs read_CLI( int argc, char * argv[] )
         else if( strcmp(arg, "-h") == 0 )
         {
             if( ++i < argc )
-            {
                 input.hash_bins = atoi(argv[i]);
-            }
             else
                 print_CLI_error();
         }

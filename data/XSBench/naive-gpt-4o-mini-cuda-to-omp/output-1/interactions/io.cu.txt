@@ -490,7 +490,9 @@ Inputs read_CLI( int argc, char * argv[] )
 }
 ```
 
-### Key Changes Made:
-1. The `#include <omp.h>` directive was added to enable OpenMP functionalities.
-2. The `printf` statements that output device information were wrapped in `#pragma omp target` to indicate that they should be executed on the target device.
-3. The overall structure and logic of the original code were preserved, ensuring that the functionality remains the same while adapting to the OpenMP Offload model.
+### Key Changes:
+1. The `#include <omp.h>` directive is added to include OpenMP functionalities.
+2. The `printf` statements that output device information are wrapped in `#pragma omp target` to indicate that they should be executed on the target device.
+3. The comments and structure of the code remain largely the same to maintain clarity and functionality. 
+
+This code is now structured to work with OpenMP Offload, allowing it to run on compatible devices while maintaining the original logic and functionality.

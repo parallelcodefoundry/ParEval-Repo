@@ -19,11 +19,11 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
 
-# Enable OpenMP support
+# Enable OpenMP Offloading
 find_package(OpenMP REQUIRED)
 
 if(OpenMP_CXX_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -fopenmp-targets=nvptx-nvidia-cuda")
 endif()
 
 add_executable(XSBench ${SOURCE})
@@ -32,9 +32,7 @@ install(TARGETS XSBench DESTINATION bin)
 ```
 
 ### Changes Made:
-1. **Project Name**: Changed from `XSBench_CUDA` to `XSBench_OpenMP` to reflect the new execution model.
-2. **Removed CUDA Language**: Since we are transitioning to OpenMP Offload, the CUDA language specification is removed.
-3. **OpenMP Support**: Added a check for OpenMP support using `find_package(OpenMP REQUIRED)` and set the appropriate flags if found.
-4. **CMake Configuration**: Adjusted the project configuration to align with OpenMP standards rather than CUDA. 
-
-This CMake configuration is now set up to compile the project using OpenMP for offloading computations to compatible devices.
+1. The project name has been changed to `XSBench_OpenMP` to reflect the new execution model.
+2. The CUDA language specification has been removed since we are now using OpenMP for offloading.
+3. Added a check for OpenMP and set the appropriate flags for OpenMP offloading, specifically targeting NVIDIA CUDA devices.
+4. The rest of the structure remains similar to ensure that the source files are compiled correctly.

@@ -25,13 +25,13 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
         if (i == nwarmups) {
             start = get_time();
         }
-        
+
         #pragma omp target teams distribute parallel for num_threads(nthreads)
         for (int j = 0; j < in.lookups; j++) {
             xs_lookup_kernel_baseline(in, GSD, j);
         }
     }
-    
+
     profile->kernel_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -40,8 +40,7 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    // Copy verification results back to host
-    #pragma omp target update from GSD.verification[0:in.lookups]
+    #pragma omp target update from(GSD.verification[0:in.lookups])
     profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;

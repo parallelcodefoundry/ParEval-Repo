@@ -11,7 +11,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Offload Support](#OpenMP-Offload-Support)
+	* [OpenMP Offloading Support](#OpenMP-Offloading-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -26,9 +26,8 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented with OpenMP offload for use with offload-capable architectures (e.g., CPUs with accelerators).
-
+XSBench has been implemented with OpenMP offloading for use with offload-capable architectures (e.g., CPUs with accelerators).
 
 ## Compilation
 
-To compile XSBench with default settings, navigate to your selected source directory and use the following command (assuming you have a suitable compiler and OpenMP offload support configured):
+To compile XSBench with default settings, navigate to your selected source directory and use the following command (assuming a suitable compiler and OpenMP offloading support are configured):

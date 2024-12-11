@@ -39,18 +39,20 @@ LDFLAGS = -lm
 
 # LLVM Compiler
 ifeq ($(COMPILER),llvm)
-  CC = clang++
-  CFLAGS += -fopenmp -fopenmp-targets=nvptx-nvidia-unknown -fopenmp-version=50 -O3 -std=c11 -D__OPENMP__
+  CC = clang
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH) -std=c11
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
+  LDFLAGS  += -g
 endif
 
 # Profiling Flags
 ifeq ($(PROFILE),yes)
   CFLAGS += -pg
+  LDFLAGS  += -pg
 endif
 
 # Optimization Flags
@@ -78,8 +80,4 @@ run:
 	./$(program)
 ```
 
-### Key Changes Made:
-1. **File Extensions**: Changed `.cu` files to `.c` to reflect the C code format.
-2. **Compiler Flags**: Adjusted the compiler flags to use OpenMP with LLVM's Clang compiler for offloading to NVIDIA GPUs.
-3. **OpenMP Target**: Added flags for OpenMP offloading to specify the target architecture.
-4. **Removed CUDA Specific Flags**: Removed CUDA-specific flags and replaced them with OpenMP flags suitable for the LLVM compiler.
+This Makefile is set up to compile the code using the OpenMP Offload model with the LLVM compiler targeting NVIDIA GPUs. Adjust the `CUDA_ARCH` variable as needed for your specific GPU architecture.

@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory.  Note that this is handled differently in OpenMP offload.  Memory management needs to be reviewed for correctness.
+    // Release device memory.  No equivalent for OpenMP offload here; manage memory directly.
     release_memory(SD);
 
     // Final Hash Step
@@ -108,19 +108,4 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-**Important Considerations for OpenMP Offload Translation:**
-
-* **CUDA Runtime Replacement:**  The CUDA runtime functions (e.g., `cudaMalloc`, `cudaMemcpy`, `cudaFree`, `cudaDeviceSynchronize`, `cudaPeekAtLastError`) need to be replaced with their OpenMP offload equivalents or suitable standard C/C++ functions where applicable.  The OpenMP offload model doesn't directly manage device memory in the same way as CUDA.  You'll likely need to use `#pragma omp target` and `#pragma omp data` clauses to manage data transfers and memory allocation on the target device.
-
-* **Thrust:** The Thrust library is used extensively for parallel operations.  You'll need to find suitable OpenMP parallel equivalents for these operations (e.g., `thrust::reduce`, `thrust::count`, `thrust::sort_by_key`, `thrust::partition`).  OpenMP provides parallel algorithms, but they might not have the exact same functionality as Thrust.
-
-* **Kernel Launches:** The CUDA kernel launches (`<<<...>>>`) are replaced with OpenMP target regions (`#pragma omp target`).  The thread management within the kernels needs to be adapted to OpenMP's threading model.
-
-* **Device Functions:** CUDA device functions (`__device__`) become regular functions that are offloaded to the target device using OpenMP.
-
-* **Memory Management:** Carefully review the memory allocation and deallocation (`malloc`, `free`, `cudaMalloc`, `cudaFree`).  OpenMP offloading requires explicit management of data movement between the host and the device using `#pragma omp data`.
-
-* **Error Handling:** The `gpuErrchk` macro needs to be replaced with appropriate OpenMP error checking mechanisms (or standard C/C++ error handling).
-
-
-This translation is a high-level outline. A complete and functional translation would require significant code rewriting to adapt to OpenMP offload's different memory model and parallel programming paradigm.  You would need to carefully review each function in `Simulation.cu`, `GridInit.cu`, and potentially other files to ensure correct data transfers, parallel execution, and error handling within the OpenMP offload framework.
+**Note:** This translation removes all CUDA-specific code (like `cudaMalloc`, `cudaMemcpy`, `<<<...>>>`, etc.). The  `Simulation.cu`, `GridInit.cu`, and other `.cu` files will require significant changes to utilize OpenMP offloading.  The memory management will need to be handled differently, and the kernels will need to be rewritten using OpenMP pragmas for offloading.  The `thrust` library calls will also need to be replaced with OpenMP-compatible alternatives.  This response only addresses the `Main.cu` file as requested.  A complete translation would require a comprehensive rewrite of the entire codebase.

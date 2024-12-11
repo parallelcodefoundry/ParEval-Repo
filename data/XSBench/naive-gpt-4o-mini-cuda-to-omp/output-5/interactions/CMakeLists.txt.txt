@@ -21,7 +21,6 @@ set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
 
 # Enable OpenMP support
 find_package(OpenMP REQUIRED)
-
 if(OpenMP_CXX_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
@@ -33,5 +32,5 @@ install(TARGETS XSBench DESTINATION bin)
 
 ### Changes Made:
 1. Changed the project name to `XSBench_OpenMP` to reflect the new execution model.
-2. Removed CUDA-specific settings and added OpenMP support using `find_package(OpenMP REQUIRED)`.
-3. Added the OpenMP flags to the compiler flags if OpenMP is found.
+2. Removed CUDA-specific settings and replaced them with OpenMP settings.
+3. Added a check for OpenMP support and included the necessary flags for OpenMP compilation.

@@ -91,4 +91,3 @@ double get_time(void)
 	#endif
 }
 ```
-  The OpenMP offloading model doesn't directly replace CUDA's `__host__ __device__` keywords.  The functions in `XSutils.cu` are largely CPU-based utility functions (math, comparisons, time measurement).  Therefore, no significant changes are needed for OpenMP offloading, as these functions will naturally run on the host CPU.  The `get_time` function might need adjustments depending on your specific OpenMP implementation and whether you want to measure time on the host or (if possible) offload a small portion for timing on a device. However, this is generally not recommended and host-based timing is preferred.

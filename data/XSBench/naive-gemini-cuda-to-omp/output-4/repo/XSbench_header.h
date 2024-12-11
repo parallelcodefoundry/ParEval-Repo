@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <omp.h>
 #include <limits> // Required for numeric_limits
+#include <stdint.h>
 #include <chrono>
 #include "XSbench_shared_header.h"
 
@@ -30,34 +31,34 @@
 
 // Structures
 typedef struct {
-        double energy;
-        double total_xs;
-        double elastic_xs;
-        double absorbtion_xs;
-        double fission_xs;
-        double nu_fission_xs;
+    double energy;
+    double total_xs;
+    double elastic_xs;
+    double absorbtion_xs;
+    double fission_xs;
+    double nu_fission_xs;
 } NuclideGridPoint;
 
 typedef struct {
-        int * num_nucs;                     // Length = length_num_nucs;
-        double * concs;                     // Length = length_concs
-        int * mats;                         // Length = length_mats
-        double * unionized_energy_array;    // Length = length_unionized_energy_array
-        int * index_grid;                   // Length = length_index_grid
-        NuclideGridPoint * nuclide_grid;    // Length = length_nuclide_grid
-        int length_num_nucs;
-        int length_concs;
-        int length_mats;
-        int length_unionized_energy_array;
-        long length_index_grid;
-        int length_nuclide_grid;
-        int max_num_nucs;
-        unsigned long * verification;
-        int length_verification;
-        double * p_energy_samples;
-        int length_p_energy_samples;
-        int * mat_samples;
-        int length_mat_samples;
+    int *num_nucs;                     // Length = length_num_nucs;
+    double *concs;                     // Length = length_concs
+    int *mats;                         // Length = length_mats
+    double *unionized_energy_array;    // Length = length_unionized_energy_array
+    int *index_grid;                   // Length = length_index_grid
+    NuclideGridPoint *nuclide_grid;    // Length = length_nuclide_grid
+    int length_num_nucs;
+    int length_concs;
+    int length_mats;
+    int length_unionized_energy_array;
+    long length_index_grid;
+    int length_nuclide_grid;
+    int max_num_nucs;
+    unsigned long *verification;
+    int length_verification;
+    double *p_energy_samples;
+    int length_p_energy_samples;
+    int *mat_samples;
+    int length_mat_samples;
 } SimulationData;
 
 // io.cu
@@ -65,7 +66,7 @@ void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);
 void fancy_int(long a);
-Inputs read_CLI(int argc, char * argv[]);
+Inputs read_CLI(int argc, char *argv[]);
 void print_CLI_error(void);
 void print_inputs(Inputs in, int nprocs, int version);
 int print_results(Inputs in, int mype, double runtime, int nprocs, unsigned long long vhash);
@@ -74,48 +75,47 @@ SimulationData binary_read(Inputs in);
 
 // Simulation.cu
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile);
-void xs_lookup_kernel_baseline(Inputs in, SimulationData SD); //Changed to non-kernel function
+void xs_lookup_kernel_baseline(Inputs in, SimulationData SD); //No longer a kernel
 void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
-                                   long n_gridpoints,
-                                   double *egrid, int *index_data,
-                                   NuclideGridPoint *nuclide_grids,
-                                   long idx, double *xs_vector, int grid_type, int hash_bins); //Changed to non-kernel function
+                          long n_gridpoints,
+                          double *egrid, int *index_data,
+                          NuclideGridPoint *nuclide_grids,
+                          long idx, double *xs_vector, int grid_type, int hash_bins); //No longer __device__
 void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
-                                   long n_gridpoints, int *num_nucs,
-                                   double *concs,
-                                   double *egrid, int *index_data,
-                                   NuclideGridPoint *nuclide_grids,
-                                   int *mats,
-                                   double *macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs); //Changed to non-kernel function
-long grid_search(long n, double quarry, double *A); //Changed to non-kernel function
-long grid_search_nuclide(long n, double quarry, NuclideGridPoint *A, long low, long high); //Changed to non-kernel function
-int pick_mat(uint64_t *seed); //Changed to non-kernel function
-double LCG_random_double(uint64_t *seed); //Changed to non-kernel function
-uint64_t fast_forward_LCG(uint64_t seed, uint64_t n); //Changed to non-kernel function
-
+                        long n_gridpoints, int *num_nucs,
+                        double *concs,
+                        double *egrid, int *index_data,
+                        NuclideGridPoint *nuclide_grids,
+                        int *mats,
+                        double *macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs); //No longer __device__
+long grid_search(long n, double quarry, double *A); //No longer __device__
+long grid_search_nuclide(long n, double quarry, NuclideGridPoint *A, long low, long high); //No longer __host__ __device__
+int pick_mat(uint64_t *seed); //No longer __device__
+double LCG_random_double(uint64_t *seed); //No longer __host__ __device__
+uint64_t fast_forward_LCG(uint64_t seed, uint64_t n); //No longer __device__
 
 unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData SD, int mype);
-void sampling_kernel(Inputs in, SimulationData SD); //Changed to non-kernel function
-void xs_lookup_kernel_optimization_1(Inputs in, SimulationData SD); //Changed to non-kernel function
+void sampling_kernel(Inputs in, SimulationData SD); //No longer a kernel
+void xs_lookup_kernel_optimization_1(Inputs in, SimulationData SD); //No longer a kernel
 
 unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData SD, int mype);
-void xs_lookup_kernel_optimization_2(Inputs in, SimulationData SD, int m); //Changed to non-kernel function
+void xs_lookup_kernel_optimization_2(Inputs in, SimulationData SD, int m); //No longer a kernel
 
 unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData SD, int mype);
-void xs_lookup_kernel_optimization_3(Inputs in, SimulationData SD, int m); //Changed to non-kernel function
+void xs_lookup_kernel_optimization_3(Inputs in, SimulationData SD, int m); //No longer a kernel
 
 unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData SD, int mype);
-void xs_lookup_kernel_optimization_4(Inputs in, SimulationData SD, int m, int n_lookups, int offset); //Changed to non-kernel function
+void xs_lookup_kernel_optimization_4(Inputs in, SimulationData SD, int m, int n_lookups, int offset); //No longer a kernel
 
 unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData SD, int mype);
-void xs_lookup_kernel_optimization_5(Inputs in, SimulationData SD, int n_lookups, int offset); //Changed to non-kernel function
+void xs_lookup_kernel_optimization_5(Inputs in, SimulationData SD, int n_lookups, int offset); //No longer a kernel
 
 unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData SD, int mype);
 
 // GridInit.cu
 SimulationData grid_init_do_not_profile(Inputs in, int mype);
-SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationData SD);
-void release_device_memory(SimulationData SD);
+SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationData SD); //Name remains, but function is altered
+void release_device_memory(SimulationData SD); //Name remains, but function is altered
 void release_memory(SimulationData SD);
 
 // XSutils.cu

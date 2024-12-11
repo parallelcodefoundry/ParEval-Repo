@@ -25,13 +25,11 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
         if (i == nwarmups) {
             start = get_time();
         }
-
         #pragma omp target teams distribute parallel for num_threads(nthreads)
         for (int j = 0; j < in.lookups; j++) {
             xs_lookup_kernel_baseline(in, GSD, j);
         }
     }
-
     profile->kernel_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -40,13 +38,21 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    // Copy verification results back to host
-    #pragma omp target update from GSD.verification[0:in.lookups]
+    #pragma omp target
+    {
+        #pragma omp teams
+        {
+            #pragma omp distribute
+            for (int i = 0; i < in.lookups; i++) {
+                SD.verification[i] = GSD.verification[i];
+            }
+        }
+    }
     profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
-        verification_scalar += GSD.verification[i];
+        verification_scalar += SD.verification[i];
 
     release_device_memory(GSD);
 
@@ -74,16 +80,16 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
         mat,             // Sampled material type index neutron is in
         in.n_isotopes,   // Total number of isotopes in simulation
         in.n_gridpoints, // Number of gridpoints per isotope in simulation
-        GSD.num_nucs,    // 1-D array with number of nuclides per material
-        GSD.concs,       // Flattened 2-D array with concentration of each nuclide in each material
+        GSD.num_nucs,     // 1-D array with number of nuclides per material
+        GSD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
         GSD.unionized_energy_array, // 1-D Unionized energy array
-        GSD.index_grid,  // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+        GSD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
         GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
-        GSD.mats,        // Flattened 2-D array with nuclide indices defining composition of each type of material
+        GSD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
         macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
         in.grid_type,    // Lookup type (nuclide, hash, or unionized)
         in.hash_bins,    // Number of hash bins used (if using hash lookup type)
-        GSD.max_num_nucs // Maximum number of nuclides present in any material
+        GSD.max_num_nucs  // Maximum number of nuclides present in any material
     );
 
     // For verification, and to prevent the compiler from optimizing

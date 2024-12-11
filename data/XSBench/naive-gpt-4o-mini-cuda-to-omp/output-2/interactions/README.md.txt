@@ -12,7 +12,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [MPI Support](#MPI-Support)
+	* [OpenMP Offload Support](#OpenMP-Offload-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -27,7 +27,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in OpenMP with offloading capabilities for use with various accelerator architectures. 
+XSBench has been implemented in OpenMP Offload for use with various accelerator architectures. 
 
 ## Compilation
 
@@ -47,14 +47,14 @@ There are also a number of switches that can be set in the makefile. Here is a s
 OPTIMIZE = yes
 DEBUG    = no
 PROFILE  = no
-MPI      = no
+OMP      = yes
 ```
-- Optimization enables the -O3 optimization flag.
-- Debugging enables the -g flag.
-- Profiling enables the -pg flag. When profiling the code, you may
-wish to significantly increase the number of lookups (with the -l
+- Optimization enables the `-O3` optimization flag.
+- Debugging enables the `-g` flag.
+- Profiling enables the `-pg` flag. When profiling the code, you may
+wish to significantly increase the number of lookups (with the `-l`
 flag) in order to wash out the initialization phase of the code.
-- MPI enables MPI support in the code.
+- OpenMP Offload enables OpenMP support in the code.
 
 ## Running XSBench
 
@@ -105,9 +105,9 @@ There are several optimized variants of the main kernel. All source bases run ba
 
 ## Feature Discussion
 
-### MPI Support
+### OpenMP Offload Support
 
-While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the makefile flag "MPI". If you are not using the mpicc wrapper on your system, you may need to alter the makefile to make use of your desired compiler.
+XSBench has been adapted to use OpenMP Offload for running on various accelerator architectures. The code leverages OpenMP directives to offload computation to the accelerator, allowing for a more portable and flexible implementation compared to CUDA. The offloading model allows for easier integration with existing CPU code and can utilize various hardware accelerators.
 
 ### Verification Support
 
@@ -201,4 +201,4 @@ Unionized_Grid_Search( Energy E, Material M ):
 
 #### Logarithmic Hash Grid
 
-An alternative to the unionized energy grid is the logarithmic hash grid. This method takes into account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform manner in log space. Therefore, the nuclide
+An alternative to the unionized energy grid is the logarithmic hash grid. This method takes into account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform manner in log space. Therefore, the nuclide grid is augmented with a separate acceleration structure similar to the unionized grid. However, the number of columns is capped at some number of bins spaced evenly in log space, with each row therefore corresponding to an approximate location within each nuclide's grid for that energy level. While the unionized grid points exactly to the correct index in the nuclide grid, the logarithmic hash grid points to only an approximate location below the true point -- meaning that a fast binary or iterative search must still be

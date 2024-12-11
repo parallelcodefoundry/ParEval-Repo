@@ -15,17 +15,21 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
+# Add OpenMP flags
+find_package(OpenMP REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+
 set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
+
+# Change the language property to CXX for OpenMP offloading
+set_source_files_properties(${SOURCE} PROPERTIES LANGUAGE CXX)
 
 add_executable(XSBench ${SOURCE})
 
-# Add OpenMP support
-find_package(OpenMP REQUIRED)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(XSBench PUBLIC OpenMP::OpenMP_CXX)
-endif()
+# Link OpenMP libraries
+target_link_libraries(XSBench OpenMP::OpenMP_CXX)
 
 install(TARGETS XSBench DESTINATION bin)
 ```
 
-In this translation, the `LANGUAGES` directive in the `project` command is updated to include `C` and `CXX` instead of `CUDA`, as OpenMP offloading is typically used with C/C++ compilers. The `find_package(OpenMP REQUIRED)` command is added to locate the OpenMP package, and `target_link_libraries` is used to link the OpenMP libraries to the `XSBench` target. This setup assumes that the source files have been appropriately modified to use OpenMP directives for offloading instead of CUDA.
+In this translation, the CUDA-specific language and flags have been replaced with OpenMP equivalents. The `find_package(OpenMP REQUIRED)` line ensures that OpenMP is available and sets the necessary compiler flags. The `set_source_files_properties` line has been updated to use `LANGUAGE CXX` to reflect the use of C++ with OpenMP. The `target_link_libraries` line links the OpenMP libraries to the executable.

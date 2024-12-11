@@ -91,4 +91,4 @@ double get_time(void)
 	#endif
 }
 ```
-The changes made for this translation are minimal because the functions in `XSutils.cu` are primarily host-side functions that don't involve CUDA or GPU-specific operations.  The OpenMP offload model would handle the data transfers and execution on the target device implicitly if those functions were called within an OpenMP offload region in other files.  No CUDA specific functions were used. Therefore, no code changes are necessary for this translation.
+The CUDA specific includes and functions are removed.  The `get_time` function now uses `omp_get_wtime()` if OpenMP is defined, and falls back to `gettimeofday()` if not.  No changes are needed for the comparison functions as they are standard C.

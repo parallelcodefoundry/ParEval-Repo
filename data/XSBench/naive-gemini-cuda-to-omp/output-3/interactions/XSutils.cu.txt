@@ -67,10 +67,6 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-	#ifdef MPI
-	return MPI_Wtime();
-	#endif
-
 	#ifdef OPENMP
 	return omp_get_wtime();
 	#endif
@@ -91,4 +87,3 @@ double get_time(void)
 	#endif
 }
 ```
-The OpenMP offload model doesn't directly replace CUDA's `__device__`, `__global__`, and CUDA memory management functions.  The translation would involve using OpenMP pragmas to offload functions to an accelerator (if available) and managing data transfers explicitly using `#pragma omp target`, `#pragma omp data`, etc.  However, the provided `XSutils.cu` file doesn't contain any CUDA-specific kernels or memory management; it's primarily composed of utility functions.  Therefore, no significant changes are needed for OpenMP offloading in this specific file.  The code above is functionally equivalent to the original.  If kernels from other files were to be offloaded,  more substantial changes would be required.

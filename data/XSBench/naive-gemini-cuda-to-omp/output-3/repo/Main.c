@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory.  Note that this is handled differently in OpenMP offload.  Memory management needs to be reviewed for correctness.
+    // Release device memory.  No equivalent for OpenMP offload here; manage memory directly.
     release_memory(SD);
 
     // Final Hash Step

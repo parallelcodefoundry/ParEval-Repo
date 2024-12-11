@@ -1,5 +1,5 @@
 ```cpp
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -121,10 +121,12 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP\n");
-	#ifdef __cplusplus
-	printf("OpenMP Device:               %s\n", ""); // Placeholder, needs OpenMP device identification
-	#endif
+	printf("Programming Model:            OpenMP-Offload\n");
+  #pragma omp target teams distribute parallel for simd
+  for (int i = 0; i < 1; i++){
+    printf("Offloading to device...\n");
+  }
+	//printf("CUDA Device:                  %s\n", prop.name);
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else

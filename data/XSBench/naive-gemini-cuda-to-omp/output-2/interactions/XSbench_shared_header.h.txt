@@ -1,4 +1,4 @@
-```cpp
+```c++
 #ifndef XSBENCH_SHARED_HEADER_H
 #define XSBENCH_SHARED_HEADER_H
 
@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-
 
 typedef struct{
         int nthreads;

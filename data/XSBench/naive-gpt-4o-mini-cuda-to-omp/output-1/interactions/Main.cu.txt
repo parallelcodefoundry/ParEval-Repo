@@ -1,4 +1,4 @@
-Here is the translated `Main.cu` file for the OpenMP Offload execution model:
+Here is the translated `Main.cu` file using the OpenMP Offload execution model:
 
 ```cpp
 #include "XSbench_header.cuh"
@@ -60,32 +60,35 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification)
+    #pragma omp target data map(to: in, SD) map(from: verification, profile)
     {
-        if (in.simulation_method == EVENT_BASED) {
-            if (in.kernel_id == 0)
-                verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
-            else if (in.kernel_id == 1)
-                verification = run_event_based_simulation_optimization_1(in, SD, mype);
-            else if (in.kernel_id == 2)
-                verification = run_event_based_simulation_optimization_2(in, SD, mype);
-            else if (in.kernel_id == 3)
-                verification = run_event_based_simulation_optimization_3(in, SD, mype);
-            else if (in.kernel_id == 4)
-                verification = run_event_based_simulation_optimization_4(in, SD, mype);
-            else if (in.kernel_id == 5)
-                verification = run_event_based_simulation_optimization_5(in, SD, mype);
-            else if (in.kernel_id == 6)
-                verification = run_event_based_simulation_optimization_6(in, SD, mype);
-            else {
-                printf("Error: No kernel ID %d found!\n", in.kernel_id);
+        #pragma omp target
+        {
+            if (in.simulation_method == EVENT_BASED) {
+                if (in.kernel_id == 0)
+                    verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+                else if (in.kernel_id == 1)
+                    verification = run_event_based_simulation_optimization_1(in, SD, mype);
+                else if (in.kernel_id == 2)
+                    verification = run_event_based_simulation_optimization_2(in, SD, mype);
+                else if (in.kernel_id == 3)
+                    verification = run_event_based_simulation_optimization_3(in, SD, mype);
+                else if (in.kernel_id == 4)
+                    verification = run_event_based_simulation_optimization_4(in, SD, mype);
+                else if (in.kernel_id == 5)
+                    verification = run_event_based_simulation_optimization_5(in, SD, mype);
+                else if (in.kernel_id == 6)
+                    verification = run_event_based_simulation_optimization_6(in, SD, mype);
+                else {
+                    printf("Error: No kernel ID %d found!\n", in.kernel_id);
+                    exit(1);
+                }
+            } else {
+                printf(
+                    "History-based simulation not implemented in CUDA code. Instead,\nuse "
+                    "the event-based method with \"-m event\" argument.\n");
                 exit(1);
             }
-        } else {
-            printf(
-                "History-based simulation not implemented in CUDA code. Instead,\nuse "
-                "the event-based method with \"-m event\" argument.\n");
-            exit(1);
         }
     }
 
@@ -113,10 +116,9 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-### Key Changes Made:
-1. **OpenMP Offload Directives**: The code now uses `#pragma omp target data` to manage data transfer between the host and the device. This allows the OpenMP runtime to handle the data mapping for the simulation.
-2. **Data Mapping**: The `in` and `SD` structures are mapped to the device for the simulation, and the `verification` variable is mapped back from the device after the simulation.
-3. **Function Calls**: The function calls remain unchanged, ensuring that the logic of the simulation is preserved.
-4. **Command Line Interface**: The command line interface remains intact, allowing for the same usage as before (e.g., `./XSBench -m event -s large`).
+### Key Changes:
+1. **OpenMP Directives**: Added `#pragma omp target data` to manage data transfer between host and device, and `#pragma omp target` to execute the simulation on the device.
+2. **Data Mapping**: Used `map(to: ...)` and `map(from: ...)` to specify which variables should be transferred to and from the device.
+3. **Maintained CLI Functionality**: The command line interface remains unchanged, ensuring that the program can still be executed with the same arguments as before. 
 
-This translation assumes that the underlying functions (like `run_event_based_simulation_baseline`, etc.) are also adapted to work with OpenMP Offload where necessary.
+This translation assumes that the OpenMP environment is set up correctly and that the necessary OpenMP libraries are linked during compilation.

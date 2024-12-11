@@ -15,7 +15,7 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
 	double start = get_time();
-        // Move Data to Device (Offload)
+        // Move Data to Device
         SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
 	profile->host_to_device_time = get_time() - start;
 
@@ -31,19 +31,19 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 	start = 0.0;
         #pragma omp parallel
         {
-          #pragma omp target data map(to: in, GSD) map(tofrom: SD.verification[0:in.lookups])
+          #pragma omp target data map(to: in, GSD) map(tofrom: SD.verification)
           {
             for (int i = 0; i < in.num_iterations + nwarmups; i++) {
-                if (i == nwarmups) {
-                        start = get_time();
-                }
-                #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
-                for (long j = 0; j < in.lookups; j++) {
-                        xs_lookup_kernel_baseline(in, GSD, j);
-                }
+              #pragma omp target teams distribute parallel for num_teams(nblocks) thread_limit(nthreads)
+              for (long j = 0; j < in.lookups; j++) {
+                xs_lookup_kernel_baseline(in, GSD, j);
+              }
+              if (i == nwarmups) {
+                start = get_time();
+              }
             }
           }
-        }
+	}
 
 	profile->kernel_time = get_time() - start;
 
@@ -54,8 +54,7 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
         if( mype == 0)	printf("Reducing verification results...\n");
 	start = get_time();
-        //Copy data back from device
-        //gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost) );
+        #pragma omp target update from(SD.verification)
 	profile->device_to_host_time = get_time() - start;
 
         unsigned long verification_scalar = 0;
@@ -74,9 +73,6 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
 {
         // The lookup ID. Used to set the seed, and to store the verification value
-
-        if( i >= in.lookups )
-                return;
 
         // Set the initial seed value
         uint64_t seed = STARTING_SEED;
@@ -392,4 +388,9 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
         return (a_new * seed + c_new) % m;
 }
 
-//Rest of the optimized functions remain largely the same, requiring similar offloading strategies.  They are omitted for brevity.
+//Rest of the optimized kernel functions remain largely the same,  requiring similar offloading strategies.  They are omitted for brevity but would follow a similar pattern of:
+//1. Data transfer to device using `#pragma omp target data`
+//2. Kernel launch using `#pragma omp target teams distribute parallel for`
+//3. Data transfer back to host using `#pragma omp target update from`
+//4. Reduction if necessary using `#pragma omp parallel for reduction`
+

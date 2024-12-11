@@ -104,7 +104,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
     if(mype == 0 )
     {
         if( is_invalid_result )
-            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", vhash);
+            printf("Verification checksum: %llu (WARNING - INVALID CHECKSUM!)\n", vhash);
         else
             printf("Verification checksum: %llu (Valid)\n", vhash);
         border_print();
@@ -310,7 +310,7 @@ Inputs read_CLI( int argc, char * argv[] )
             if( strcmp(sim_type, "history") == 0 )
                 input.simulation_method = HISTORY_BASED;
             else if( strcmp(sim_type, "event") == 0 )
-        {
+            {
                 input.simulation_method = EVENT_BASED;
                 // Also resets default # of lookups
                 if( default_lookups && default_particles )
@@ -337,9 +337,7 @@ Inputs read_CLI( int argc, char * argv[] )
         else if( strcmp(arg, "-h") == 0 )
         {
             if( ++i < argc )
-            {
                 input.hash_bins = atoi(argv[i]);
-            }
             else
                 print_CLI_error();
         }

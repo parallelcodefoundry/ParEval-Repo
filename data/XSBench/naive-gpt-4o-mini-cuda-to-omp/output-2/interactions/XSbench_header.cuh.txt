@@ -9,6 +9,8 @@ Here is the translated `XSbench_header.cuh` file for the OpenMP Offload executio
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
+#include <thrust/reduce.h>
+#include <thrust/partition.h>
 #include <stdint.h>
 #include <chrono>
 #include "XSbench_shared_header.h"
@@ -30,12 +32,13 @@ Here is the translated `XSbench_header.cuh` file for the OpenMP Offload executio
 // Starting Seed
 #define STARTING_SEED 1070
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(int code, const char *file, int line, bool abort=true)
+// Error checking macro for OpenMP offload
+#define ompErrchk(ans) { ompAssert((ans), __FILE__, __LINE__); }
+inline void ompAssert(int code, const char *file, int line, bool abort=true)
 {
         if (code != 0)
         {
-                fprintf(stderr,"GPUassert: %d %s %d\n", code, file, line);
+                fprintf(stderr,"OpenMP Error: %d %s %d\n", code, file, line);
                 if (abort) exit(code);
         }
 }
@@ -136,10 +139,12 @@ double rn_v(void);
 size_t estimate_mem_usage(Inputs in);
 double get_time(void);
 
-#endif // __XSBENCH_HEADER_H__
+#endif
 ```
 
-### Key Changes:
-1. Removed CUDA-specific error handling and replaced it with a generic integer check for errors.
-2. Removed CUDA-specific types and functions, such as `__global__` and `__device__`, since OpenMP Offload uses different mechanisms for offloading.
-3. Adjusted function signatures to remove CUDA-specific qualifiers and ensure compatibility with OpenMP Offload.
+### Changes Made:
+1. Removed CUDA-specific includes and replaced error checking macros with OpenMP-compatible ones.
+2. Changed kernel function declarations to regular function declarations, as OpenMP offload does not use the same kernel syntax as CUDA.
+3. Adjusted comments to reflect the OpenMP context. 
+
+This code is now structured for use with OpenMP offload, which will require the appropriate OpenMP pragmas to be added in the implementation files where necessary.

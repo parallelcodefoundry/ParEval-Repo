@@ -29,20 +29,16 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-lm
+CFLAGS := -fopenmp -foffload=-march=sm_${CUDA_ARCH}
 
 # Linker Flags
 LDFLAGS = -lm
 
 # LLVM Compiler
 ifeq ($(COMPILER),llvm)
-  CC = clang++
-  CFLAGS += -Wall -Wextra -O3 -march=native -fopenmp
-  LDFLAGS += -fopenmp
+  CC = clang
 endif
 
-# CUDA Offload Flags
-CFLAGS += -foffload=${CUDA_ARCH} -fsycl
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

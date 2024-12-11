@@ -39,7 +39,7 @@ inline void ompAssert(int code, const char *file, int line, bool abort=true)
 }
 
 // Structures
-typedef struct{
+typedef struct {
     double energy;
     double total_xs;
     double elastic_xs;
@@ -48,7 +48,7 @@ typedef struct{
     double nu_fission_xs;
 } NuclideGridPoint;
 
-typedef struct{
+typedef struct {
     int * num_nucs;                     // Length = length_num_nucs;
     double * concs;                     // Length = length_concs
     int * mats;                         // Length = length_mats
@@ -134,4 +134,4 @@ double rn_v(void);
 size_t estimate_mem_usage(Inputs in);
 double get_time(void);
 
-#endif
+#endif // __XSBENCH_HEADER_H__
