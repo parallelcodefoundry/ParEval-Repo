@@ -203,7 +203,14 @@ def main():
     code_repos = gather_code_repos(args, results)
 
     # Build and run each code repository
-    with alive_bar(len(code_repos)*2, title="Building and running code repositories", max_cols=os.get_terminal_size().columns, disable=args.hide_progress) as pbar:
+    try:
+        max_cols = os.get_terminal_size().columns
+    except OSError as error:
+        if error.errno == 25:
+            max_cols = 80
+        else:
+            raise error
+    with alive_bar(len(code_repos)*2, title="Building and running code repositories", max_cols=max_cols, disable=args.hide_progress) as pbar:
         for code_repo in code_repos:
             with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
                 logging.debug(f"Temporary directory created: {tempdir}")
