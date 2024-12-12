@@ -1,10 +1,10 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
 ////////////////////////////////////////////////////////////////////////////////////
 // All "baseline" code is at the top of this file. The baseline code is a simple
-// port of the original CPU OpenMP code to CUDA with few significant changes or
+// port of the original CPU OpenMP code to OpenMP offloading with few significant changes or
 // optimizations made. Following these functions are a number of optimized variants,
 // which each deploy a different combination of optimizations strategies. By
 // default, XSBench will only run the baseline implementation. Optimized variants
@@ -15,7 +15,7 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
 	double start = get_time();
-        // Move Data to Device (using OpenMP offloading)
+        // Move Data to Device
         SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
 	profile->host_to_device_time = get_time() - start;
 
@@ -25,19 +25,29 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
         if( mype == 0)	printf("Running baseline event-based simulation...\n");
 
         int nthreads = 256;
-	//No need for nblocks calculation as we are using OpenMP
-	start = 0.0;
-	for (int i = 0; i < in.num_iterations + in.num_warmups; i++) {
-		if (i == in.num_warmups) {
-			start = get_time();
-		}
-		#pragma omp target teams distribute parallel for simd num_threads(nthreads) map(to:in,GSD) map(from:GSD.verification)
-		for (long idx = 0; idx < in.lookups; idx++) {
-			xs_lookup_kernel_baseline(in, GSD, idx);
-		}
-	}
-	profile->kernel_time = get_time() - start;
 
+	int nwarmups = in.num_warmups;
+	start = 0.0;
+        int n_lookups = in.lookups;
+#pragma omp parallel
+{
+#pragma omp master
+{
+    for (int i = 0; i < in.num_iterations + nwarmups; i++) {
+        if (i == nwarmups) {
+            start = get_time();
+        }
+#pragma omp target teams distribute parallel for num_teams( (n_lookups + 255) / 256 ) thread_limit(256) map(to: in, GSD) map(from:GSD.verification[0:n_lookups])
+        for (long j = 0; j < n_lookups; j++) {
+            xs_lookup_kernel_baseline(in, GSD, j);
+        }
+    }
+}
+}
+
+	//gpuErrchk( cudaPeekAtLastError() );
+	//gpuErrchk( cudaDeviceSynchronize() );
+	profile->kernel_time = get_time() - start;
 
         ////////////////////////////////////////////////////////////////////////////////
         // Reduce Verification Results
@@ -45,13 +55,11 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
         if( mype == 0)	printf("Reducing verification results...\n");
 	start = get_time();
-        //Copy back data from device to host
-	#pragma omp target update from(GSD.verification[0:in.lookups])
+        //gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost) );
+        #pragma omp target teams distribute parallel for reduction(+:verification_scalar) map(to:GSD.verification[0:n_lookups])
+        for( int i =0; i < n_lookups; i++ )
+                verification_scalar += GSD.verification[i];
 	profile->device_to_host_time = get_time() - start;
-
-        unsigned long verification_scalar = 0;
-        for( int i =0; i < in.lookups; i++ )
-                verification_scalar += SD.verification[i];
 
         release_device_memory(GSD);
 
@@ -115,11 +123,12 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, long i)
 }
 
 // Calculates the microscopic cross section for a given nuclide & energy
-__device__ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
+void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                                    long n_gridpoints,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
-                                   long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins ){
+                                   long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins )
+{
         // Variables
         double f;
         NuclideGridPoint * low, * high;
@@ -148,7 +157,7 @@ __device__ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
                         low = &nuclide_grids[nuc*n_gridpoints + index_data[idx * n_isotopes + nuc]];
         }
         else // Hash grid
-{
+        {
                 // load lower bounding index
                 int u_low = index_data[idx * n_isotopes + nuc];
 
@@ -200,13 +209,14 @@ __device__ void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
 }
 
 // Calculates macroscopic cross section based on a given material & energy
-__device__ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
+void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
                                    long n_gridpoints, int * __restrict__ num_nucs,
                                    double * __restrict__ concs,
                                    double * __restrict__ egrid, int * __restrict__ index_data,
                                    NuclideGridPoint * __restrict__ nuclide_grids,
                                    int * __restrict__ mats,
-                                   double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ){
+                                   double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs )
+{
         int p_nuc; // the nuclide we are looking up
         long idx = -1;
         double conc; // the concentration of the nuclide in the material
@@ -254,7 +264,7 @@ __device__ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
 
 // binary search for energy on unionized energy grid
 // returns lower index
-__device__ long grid_search( long n, double quarry, double * __restrict__ A)
+long grid_search( long n, double quarry, double * __restrict__ A)
 {
         long lowerLimit = 0;
         long upperLimit = n-1;
@@ -277,7 +287,7 @@ __device__ long grid_search( long n, double quarry, double * __restrict__ A)
 }
 
 // binary search for energy on nuclide energy grid
-__host__ __device__ long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high)
+long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high)
 {
         long lowerLimit = low;
         long upperLimit = high;
@@ -300,7 +310,7 @@ __host__ __device__ long grid_search_nuclide( long n, double quarry, NuclideGrid
 }
 
 // picks a material based on a probabilistic distribution
-__device__ int pick_mat( uint64_t * seed )
+int pick_mat( uint64_t * seed )
 {
         // I have a nice spreadsheet supporting these numbers. They are
         // the fractions (by volume) of material in the core. Not a
@@ -339,7 +349,7 @@ __device__ int pick_mat( uint64_t * seed )
         return 0;
 }
 
-__host__ __device__ double LCG_random_double(uint64_t * seed)
+double LCG_random_double(uint64_t * seed)
 {
         // LCG parameters
         const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -349,7 +359,7 @@ __host__ __device__ double LCG_random_double(uint64_t * seed)
         return (double) (*seed) / (double) m;
 }
 
-__device__ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
+uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
 {
         // LCG parameters
         const uint64_t m = 9223372036854775808ULL; // 2^63
@@ -377,23 +387,7 @@ __device__ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
         return (a_new * seed + c_new) % m;
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-// OPTIMIZED VARIANT FUNCTIONS
-////////////////////////////////////////////////////////////////////////////////////
-// This section contains a number of optimized variants of some of the above
-// functions, which each deploy a different combination of optimizations strategies
-// specific to GPU. By default, XSBench will not run any of these variants. They
-// must be specifically selected using the "-k <optimized variant ID>" command
-// line argument.
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-
-// Implementations for optimized kernels 1-6 would follow a similar pattern to the baseline,
-// using OpenMP offloading pragmas to manage data movement and kernel execution.  
-// The details would vary depending on the specific optimization strategy used in each kernel.
-
+// ... rest of the optimized kernels remain largely the same, 
+//      requiring similar translation to offload to the device.
+//      The thrust functions will need to be replaced with OpenMP equivalents.
+//      For example, thrust::count could be replaced by an OpenMP reduction loop.

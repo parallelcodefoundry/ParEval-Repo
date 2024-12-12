@@ -1,4 +1,4 @@
-```cpp
+```c
 #include "SimpleMOC-kernel_header.h"
 
 /* My parallelization scheme here is to basically have a single
@@ -10,121 +10,206 @@
  * 		- A set of __shared__ SIMD vectors, each thread id being its idx
  */
 
-#pragma omp target teams distribute parallel for simd private(localState, blockId, g, q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4, state_flux, FSR_flux, dz, zin, weight, mu, mu2, ds)
-void run_kernel(Input I, Source *S,
-    Source_Arrays SA, Table *table, curandState *state,
-    float *state_fluxes, int N_state_fluxes) {
-    int blockId = omp_get_team_num() * omp_get_max_teams() + omp_get_thread_num(); // geometric segment
+#pragma omp declare target
+void run_kernel( Input I, Source *  S,
+		Source_Arrays SA, Table *  table, curandState *  state,
+		float *  state_fluxes, int N_state_fluxes)
+{
+	int blockId = omp_get_thread_num(); // geometric segment	
 
-    if (blockId >= I.segments / I.seg_per_thread)
-        return;
+  //  if( blockId >= I.segments / I.seg_per_thread )
+  //      return;
 
-    // Assign RNG state.  Note:  curandState management needs to be handled differently in OpenMP offloading.  This is a placeholder and may require significant changes depending on your curand usage.
-    curandState localState = state[blockId % I.streams]; //This assumes you manage states appropriately outside of the kernel
+	// Assign RNG state
+	curandState *  localState = &state[blockId % I.streams];
 
+	blockId *= I.seg_per_thread;
+	blockId--;
 
-    blockId *= I.seg_per_thread;
-    blockId--;
+	int g = 0; //Each energy group (g) is one thread in a block.  We'll use OpenMP for this now.
 
-    int g = omp_get_thread_num(); // Each energy group (g) is one thread in a block
+	// Thread Local (i.e., specific to E group) variables
+	// Similar to SIMD vectors in CPU code
+	float q0           ;
+	float q1           ;
+	float q2           ;
+	float sigT         ;
+	float tau          ;
+	float sigT2        ;
+	float expVal       ;
+	float reuse        ;
+	float flux_integral;
+	float tally        ;
+	float t1           ;
+	float t2           ;
+	float t3           ;
+	float t4           ;
 
-    // Thread Local (i.e., specific to E group) variables
-    // Similar to SIMD vectors in CPU code
-    float q0;
-    float q1;
-    float q2;
-    float sigT;
-    float tau;
-    float sigT2;
-    float expVal;
-    float reuse;
-    float flux_integral;
-    float tally;
-    float t1;
-    float t2;
-    float t3;
-    float t4;
+	// Randomized variables (common accross all thread within block)
+	int state_flux_id[I.seg_per_thread];
+	int QSR_id[I.seg_per_thread];
+	int FAI_id[I.seg_per_thread];
 
+	// Initialize random numbers for each thread
+	for( int i = 0; i < I.seg_per_thread; i++ )
+	{
+		state_flux_id[i] = curand(localState) % N_state_fluxes;
+		QSR_id[i] = curand(localState) % I.source_3D_regions;
+		FAI_id[i] = curand(localState) % I.fine_axial_intervals;
+	}
 
-    // Randomized variables (common accross all thread within block)
-    // Shared memory is not directly available in OpenMP offloading in the same way as CUDA.  You might need to use other mechanisms for this data sharing
-    //int state_flux_id[I.seg_per_thread];
-    //int QSR_id[I.seg_per_thread];
-    //int FAI_id[I.seg_per_thread];
+	#pragma omp parallel for
+  for( int i = 0; i < I.seg_per_thread; i++ )
+	{
+		blockId++;
 
-    //Replacement using OpenMP's private variables: 
-    int state_flux_id;
-    int QSR_id;
-    int FAI_id;
-
-
-
-    for (int i = 0; i < I.seg_per_thread; i++) {
-        blockId++;
-
-        //Random number generation and array indices need to be managed outside the parallel loop or using OpenMP's threadprivate variables.  The following is a placeholder.
-        //state_flux_id[i] = curand(localState) % N_state_fluxes;
-        //QSR_id[i] = curand(localState) % I.source_3D_regions;
-        //FAI_id[i] = curand(localState) % I.fine_axial_intervals;
-
-        //Placeholder - needs proper random number generation and index management.
-        state_flux_id = i % N_state_fluxes;
-        QSR_id = i % I.source_3D_regions;
-        FAI_id = i % I.fine_axial_intervals;
+		float *  state_flux = &state_fluxes[state_flux_id[i]];
 
 
+		//__syncthreads(); //Not needed in OpenMP
 
-        float *state_flux = &state_fluxes[state_flux_id];
+		//////////////////////////////////////////////////////////
+		// Attenuate Segment
+		//////////////////////////////////////////////////////////
 
-        //////////////////////////////////////////////////////////
-        // Attenuate Segment
-        //////////////////////////////////////////////////////////
+		// Some placeholder constants - In the full app some of these are
+		// calculated based off position in geometry. This treatment
+		// shaves off a few FLOPS, but is not significant compared to the
+		// rest of the function.
+		float dz = 0.1f;
+		float zin = 0.3f; 
+		float weight = 0.5f;
+		float mu = 0.9f;
+		float mu2 = 0.3f;
+		float ds = 0.7f;
 
-        // Some placeholder constants - In the full app some of these are
-        // calculated based off position in geometry. This treatment
-        // shaves off a few FLOPS, but is not significant compared to the
-        // rest of the function.
-        float dz = 0.1f;
-        float zin = 0.3f;
-        float weight = 0.5f;
-        float mu = 0.9f;
-        float mu2 = 0.3f;
-        float ds = 0.7f;
+		const int egroups = I.egroups;
 
-        const int egroups = I.egroups;
+		// load fine source region flux vector
+		float *  FSR_flux = &SA.fine_flux_arr[ S[QSR_id[i]].fine_flux_id + FAI_id[i] * egroups];
 
-        // load fine source region flux vector
-        float *FSR_flux = &SA.fine_flux_arr[S[QSR_id].fine_flux_id + FAI_id * egroups];
+		#pragma omp parallel for
+    for (g = 0; g < egroups; ++g){
+      if( FAI_id[i] == 0 )
+      {
+        float *   f2 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i])*egroups];
+        float *   f3 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]+1)*egroups];
+        // cycle over energy groups
+        // load neighboring sources
+        float y2 = __ldg(&f2[g]);
+        float y3 = __ldg(&f3[g]);
 
-        //Conditional logic for source loading, largely unchanged
-        if (FAI_id == 0) {
-            // ... (same as CUDA code) ...
-        }
-        else if (FAI_id == I.fine_axial_intervals - 1) {
-            // ... (same as CUDA code) ...
-        }
-        else {
-            // ... (same as CUDA code) ...
-        }
+        // do linear "fitting"
+        float c0 = y2;
+        float c1 = (y3 - y2) / dz;
 
-        // load total cross section
-        sigT = SA.sigT_arr[S[QSR_id].sigT_id + g];
+        // calculate q0, q1, q2
+        q0 = c0 + c1*zin;
+        q1 = c1;
+        q2 = 0;
+      }
+      else if ( FAI_id[i] == I.fine_axial_intervals - 1 )
+      {
+        float *   f1 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]-1)*egroups];
+        float *   f2 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i])*egroups];
+        // cycle over energy groups
+        // load neighboring sources
+        float y1 = __ldg(&f1[g]);
+        float y2 = __ldg(&f2[g]);
 
-        // calculate common values for efficiency
-        tau = sigT * ds;
-        sigT2 = sigT * sigT;
+        // do linear "fitting"
+        float c0 = y2;
+        float c1 = (y2 - y1) / dz;
 
-        #ifdef TABLE
-            interpolateTable(table, tau, &expVal);
-        #else
-            expVal = 1.f - expf(-tau); // EXP function is fater than table lookup
-        #endif
+        // calculate q0, q1, q2
+        q0 = c0 + c1*zin;
+        q1 = c1;
+        q2 = 0;
+      }
+      else
+      {
+        float *   f1 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]-1)*egroups];
+        float *   f2 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i])*egroups];
+        float *   f3 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]+1)*egroups];
+        // cycle over energy groups
+        // load neighboring sources
+        float y1 = __ldg(&f1[g]); 
+        float y2 = __ldg(&f2[g]);
+        float y3 = __ldg(&f3[g]);
 
-        // ... (rest of the calculations remain the same) ...
+        // do quadratic "fitting"
+        float c0 = y2;
+        float c1 = (y1 - y3) / (2.f*dz);
+        float c2 = (y1 - 2.f*y2 + y3) / (2.f*dz*dz);
+
+        // calculate q0, q1, q2
+        q0 = c0 + c1*zin + c2*zin*zin;
+        q1 = c1 + 2.f*c2*zin;
+        q2 = c2;
+      }
+
+      // load total cross section
+      sigT = __ldg(&SA.sigT_arr[ S[QSR_id[i]].sigT_id + g]);
+
+      // calculate common values for efficiency
+      tau = sigT * ds;
+      sigT2 = sigT * sigT;
+
+      #ifdef TABLE
+      interpolateTable( table, tau, &expVal );  
+      #else
+      expVal = 1.f - expf( -tau); // EXP function is fater than table lookup
+      #endif
+
+      // Flux Integral
+
+      // Re-used Term
+      reuse = tau * (tau - 2.f) + 2.f * expVal
+        / (sigT * sigT2); 
+
+      // add contribution to new source flux
+      flux_integral = (q0 * tau + (sigT * __ldg(&state_flux[g]) - q0)
+        * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 
+        * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) 
+        / (3.f * sigT2 * sigT2);
+
+      // Prepare tally
+      tally = weight * flux_integral;
+
+      // SHOULD BE ATOMIC HERE!
+      //FSR_flux[g] += tally;
+      atomicAdd(&FSR_flux[g], (float) tally);
+
+      // Term 1
+      t1 = q0 * expVal / sigT;  
+      // Term 2
+      t2 = q1 * mu * (tau - expVal) / sigT2; 
+      // Term 3
+      t3 =	q2 * mu2 * reuse;
+      // Term 4
+      t4 = state_flux[g] * (1.f - expVal);
+      // Total psi
+      state_flux[g] = t1 + t2 + t3 + t4;
     }
-}
+	}
+}	
 
-__device__ void interpolateTable(Table *table, float x, float *out) {
-    // ... (same as CUDA code) ...
+/* Interpolates a formed exponential table to compute ( 1- exp(-x) )
+ *  at the desired x value */
+__device__ void interpolateTable(Table *  table, float x, float *  out)
+{
+	// check to ensure value is in domain
+	if( x > table->maxVal )
+		*out = 1.0f;
+	else
+	{
+		int interval = (int) ( x / table->dx + 0.5f * table->dx );
+		interval = interval * 2;
+		float slope = table->values[ interval ];
+		float intercept = table->values[ interval + 1 ];
+		float val = slope * x + intercept;
+		*out = val;
+	}
 }
+#pragma omp end declare target
 ```

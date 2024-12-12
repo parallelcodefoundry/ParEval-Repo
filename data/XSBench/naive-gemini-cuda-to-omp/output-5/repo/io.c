@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_shared_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -43,13 +43,16 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		lookups = in.lookups;
 	long lookups_per_sec = (long) ((double) lookups / runtime);
 
-	// If running in MPI, reduce timing statistics and calculate average
-	#ifdef MPI
-	long total_lookups = 0;
-	MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_LONG,
-		   MPI_SUM, 0, MPI_COMM_WORLD);
-	#endif
+	// If running in OpenMP, reduce timing statistics and calculate average
+        long total_lookups = 0;
+#pragma omp parallel reduction(+:total_lookups)
+        {
+#pragma omp single
+            {
+                total_lookups = lookups_per_sec;
+            }
+        }
+
 
 	int is_invalid_result = 1;
 
@@ -62,20 +65,12 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 
 		// Print the results
 		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-		#ifdef MPI
-		printf("MPI ranks:   %d\n", nprocs);
-		#endif
-		#ifdef MPI
+                printf("OpenMP threads:   %d\n", omp_get_max_threads());
 		printf("Total Lookups/s:            ");
 		fancy_int(total_lookups);
-		printf("Avg Lookups/s per MPI rank: ");
-		fancy_int(total_lookups / nprocs);
-		#else
-		printf("Runtime:     %.3lf seconds\n", runtime);
-		printf("Lookups:     "); fancy_int(lookups);
-		printf("Lookups/s:   ");
-		fancy_int(lookups_per_sec);
-		#endif
+                printf("Avg Lookups/s per OpenMP thread: ");
+                fancy_int(total_lookups / omp_get_max_threads());
+		
 	}
 
 	unsigned long long large = 0;
@@ -120,15 +115,7 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP offload\n");
-  #pragma omp target map(tofrom: mem_tot)
-  {
-	  #ifdef __CUDA_ARCH__
-		printf("CUDA Device:                  %s\n", "GPU");
-	  #else
-		printf("CUDA Device:                  N/A\n");
-	  #endif
-  }
+	printf("Programming Model:            OpenMP\n");
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -162,12 +149,8 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-	#ifdef MPI
-	printf("MPI Ranks:                    %d\n", nprocs);
-	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
-	#else
+        printf("OpenMP Threads:               %d\n", omp_get_max_threads());
 	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
-	#endif
 	printf("Binary File Mode:             ");
 	if( in.binary_mode == NONE )
 		printf("Off\n");
@@ -238,7 +221,7 @@ Inputs read_CLI( int argc, char * argv[] )
 	input.simulation_method = HISTORY_BASED;
 
 	// defaults to max threads on the system
-	input.nthreads = 1;
+	input.nthreads = omp_get_max_threads();
 
 	// defaults to 355 (corresponding to H-M Large benchmark)
 	input.n_isotopes = 355;
@@ -316,7 +299,7 @@ Inputs read_CLI( int argc, char * argv[] )
 			if( strcmp(sim_type, "history") == 0 )
 				input.simulation_method = HISTORY_BASED;
 			else if( strcmp(sim_type, "event") == 0 )
-		{
+			{
 				input.simulation_method = EVENT_BASED;
 				// Also resets default # of lookups
 				if( default_lookups && default_particles )

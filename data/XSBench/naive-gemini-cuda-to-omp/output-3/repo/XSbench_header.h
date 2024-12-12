@@ -6,7 +6,6 @@
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
-#include <limits> // Required for numeric_limits
 #include <stdint.h>
 #include <chrono>
 #include "XSbench_shared_header.h"
@@ -30,7 +29,7 @@
 
 
 // Structures
-typedef struct {
+typedef struct{
         double energy;
         double total_xs;
         double elastic_xs;
@@ -39,7 +38,7 @@ typedef struct {
         double nu_fission_xs;
 } NuclideGridPoint;
 
-typedef struct {
+typedef struct{
         int * num_nucs;                     // Length = length_num_nucs;
         double * concs;                     // Length = length_concs
         int * mats;                         // Length = length_mats
@@ -61,85 +60,72 @@ typedef struct {
         int length_mat_samples;
 } SimulationData;
 
-// io.cu
+// io.c
 void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);
 void fancy_int(long a);
-Inputs read_CLI(int argc, char *argv[]);
+Inputs read_CLI( int argc, char * argv[] );
 void print_CLI_error(void);
 void print_inputs(Inputs in, int nprocs, int version);
-int print_results(Inputs in, int mype, double runtime, int nprocs, unsigned long long vhash);
-void binary_write(Inputs in, SimulationData SD);
-SimulationData binary_read(Inputs in);
+int print_results( Inputs in, int mype, double runtime, int nprocs, unsigned long long vhash );
+void binary_write( Inputs in, SimulationData SD );
+SimulationData binary_read( Inputs in );
 
-// Simulation.cu
+// Simulation.c
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile);
-//Removed __global__ since it's not needed for OpenMP offloading
-void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD);
-//Removed __device__ since it's not needed for OpenMP offloading
-void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
-                        long n_gridpoints,
-                        double * __restrict__ egrid, int * __restrict__ index_data,
-                        NuclideGridPoint * __restrict__ nuclide_grids,
-                        long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins);
-//Removed __device__ since it's not needed for OpenMP offloading
-void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
-                        long n_gridpoints, int * __restrict__ num_nucs,
-                        double * __restrict__ concs,
-                        double * __restrict__ egrid, int * __restrict__ index_data,
-                        NuclideGridPoint * __restrict__ nuclide_grids,
-                        int * __restrict__ mats,
-                        double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs);
-//Removed __device__ since it's not needed for OpenMP offloading
-long grid_search(long n, double quarry, double * __restrict__ A);
-long grid_search_nuclide(long n, double quarry, NuclideGridPoint *A, long low, long high);
-//Removed __device__ since it's not needed for OpenMP offloading
-int pick_mat(uint64_t *seed);
-double LCG_random_double(uint64_t *seed);
-//Removed __device__ since it's not needed for OpenMP offloading
-uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
+void xs_lookup_kernel_baseline(Inputs in, SimulationData SD); //removed __global__
+void calculate_micro_xs(   double p_energy, int nuc, long n_isotopes,
+                                   long n_gridpoints,
+                                   double * egrid, int * index_data,
+                                   NuclideGridPoint * nuclide_grids,
+                                   long idx, double * xs_vector, int grid_type, int hash_bins ); //removed __device__
+void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
+                                   long n_gridpoints, int * num_nucs,
+                                   double * concs,
+                                   double * egrid, int * index_data,
+                                   NuclideGridPoint * nuclide_grids,
+                                   int * mats,
+                                   double * macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs ); //removed __device__
+long grid_search( long n, double quarry, double * A); //removed __device__
+long grid_search_nuclide( long n, double quarry, NuclideGridPoint * A, long low, long high); //removed __host__ __device__
+int pick_mat( uint64_t * seed ); //removed __device__
+double LCG_random_double(uint64_t * seed); //removed __host__ __device__
+uint64_t fast_forward_LCG(uint64_t seed, uint64_t n); //removed __device__
 
-unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData GSD, int mype);
-//Removed __global__ since it's not needed for OpenMP offloading
-void sampling_kernel(Inputs in, SimulationData GSD);
-//Removed __global__ since it's not needed for OpenMP offloading
-void xs_lookup_kernel_optimization_1(Inputs in, SimulationData GSD);
+unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData SD, int mype);
+void sampling_kernel(Inputs in, SimulationData SD); //removed __global__
+void xs_lookup_kernel_optimization_1(Inputs in, SimulationData SD); //removed __global__
 
-unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData GSD, int mype);
-//Removed __global__ since it's not needed for OpenMP offloading
-void xs_lookup_kernel_optimization_2(Inputs in, SimulationData GSD, int m);
+unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_2(Inputs in, SimulationData SD, int m ); //removed __global__
 
-unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData GSD, int mype);
-//Removed __global__ since it's not needed for OpenMP offloading
-void xs_lookup_kernel_optimization_3(Inputs in, SimulationData GSD, int m);
+unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_3(Inputs in, SimulationData SD, int m ); //removed __global__
 
-unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData GSD, int mype);
-//Removed __global__ since it's not needed for OpenMP offloading
-void xs_lookup_kernel_optimization_4(Inputs in, SimulationData GSD, int m, int n_lookups, int offset);
+unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_4(Inputs in, SimulationData SD, int m, int n_lookups, int offset ); //removed __global__
 
-unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData GSD, int mype);
-//Removed __global__ since it's not needed for OpenMP offloading
-void xs_lookup_kernel_optimization_5(Inputs in, SimulationData GSD, int n_lookups, int offset);
+unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData SD, int mype);
+void xs_lookup_kernel_optimization_5(Inputs in, SimulationData SD, int n_lookups, int offset ); //removed __global__
 
-unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData GSD, int mype);
+unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData SD, int mype);
 
-// GridInit.cu
-SimulationData grid_init_do_not_profile(Inputs in, int mype);
-SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationData SD);
-void release_device_memory(SimulationData GSD);
+// GridInit.c
+SimulationData grid_init_do_not_profile( Inputs in, int mype );
+SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD );
+void release_device_memory(SimulationData SD); //removed GSD
 void release_memory(SimulationData SD);
 
-// XSutils.cu
-int NGP_compare(const void *a, const void *b);
-int double_compare(const void *a, const void *b);
+// XSutils.c
+int NGP_compare( const void * a, const void * b );
+int double_compare(const void * a, const void * b);
 double rn_v(void);
-size_t estimate_mem_usage(Inputs in);
+size_t estimate_mem_usage( Inputs in );
 double get_time(void);
 
-// Materials.cu
-int *load_num_nucs(long n_isotopes);
-int *load_mats(int *num_nucs, long n_isotopes, int *max_num_nucs);
-double *load_concs(int *num_nucs, int max_num_nucs);
-
+// Materials.c
+int * load_num_nucs(long n_isotopes);
+int * load_mats( int * num_nucs, long n_isotopes, int * max_num_nucs );
+double * load_concs( int * num_nucs, int max_num_nucs );
 #endif

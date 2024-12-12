@@ -45,7 +45,7 @@ the code and enable more transparent analysis techniques on high performance
 architectures.
 
 The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
-attentuation of neutron fluxes across an individual geometrical segment.
+attenuation of neutron fluxes across an individual geometrical segment.
 This kernel composes approximately 92% of the walltime of the full application,
 and is therefore useful for analyzing optimization methods and performance
 implications for exascale supercomputer architectures.
@@ -58,7 +58,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g., Intel Xeon Phi, AMD GPUs).
+SimpleMOC-kernel is now a C code supporting OpenMP offloading to accelerators.
 
 ==============================================================================
 Quick Start Guide
@@ -84,7 +84,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable OpenMP offloading compiler):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable compiler with OpenMP 5.0 support and a target accelerator):
 
 	>$ make
 
@@ -102,13 +102,13 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per offload target workgroup
-	
+	  -p <segs per thread>  Number of segments per OpenMP task
 
-	If not options are specified, then a default set of parameters will
+
+	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
 	work load for a full core reactor simulation (the the number of geometry
-	segments has been signficantly reduced to reduce runtime while preserving
+	segments has been significantly reduced to reduce runtime while preserving
 	the computational profile).
 
 ==============================================================================
@@ -120,14 +120,16 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = <OpenMP offloading compiler>
+COMPILER    = <your compiler>
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
+TABLE       = no
+
 
 Explanation of Flags:
 
-COMPILER <OpenMP offloading compiler> - This selects your compiler (e.g., icpc with -foffload).
+COMPILER <your compiler> - This selects your compiler (e.g., gcc, clang).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
@@ -141,7 +143,7 @@ SimpleMOC-kernel Strawman Reactor Defintion
 
 For the purposes of simplicity this mini-app uses a conservative "strawman"
 reactor model to represent a good target problem for full core reactor
-simualations to be run on exascale class supercomputers. Arbitrary
+simulations to be run on exascale class supercomputers. Arbitrary
 user-defined geometries are not supported.
 
 ===============================================================================

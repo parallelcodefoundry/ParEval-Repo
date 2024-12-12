@@ -1,4 +1,4 @@
-```cpp
+```c
 #include "SimpleMOC-kernel_header.h"
 
 // Prints program logo
@@ -81,13 +81,7 @@ void print_input_summary(Input I)
 	center_print("INPUT SUMMARY", 79);
 	border_print();
 
-        //  The following CUDA specific code needs to be replaced with OpenMP target compatible code.
-        //  This may involve querying the system for available devices and selecting a suitable one.
-	//cudaDeviceProp prop;
-	//int device;
-	//cudaGetDevice(&device);
-	//cudaGetDeviceProperties ( &prop, device );
-	//printf("%-25s%s\n", "CUDA Device: ", prop.name); 
+  //  Note:  CUDA calls are removed as this code is now targeted to OpenMP offload
 	printf("%-25s%d\n", "Energy Groups:", I.egroups);
 	printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
 	printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -148,15 +142,7 @@ void read_CLI( int argc, char * argv[], Input * input )
 			else
 				print_CLI_error();
 		}
-		// OpenMP Device Number (-d) - Placeholder, needs proper OpenMP device selection.
-		else if (strcmp(arg, "-d") == 0) {
-			if (++i < argc) {
-				//int device_id = atoi(argv[i]);  //Not applicable to OpenMP
-				//omp_set_default_device(device_id); // Needs OpenMP target specific device selection
-			} else {
-				print_CLI_error();
-			}
-		}
+		//Removed CUDA device selection
 		else
 			print_CLI_error();
 	}
@@ -170,8 +156,7 @@ void print_CLI_error(void)
 	printf("  -t <threads>          Number of OpenMP threads to run\n");
 	printf("  -s <segments>         Number of segments to process\n");
 	printf("  -e <energy groups>    Number of energy groups\n");
-	printf("  -p <segs per thread>  Number of segments per OpenMP Team\n"); //Changed to OpenMP
-	printf("  -d <Device ID>        OpenMP Target Device ID (Placeholder)\n"); //Placeholder
+	printf("  -p <segs per thread>  Number of segments per OpenMP Team\n"); //Changed to reflect OpenMP
 	printf("See readme for full description of default run values\n");
 	exit(1);
 }

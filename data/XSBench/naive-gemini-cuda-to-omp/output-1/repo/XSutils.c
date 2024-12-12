@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 int double_compare(const void * a, const void * b)
 {
@@ -66,18 +66,8 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-	#ifdef MPI
-	return MPI_Wtime();
-	#endif
-
 	#ifdef OPENMP
 	return omp_get_wtime();
-	#endif
-
-	#ifdef __cplusplus
-	// If using C++, we can do this:
-	unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
-	return (double) us_since_epoch / 1.0e6;
 	#else
 	struct timeval timecheck;
 

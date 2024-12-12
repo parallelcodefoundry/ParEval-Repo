@@ -5,13 +5,13 @@ SM_VERSION ?= $(SM_VERSION)
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -I$(INC) -std=c++17 -fopenmp -foffload=-march=sm_$(SM_VERSION)
+CXXFLAGS ?= -I$(INC) -std=c++17 -fsycl -fsycl-targets=nvptx64-nvidia-cuda --cuda-gpu-arch=$(SM_VERSION)
 ifneq ($(DEBUG), yes)
 	CXXFLAGS += -O3
 else
 	CXXFLAGS += -g -G
 endif
-LDFLAGS ?= -lcudart -fopenmp
+LDFLAGS ?= 
 
 CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
 DEPS = $(INC)/microXOR.hpp

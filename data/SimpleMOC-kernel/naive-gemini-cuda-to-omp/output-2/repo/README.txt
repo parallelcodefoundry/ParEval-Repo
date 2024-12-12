@@ -1,5 +1,5 @@
 ===============================================================================
-
+    
               _____ _                 _      __  __  ____   _____ 
              / ____(_)               | |    |  \/  |/ __ \ / ____|
             | (___  _ _ __ ___  _ __ | | ___| \  / | |  | | |     
@@ -57,7 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offloading code and supports architectures with compatible OpenMP offloading capabilities (e.g.,  Intel Xeon Phi,  AMD GPUs).
+SimpleMOC-kernel is now a C code that supports OpenMP offloading to accelerators.
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +83,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compatible compiler and OpenMP offloading support):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a compiler supporting OpenMP offloading, like GCC or Clang with appropriate flags):
 
 	>$ make
 
@@ -115,20 +115,20 @@ Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
 There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.
+with more advanced compilation features.  Compilation flags for OpenMP offloading will need to be added to the Makefile.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = <Your OpenMP offloading compatible compiler>
+COMPILER    = gcc # or clang
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
 
 Explanation of Flags:
 
-COMPILER <Your OpenMP offloading compatible compiler> - This selects your compiler (e.g., icc, clang).
+COMPILER <gcc> or <clang> - This selects your compiler (GCC or Clang are supported).
 
-OPTIMIZE - Adds compiler optimization flags.
+OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
 DEBUG - Adds the compiler flag "-g".
 

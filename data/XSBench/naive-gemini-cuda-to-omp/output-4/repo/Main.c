@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory
+    // Release device memory  (No equivalent needed for OpenMP offload)
     release_memory(SD);
 
     // Final Hash Step

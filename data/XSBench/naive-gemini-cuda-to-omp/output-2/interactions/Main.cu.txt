@@ -1,14 +1,14 @@
-```cpp
-#include "XSbench_header.cuh"
+```c++
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
     // =====================================================================
     // Initialization & Command Line Read-In
     // =====================================================================
     int version = 20;
-    int mype = 0;
+    int mype = 0; // This will need to be adapted for OpenMP
     double omp_start, omp_end;
-    int nprocs = 1;
+    int nprocs = 1; // This will need to be adapted for OpenMP
     unsigned long long verification;
 
     // Process CLI Fields -- store in "Inputs" structure
@@ -56,53 +56,46 @@ int main(int argc, char *argv[]) {
     // Start Simulation Timer
     omp_start = get_time();
 
-    // Run simulation
-    if (in.simulation_method == EVENT_BASED) {
-        #pragma omp target data map(to: in, SD) map(from: verification)
+    // Run simulation.  Offload to device if available.
+    #pragma omp target if(in.num_iterations > 1000) device(0)
+    {
+        #pragma omp parallel
         {
-            if (in.kernel_id == 0)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
-            else if (in.kernel_id == 1)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_optimization_1(in, SD, mype);
-            else if (in.kernel_id == 2)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_optimization_2(in, SD, mype);
-            else if (in.kernel_id == 3)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_optimization_3(in, SD, mype);
-            else if (in.kernel_id == 4)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_optimization_4(in, SD, mype);
-            else if (in.kernel_id == 5)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_optimization_5(in, SD, mype);
-            else if (in.kernel_id == 6)
-                #pragma omp target teams distribute parallel for reduction(+:verification)
-                verification = run_event_based_simulation_optimization_6(in, SD, mype);
-            else {
-                printf("Error: No kernel ID %d found!\n", in.kernel_id);
-                exit(1);
+            int my_thread = omp_get_thread_num();
+            #pragma omp single
+            {
+                if (in.kernel_id == 0)
+                    verification = run_event_based_simulation_baseline(in, SD, my_thread, &profile); //Pass thread ID instead of MPI rank
+                else if (in.kernel_id == 1)
+                    verification = run_event_based_simulation_optimization_1(in, SD, my_thread); //Pass thread ID instead of MPI rank
+                else if (in.kernel_id == 2)
+                    verification = run_event_based_simulation_optimization_2(in, SD, my_thread); //Pass thread ID instead of MPI rank
+                else if (in.kernel_id == 3)
+                    verification = run_event_based_simulation_optimization_3(in, SD, my_thread); //Pass thread ID instead of MPI rank
+                else if (in.kernel_id == 4)
+                    verification = run_event_based_simulation_optimization_4(in, SD, my_thread); //Pass thread ID instead of MPI rank
+                else if (in.kernel_id == 5)
+                    verification = run_event_based_simulation_optimization_5(in, SD, my_thread); //Pass thread ID instead of MPI rank
+                else if (in.kernel_id == 6)
+                    verification = run_event_based_simulation_optimization_6(in, SD, my_thread); //Pass thread ID instead of MPI rank
+                else {
+                    printf("Error: No kernel ID %d found!\n", in.kernel_id);
+                    exit(1);
+                }
             }
         }
-    } else {
-        printf(
-            "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
-            "the event-based method with \"-m event\" argument.\n");
-        exit(1);
     }
+
 
     if (mype == 0) {
         printf("\n");
         printf("Simulation complete.\n");
     }
 
-
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory.  Note that this is handled implicitly by `omp target data`
+    // Release device memory  (This section needs adaptation for OpenMP offloading;  memory management is different)
     release_memory(SD);
 
     // Final Hash Step

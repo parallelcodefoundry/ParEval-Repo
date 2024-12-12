@@ -30,17 +30,24 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-march=sm_${CUDA_ARCH} -foffload=-mllvm -mattr=+sm_${CUDA_ARCH}
+CFLAGS := -fopenmp -foffload=-march=native -foffload=
+
+# Add CUDA architecture flag if specified
+ifeq ($(CUDA_ARCH),)
+else
+  CFLAGS += -foffload=$(CUDA_ARCH)
+endif
+
 
 # Linker Flags
 LDFLAGS = -lm
 
 # Compiler selection
-ifeq ($(COMPILER),llvm)
-  CC = clang
-endif
 ifeq ($(COMPILER),gcc)
   CC = gcc
+endif
+ifeq ($(COMPILER),llvm)
+  CC = clang
 endif
 
 
@@ -65,17 +72,17 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
+$(program): $(obj) XSbench_header.h Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
+%.o: %.c XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.h XSbench_shared_header.h
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)

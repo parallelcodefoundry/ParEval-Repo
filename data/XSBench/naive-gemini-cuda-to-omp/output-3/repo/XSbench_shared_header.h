@@ -5,19 +5,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <omp.h>
-#include <chrono>
+#include <string.h> // Added for string manipulation functions
+#include <omp.h> // Added for OpenMP directives
 
 
 typedef struct{
         int nthreads;
         long n_isotopes;
         long n_gridpoints;
-        int lookups;
+        long lookups; // Changed to long to handle larger values
         char * HM;
         int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
         int hash_bins;
-        int particles;
+        long particles; // Changed to long to handle larger values
         int simulation_method;
         int binary_mode;
         int kernel_id;
@@ -32,27 +32,23 @@ typedef struct{
   double host_to_device_time;
 } Profile;
 
+// Function to print profiling information.  Handles both file and stdout output.
 inline void print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_time_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
+  FILE* output = (in.filename) ? fopen(in.filename, "w") : stdout; //Use stdout if filename is NULL
+  if (output == NULL && in.filename) {
+      fprintf(stderr, "Error opening file %s for writing.\n", in.filename);
+      exit(1); //Exit if there's an error opening the file.
+  }
+
+  fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+  fprintf(output, "%f,%f,%f,%d,%d\n",
             profile.host_to_device_time*1000,
             profile.kernel_time*1000,
             profile.device_to_host_time*1000,
             in.num_iterations,
             in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_time_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
-  }
+  if (in.filename) fclose(output); //Close file if it was opened
 }
+
 
 #endif // XSBENCH_SHARED_HEADER_H

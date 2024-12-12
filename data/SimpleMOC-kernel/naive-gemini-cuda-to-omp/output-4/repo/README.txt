@@ -4,7 +4,7 @@
              / ____(_)               | |    |  \/  |/ __ \ / ____|
             | (___  _ _ __ ___  _ __ | | ___| \  / | |  | | |     
              \___ \| | '_ ` _ \| '_ \| |/ _ \ |\/| | |  | | |     
-             ____) | | | | | | | |_) | |  __/ |  | | |__| | |____ 
+             ____) | | | | | | |_) | |  __/ |  | | |__| | |____ 
             |_____/|_|_| |_| |_| .__/|_|\___|_|  |_|\____/ \_____|
                                | |                                
                                |_|                                
@@ -44,7 +44,7 @@ the code and enable more transparent analysis techniques on high performance
 architectures.
 
 The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
-attentuation of neutron fluxes across an individual geometrical segment.
+attenuation of neutron fluxes across an individual geometrical segment.
 This kernel composes approximately 92% of the walltime of the full application,
 and is therefore useful for analyzing optimization methods and performance
 implications for exascale supercomputer architectures.
@@ -57,7 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP offload code and supports architectures with OpenMP 5.0+ offloading capabilities (e.g., Intel Xeon Phi, AMD CPUs with compatible accelerators).
+SimpleMOC-kernel is now a C code that supports OpenMP offloading to accelerators.
 
 ==============================================================================
 Quick Start Guide
@@ -83,7 +83,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings, use the following command (assuming you have a suitable OpenMP offloading compiler like icpc):
+	To compile SimpleMOC-kernel with default settings, use the following command (assuming a compiler supporting OpenMP offloading is available, like GCC with appropriate flags):
 
 	>$ make
 
@@ -101,8 +101,8 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per OpenMP offload task
-
+	  -p <segs per thread>  Number of segments per offload region
+	
 
 	If no options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -119,7 +119,7 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = icpc #or other suitable compiler
+COMPILER    = gcc  // or clang, etc.
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
@@ -128,13 +128,15 @@ TABLE       = no
 
 Explanation of Flags:
 
-COMPILER <icpc> - This selects your compiler (Intel is one supported example).
+COMPILER <gcc> - This selects your compiler (GCC, Clang, or other OpenMP-capable compiler).
 
-OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
+OPTIMIZE - Adds compiler optimization flags.
 
-DEBUG - Adds the compiler flag "-g".
+DEBUG - Adds compiler debugging flags.
 
-PROFILE - Adds the compiler flag "-pg".
+PROFILE - Adds compiler profiling flags.
+
+TABLE - Enables/Disables the use of an exponential table (for performance comparison).
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion

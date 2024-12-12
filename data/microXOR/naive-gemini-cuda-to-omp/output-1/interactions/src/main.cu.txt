@@ -1,7 +1,7 @@
 ```cpp
 // microXOR driver
 
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
 void cleanup(int *input, int *output) {
   delete[] input;
@@ -39,41 +39,65 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  #pragma omp target data map(to: input[0:N*N]) map(from: output[0:N*N])
-  {
-    dim3 threadsPerBlock(blockEdge, blockEdge);
-    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                   (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
-    #pragma omp target teams distribute parallel for collapse(2) thread_limit(512)
-    for (int i = 0; i < N; i++) {
-      for (int j = 0; j < N; j++) {
-        int count = 0;
-        if (i > 0 && input[(i - 1) * N + j] == 1) count++;
-        if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
-        if (j > 0 && input[i * N + (j - 1)] == 1) count++;
-        if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
-        output[i * N + j] = (count == 1) ? 1 : 0;
-      }
-    }
-  }
+  int *d_input, *d_output;
 
+  #pragma omp target enter data map(to: input[0:N*N])
+  #pragma omp target allocate(d_input[0:N*N])
+  d_input = input; // Assign to the allocated memory
+
+  #pragma omp target allocate(d_output[0:N*N])
+  d_output = new int[N*N]; // Allocate memory on device
+
+
+  dim3 threadsPerBlock(blockEdge, blockEdge);
+  dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                 (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+  #pragma omp target teams distribute parallel for collapse(2) \
+  map(to:d_input[0:N*N]) map(from:d_output[0:N*N])
+  for (int i = 0; i < numBlocks.y; i++){
+    for (int j = 0; j < numBlocks.x; j++){
+      int row = i*threadsPerBlock.y;
+      int col = j*threadsPerBlock.x;
+      for(int k = 0; k < threadsPerBlock.y; k++){
+        for (int l = 0; l < threadsPerBlock.x; l++){
+            int cur_i = row+k;
+            int cur_j = col+l;
+
+            if (cur_i < N && cur_j < N) {
+              int count = 0;
+              if (cur_i > 0 && d_input[(cur_i-1)*N + cur_j] == 1) count++;
+              if (cur_i < N-1 && d_input[(cur_i+1)*N + cur_j] == 1) count++;
+              if (cur_j > 0 && d_input[cur_i*N + (cur_j-1)] == 1) count++;
+              if (cur_j < N-1 && d_input[cur_i*N + (cur_j+1)] == 1) count++;
+              d_output[cur_i*N + cur_j] = (count == 1) ? 1 : 0;
+            }
+          }
+        }
+      }
+  }
+  
+
+  #pragma omp target update from(output[0:N*N]) map(from:d_output[0:N*N])
+  #pragma omp target exit data map(release: input[0:N*N]) map(release: d_output[0:N*N])
+  delete[] d_output;
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {
     for (size_t j = 0; j < N; j++) {
       int count = 0;
-      if (i > 0 && input[(i - 1) * N + j] == 1) count++;
-      if (i < N - 1 && input[(i + 1) * N + j] == 1) count++;
-      if (j > 0 && input[i * N + (j - 1)] == 1) count++;
-      if (j < N - 1 && input[i * N + (j + 1)] == 1) count++;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
       if (count == 1) {
-        if (output[i * N + j] != 1) {
+        if (output[i*N + j] != 1) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
           cleanup(input, output);
           return 1;
         }
       } else {
-        if (output[i * N + j] != 0) {
+        if (output[i*N + j] != 0) {
           std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
           cleanup(input, output);
           return 1;

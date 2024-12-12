@@ -28,23 +28,15 @@ obj = $(source:.c=.o)
 # Sets Flags
 #===============================================================================
 
-# Regular clang Compiler
-CC = clang++
-
 # Standard Flags
-override CFLAGS += -fopenmp -foffload=-lm -foffload=-lcurand -Iinclude -march=native  -Xopenmp-target -mavx2
-
-# Add target specific flags
-ifeq ($(findstring 80,$(SM_VERSION)),80)
-  CFLAGS += -Xopenmp-target=nvptx80 -foffload=nvptx-none -L$(shell echo "/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/" | sed 's/\/$//')
-endif
+override CFLAGS += -foffload=-lm -foffload=-lcurand -fopenmp -Iinclude -march=native  -Xopenmp-target=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_$(SM_VERSION)
 
 # Linker Flags
-
+LDFLAGS = $(CFLAGS) #-lm -lcurand  #Linker flags are included in CFLAGS for offloading
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
 endif
 
 # Profiling Flags
@@ -67,10 +59,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) SimpleMOC-kernel_header.h
-	$(CC) $(CFLAGS) $(obj) -o $@ 
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

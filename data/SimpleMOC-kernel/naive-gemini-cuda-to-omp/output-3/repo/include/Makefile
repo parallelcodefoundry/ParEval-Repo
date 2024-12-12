@@ -27,15 +27,14 @@ obj = $(source:.c=.o)
 # Sets Flags
 #===============================================================================
 
-#Regular clang Compiler
-CC = clang
+# Regular clang Compiler
+CC = clang++
 
 # Standard Flags
-override CFLAGS += -fopenmp -foffload=-march=native -foffload=--device=nvptx-nvidia-cuda -I$(shell $(CXX) --print-file-name=include) -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -foffload=-lm -foffload=-lcurand -Iinclude -march=native
 
 # Linker Flags
-LDFLAGS = -lm -lcurand -fopenmp $(shell $(CXX) --print-file-name=lib) -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
-
+LDFLAGS = $(shell echo -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/) -lm -lcurand
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -56,6 +55,12 @@ endif
 ifeq ($(TABLE), yes)
 	CFLAGS += -DTABLE
 endif
+
+# Add OpenMP target flags if needed
+ifeq ($(TARGET), yes)
+  CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda --cuda-path=/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/targets/x86_64-linux/ -mcpu=sm_$(SM_VERSION)
+endif
+
 
 #===============================================================================
 # Targets to Build

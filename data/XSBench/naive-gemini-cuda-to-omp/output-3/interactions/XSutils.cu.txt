@@ -1,5 +1,5 @@
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 
 int double_compare(const void * a, const void * b)
 {

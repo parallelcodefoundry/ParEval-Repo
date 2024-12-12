@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_shared_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -43,12 +43,13 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		lookups = in.lookups;
 	long lookups_per_sec = (long) ((double) lookups / runtime);
 
-	// If running in MPI, reduce timing statistics and calculate average
-	#ifdef MPI
+	// If running in OpenMP, reduce timing statistics and calculate average
+	#ifdef _OPENMP
 	long total_lookups = 0;
-	MPI_Barrier(MPI_COMM_WORLD);
-	MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_LONG,
-		   MPI_SUM, 0, MPI_COMM_WORLD);
+	#pragma omp parallel reduction(+:total_lookups)
+	{
+		total_lookups += lookups_per_sec;
+	}
 	#endif
 
 	int is_invalid_result = 1;
@@ -62,14 +63,14 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 
 		// Print the results
 		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-		#ifdef MPI
-		printf("MPI ranks:   %d\n", nprocs);
+		#ifdef _OPENMP
+		printf("OpenMP threads:   %d\n", omp_get_max_threads());
 		#endif
-		#ifdef MPI
+		#ifdef _OPENMP
 		printf("Total Lookups/s:            ");
 		fancy_int(total_lookups);
-		printf("Avg Lookups/s per MPI rank: ");
-		fancy_int(total_lookups / nprocs);
+		printf("Avg Lookups/s per thread: ");
+		fancy_int(total_lookups / omp_get_max_threads());
 		#else
 		printf("Runtime:     %.3lf seconds\n", runtime);
 		printf("Lookups:     "); fancy_int(lookups);
@@ -120,11 +121,20 @@ void print_inputs(Inputs in, int nprocs, int version )
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            OpenMP Offload\n"); // Changed line
-        #pragma omp target teams distribute parallel for simd
-        for (int i = 0; i < 10; i++) {
-                //Perform some computation
-        }
+	printf("Programming Model:            OpenMP\n");
+	#ifdef _OPENMP
+	printf("OpenMP threads:              %d\n", omp_get_max_threads());
+	#endif
+	if( in.simulation_method == EVENT_BASED )
+		printf("Simulation Method:            Event Based\n");
+	else
+		printf("Simulation Method:            History Based\n");
+	if( in.grid_type == NUCLIDE )
+		printf("Grid Type:                    Nuclide Grid\n");
+	else if( in.grid_type == UNIONIZED )
+		printf("Grid Type:                    Unionized Grid\n");
+	else
+		printf("Grid Type:                    Hash\n");
 
 	printf("Materials:                    %d\n", 12);
 	printf("H-M Benchmark Size:           %s\n", in.HM);
@@ -148,9 +158,9 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-	#ifdef MPI
-	printf("MPI Ranks:                    %d\n", nprocs);
-	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
+	#ifdef _OPENMP
+	printf("OpenMP Threads:               %d\n", omp_get_max_threads());
+	printf("Mem Usage per thread (MB):  "); fancy_int(mem_tot);
 	#else
 	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
 	#endif
@@ -302,7 +312,7 @@ Inputs read_CLI( int argc, char * argv[] )
 			if( strcmp(sim_type, "history") == 0 )
 				input.simulation_method = HISTORY_BASED;
 			else if( strcmp(sim_type, "event") == 0 )
-		{
+			{
 				input.simulation_method = EVENT_BASED;
 				// Also resets default # of lookups
 				if( default_lookups && default_particles )
