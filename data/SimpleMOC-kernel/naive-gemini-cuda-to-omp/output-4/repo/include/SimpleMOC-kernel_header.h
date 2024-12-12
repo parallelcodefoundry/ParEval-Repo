@@ -1,10 +1,8 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
-#include <random>
-#include <omp.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include <time.h>
@@ -14,12 +12,16 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <assert.h>
+#include <omp.h>
 
-//Error Handling Macro (replace with more robust error handling if needed)
-#define ERROR_CHECK(x) do { if((x) != 0) { \
+#define ERROR_CHECK
+ 
+#define CudaCheckError()    __checkError( __FILE__, __LINE__ )
+
+// Error Handling Macro
+#define CHECK(x) do { if((x) != 0) { \
     printf("Error at %s:%d\n",__FILE__,__LINE__); \
-    exit(EXIT_FAILURE);}} while(0)
+    return EXIT_FAILURE;}} while(0)
 
 
 // User inputs
@@ -59,26 +61,26 @@ typedef struct{
 	int N;
 } Table;
 
-// Function declarations (kernel and other functions)
+// Function declarations for kernel and helper functions.  Note that the
+// OpenMP offloading model doesn't directly map to CUDA kernels. We will
+// use OpenMP target regions to offload to the accelerator.
 
-//Note:  The OpenMP offloading model doesn't directly map to the CUDA kernel structure.  The `run_kernel` function will need significant restructuring to utilize OpenMP pragmas for parallelization.  This restructuring is beyond the scope of a simple header translation.
-
-//Example of how the function might be declared if using OpenMP target regions:
-void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
-
+// kernel.c
+int run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state,
+		float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
 
-
-// init.c function declarations
+// init.c
 double mem_estimate(Input I);
-void setup_kernel(unsigned int *state, Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
+int setup_kernel(float *state, Input I);
+int init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
-Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+int initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
+void __checkError(const char *file, const int line);
 
-// io.c function declarations
+// io.c
 void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);
@@ -86,6 +88,5 @@ void fancy_int(int a);
 void print_input_summary(Input input);
 void read_CLI(int argc, char *argv[], Input *input);
 void print_CLI_error(void);
-
 
 #endif

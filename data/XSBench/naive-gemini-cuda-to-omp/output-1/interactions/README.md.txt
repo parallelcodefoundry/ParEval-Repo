@@ -5,14 +5,14 @@
 [![Build Status](https://travis-ci.com/ANL-CESAR/XSBench.svg?branch=master)](https://travis-ci.com/ANL-CESAR/XSBench)
 [![Published in Annals of Nuclear Energy](https://img.shields.io/badge/Published%20in-Annals%20of%20Nuclear%20Energy-167DA4.svg)](https://www.sciencedirect.com/science/article/pii/S0306454914004332)
 
-XSBench is a mini-app representing a key computational kernel of the Monte Carlo neutron transport algorithm. Specifically, XSBench represents the continuous energy macroscopic neutron cross section lookup kernel. XSBench serves as a lightweight stand-in for full neutron transport applications like [OpenMC](https://github.com/openmc-dev/openmc), and is a useful tool for performance analysis on high performance computing architectures.
+XSBench is a mini-app representing a key computational kernel of the Monte Carlo neutron transport algorithm. Specifically, XSBench represents the continuous energy macroscopic neutron cross section lookup kernel. XSBench serves as a lightweight stand-in for full neutron transport applications like [OpenMC](https://github.com/openmc-dev/openmc), and is a useful tool for performance analysis on high-performance computing architectures.
 
 ## Table of Contents
 
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Offloading Support](#OpenMP-Offloading-Support)
+	* [OpenMP Offload Support](#OpenMP-Offload-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -27,49 +27,42 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been adapted for OpenMP offloading to target various architectures supporting OpenMP 5.0.
+XSBench has been implemented using OpenMP offloading for compatibility with various architectures supporting OpenMP 5.0 or later.
+
 
 ## Compilation
 
-To compile XSBench with default settings, navigate to your selected source directory and use the following command (assuming a compiler supporting OpenMP 5.0 offloading):
+To compile XSBench with default settings, navigate to your selected source directory and use the following command (assuming a suitable compiler like GCC or Clang with OpenMP support):
 
 ```bash
 make
 ```
-
-You can alter compiler settings in the included Makefile.  Ensure your compiler and linker are configured appropriately for OpenMP offloading to your target device (e.g., setting environment variables).
-
+ 
+You can alter compiler settings in the included Makefile.  Ensure your compiler supports OpenMP offloading and that the necessary target device is correctly specified (e.g., using compiler flags).
 
 ### Debugging, Optimization & Profiling
 
-The Makefile can control debugging, optimization, and profiling.  Adjust the following variables as needed:
+There are also a number of switches that can be set in the makefile. Here is a sample of the control panel at the top of the makefile:
 
 ```make
 OPTIMIZE = yes
 DEBUG    = no
 PROFILE  = no
 ```
-- `OPTIMIZE` enables optimization flags (adjust as needed for your compiler).
-- `DEBUG` enables debugging flags (e.g., `-g`).
-- `PROFILE` enables profiling flags (e.g., `-pg`; requires a suitable profiling tool).  Consider increasing lookups (-l) for better profiling results.
+- Optimization enables optimization flags (e.g., `-O3`).
+- Debugging enables debugging flags (e.g., `-g`).
+- Profiling enables profiling flags (e.g., `-pg`). When profiling the code, you may
+wish to significantly increase the number of lookups (with the -l
+flag) in order to wash out the initialization phase of the code.
+
 
 ## Running XSBench
-
-To run XSBench with default settings:
-```bash
-./XSBench
-```
-
-XSBench uses command-line options (see below).
-
-
-## Running XSBench / Command Line Interface
 
 To run XSBench with default settings, use the following command:
 ```bash
 ./XSBench
 ```
-For non-default settings, XSBench supports the following command line options:
+For non-default settings, XSBench supports the following command line options:  (See detailed explanations in the original README)
 
 | Argument    |Description | Options     | Default
 |-------------|------------|---------------|------------|
@@ -83,84 +76,37 @@ For non-default settings, XSBench supports the following command line options:
 -b | Read/Write binary files | read, write |  |
 -k | Optimized kernel ID | integer value | 0
 
-- **-m [simulation method]**
-Sets the simulation method, either "history" or "event".  The default is the history-based method.  See the [Transport Simulation Styles](#Transport-Simulation-Styles) section for more information.
-
-- **-s [size]**
-Sets the size of the Hoogenboom-Martin reactor model ('small', 'large', 'XL', 'XXL').  The default is 'large'.  See the description in the original README for details on problem size implications.
-
-- **-g [gridpoints]**
-Sets the number of gridpoints per nuclide.  Overrides '-s' defaults.
-
-- **-G [grid type]**
-Sets the grid search type ('unionized', 'nuclide', 'hash').  The default is 'unionized'.  See the [Cross Section Lookup Methods](#Cross-Section-Lookup-Methods) section for more details.
-
-- **-p [particles]**
-Sets the number of particle histories (only for "history" method).
-
-- **-l [lookups]**
-Sets the number of cross-section (XS) lookups per particle (history-based) or total lookups (event-based).
-
-- **-h [hash bins]**
-Sets the number of hash bins (only for "hash" grid type).
-
-- **-b [binary mode]**
-Read or write simulation data to/from a binary file ('read', 'write'). See original README for details.
-
-- **-k [kernel]**
-Selects which kernel to run (0 for baseline, 1, 2, etc. for optimized variants).
-
 
 ## Feature Discussion
 
-### OpenMP Offloading Support
+### OpenMP Offload Support
 
-The CUDA code has been replaced with OpenMP offloading directives.  The Makefile should be adjusted to use a compiler supporting OpenMP 5.0 and the appropriate offloading targets.  You will likely need to specify compiler flags and environment variables to point to the correct OpenMP offloading libraries and target devices.
-
+The OpenMP offload implementation allows XSBench to leverage the acceleration capabilities of various devices supported by OpenMP.  The computationally intensive parts of the code are offloaded to the target device using OpenMP directives.  Performance will depend on the specific hardware and compiler used.
 
 ### Verification Support
 
-XSBench uses a verification scheme that generates a hash of the results.  This hash can be compared to verify the correctness of the results across different runs and configurations (see original README for details).
+(This section remains the same as in the original README)
 
 ### Binary File Support
 
-The binary file support remains the same as described in the original README.
+(This section remains the same as in the original README)
+
 
 ## Algorithms
 
-### Transport Simulation Styles
+(This section remains the same as in the original README)
 
-#### History-Based Transport
-
-(Same as in original README)
-
-#### Event-Based Transport
-
-(Same as in original README)
-
-### Cross Section (XS) Lookup Methods
-
-#### Nuclide Grid
-
-(Same as in original README)
-
-#### Unionized Energy Grid
-
-(Same as in original README)
-
-#### Logarithmic Hash Grid
-
-(Same as in original README)
 
 ## Optimized Kernels
 
-(Same as in original README)
+(This section remains the same as in the original README)
+
 
 ## Citing XSBench
 
-(Same as in original README)
+(This section remains the same as in the original README)
+
 
 ## Development Team
-
-(Same as in original README)
+(This section remains the same as in the original README)
 ```

@@ -16,15 +16,6 @@
 #include <omp.h>
 
 
-#define ERROR_CHECK
- 
-#define CudaCheckError()    __cudaCheckError( __FILE__, __LINE__ )
-
-// Error Handling Macro (replace CUDA_CALL with a suitable OpenMP error check if needed)
-#define CUDA_CALL(x) do { if((x) != 0) { \
-    printf("Error at %s:%d\n",__FILE__,__LINE__); \
-    return EXIT_FAILURE;}} while(0)
-
 // User inputs
 typedef struct{
 	int source_2D_regions;
@@ -62,34 +53,27 @@ typedef struct{
 	int N;
 } Table;
 
+// Function declarations (kernel.c)
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
+void interpolateTable(Table *table, float x, float *out);
 
-// Function declarations (replace CUDA kernel calls with OpenMP pragmas)
-//Note:  The actual implementation of these functions will require significant changes to utilize OpenMP offloading.  These are placeholders.
 
+// Function declarations (init.c)
+double mem_estimate(Input I);
+void setup_kernel(unsigned int *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
+Source *initialize_sources(Input I, Source_Arrays *SA);
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
+Table buildExponentialTable(void);
+Input set_default_input(void);
 
-void run_kernel( Input I, Source *  S,
-		Source_Arrays SA, Table *  table, unsigned int * state, //Changed curandState to unsigned int array for simpler OpenMP implementation
-		float *  state_fluxes, int N_state_fluxes);
-
-void interpolateTable(Table *  table, float x, float *  out);
-
-// init.c functions
-double mem_estimate( Input I );
-void setup_kernel(unsigned int *state, Input I); //Changed curandState to unsigned int array
-void	init_flux_states( float * flux_states, int N_flux_states, Input I, unsigned int * state); //Changed curandState to unsigned int array
-Source * initialize_sources( Input I, Source_Arrays * SA );
-Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
-Table buildExponentialTable( void );
-Input set_default_input( void );
-void __cudaCheckError( const char *file, const int line );
-
-// io.c functions
+// Function declarations (io.c)
 void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);
-void fancy_int( int a );
+void fancy_int(int a);
 void print_input_summary(Input input);
-void read_CLI( int argc, char * argv[], Input * input );
+void read_CLI(int argc, char *argv[], Input *input);
 void print_CLI_error(void);
 
 #endif

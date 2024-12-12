@@ -1,7 +1,7 @@
 ```cpp
 // microXOR driver
 
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
 void cleanup(int *input, int *output) {
   delete[] input;
@@ -39,23 +39,34 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  #pragma omp target data map(to: input[0:N*N]) map(from: output[0:N*N])
-  {
-    dim3 threadsPerBlock(blockEdge, blockEdge);
-    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                   (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
-    #pragma omp target teams distribute parallel for num_teams(numBlocks.x) thread_limit(threadsPerBlock.x * threadsPerBlock.y) collapse(2)
-    for (int i = 0; i < N; i++) {
-      for (int j = 0; j < N; j++) {
-        int count = 0;
-        if (i > 0 && input[(i-1)*N + j] == 1) count++;
-        if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-        if (j > 0 && input[i*N + (j-1)] == 1) count++;
-        if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-        output[i*N + j] = (count == 1) ? 1 : 0;
-      }
+  int *d_input, *d_output;
+
+  #pragma omp target enter data map(alloc: d_input[0:N*N])
+  d_input = (int*)d_input;
+  #pragma omp target enter data map(alloc: d_output[0:N*N])
+  d_output = (int*)d_output;
+
+  #pragma omp target update to(d_input[0:N*N])
+  
+
+  dim3 threadsPerBlock(blockEdge, blockEdge);
+  dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                 (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+  #pragma omp target teams distribute parallel for collapse(2) \
+    num_teams(numBlocks.y) thread_limit(blockEdge*blockEdge)
+  for (int i = 0; i < N; i++){
+    for (int j = 0; j < N; j++){
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      d_output[i*N + j] = (count == 1) ? 1 : 0;
     }
   }
+
+  #pragma omp target update from(d_output[0:N*N])
 
 
   // Validate the output
@@ -83,6 +94,7 @@ int main(int argc, char **argv) {
   }
   std::cout << "Validation passed." << std::endl;
   cleanup(input, output);
+  #pragma omp target exit data map(delete:d_input, d_output)
   return 0;
 }
 ```

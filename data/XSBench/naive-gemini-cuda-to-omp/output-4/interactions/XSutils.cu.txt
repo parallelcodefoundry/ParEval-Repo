@@ -1,5 +1,5 @@
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 
 int double_compare(const void * a, const void * b)
 {
@@ -67,10 +67,6 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-	#ifdef MPI
-	return MPI_Wtime();
-	#endif
-
 	#ifdef OPENMP
 	return omp_get_wtime();
 	#endif
@@ -91,4 +87,3 @@ double get_time(void)
 	#endif
 }
 ```
-The CUDA specific includes and functions are removed.  The `get_time` function now uses `omp_get_wtime()` if OpenMP is defined, and falls back to `gettimeofday()` if not.  No changes are needed for the comparison functions as they are standard C.

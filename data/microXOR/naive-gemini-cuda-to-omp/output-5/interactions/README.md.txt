@@ -3,15 +3,16 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP offloading for parallel execution on a host with an accelerator device (e.g., GPU).
+This version of microXOR is written in OpenMP offloading for GPU execution (if available).  It falls back to CPU execution if offloading is not supported.
 
 ## Prerequisites
 
-An OpenMP-capable compiler with offloading support (e.g., GCC, Clang) and an accelerator device are required.  The target architecture for offloading should be specified during compilation.
+An OpenMP-capable compiler with offloading support (e.g., g++ with -fopenmp) is required.  For GPU offloading, a compatible device (e.g., NVIDIA GPU with appropriate drivers) must be present.
+
 
 ## Build
 
-To build microXOR, use `make`.  The Makefile will attempt to automatically detect the appropriate offloading target, but you may need to adjust the `TARGET` variable if necessary. For example, to specify an NVIDIA GPU, you might need to use a compiler flag such as `-fopenmp-targets=nvptx64-nvidia-cuda`.
+To build microXOR, use `make`.
 
 ```bash
 make
@@ -19,7 +20,7 @@ make
 
 ## Run
 
-microXOR requires two command-line arguments, one for matrix size and one for the number of threads per block (this will affect the OpenMP parallel region, not CUDA blocks as before). For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block (per OpenMP team):
+microXOR requires two command-line arguments, one for matrix size and one for the number of threads per team (analogous to CUDA's block size). For example, the following will run microXOR with a 1024x1024 input matrix and a team size of 32x32:
 
 ```bash
 ./microXOR.exe 1024 32

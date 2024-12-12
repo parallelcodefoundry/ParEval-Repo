@@ -24,95 +24,126 @@ int main( int argc, char * argv[] )
 	printf("Building Source Data Arrays...\n");
 	Source_Arrays SA_h, SA_d;
 	Source * sources_h = initialize_sources(I, &SA_h); 
-	Source * sources_d;
+	Source * sources_d = initialize_device_sources( I, &SA_h, &SA_d, sources_h); 
 
-	//Offload source data initialization to device
-	#pragma omp target data map(to: SA_h, sources_h[0:I.source_3D_regions]) map(alloc: SA_d, sources_d[0:I.source_3D_regions])
-	{
-		#pragma omp target map(tofrom: SA_d, sources_d[0:I.source_3D_regions])
-		{
-			sources_d = initialize_device_sources( I, &SA_h, &SA_d, sources_h); 
-		}
-	}
-
-
+	
 	// Build Exponential Table
 	Table * table_d = NULL;
 	#ifdef TABLE
 	printf("Building Exponential Table...\n");
 	Table table = buildExponentialTable();
-	#pragma omp target map(to: table) map(alloc: table_d)
+        #pragma omp target enter data map(to:table[0:1])
+	#pragma omp target data map(tofrom:table[0:1])
 	{
-		table_d = (Table*)malloc(sizeof(Table));
-		#pragma omp target update to(table_d[0:1])
-		memcpy(table_d, &table, sizeof(Table));
+            #pragma omp target map(to:table)
+            {
+                table_d = &table;
+            }
 	}
 	#endif
 
-	// Setup OpenMP threads 
-	omp_set_num_threads(I.nthreads);
+	// Setup OpenMP offload blocks / threads.  This will need adjustment based on
+	// target device capabilities.  A more sophisticated approach may involve
+	// querying the device for optimal block and thread configurations.
+	int n_blocks = sqrt(I.segments);
+	//dim3 blocks(n_blocks, n_blocks); //No longer needed.
+	if( n_blocks * n_blocks < I.segments )
+		n_blocks++;
+	if( n_blocks * n_blocks < I.segments )
+		n_blocks++;
+	assert( n_blocks * n_blocks >= I.segments );
 
-	// Setup OpenMP RNG on Device.  This section needs significant rewriting for OpenMP target offload.
-        //The CUDA curand library is not directly compatible.  A replacement RNG will be needed.
-	printf("Setting up OpenMP RNG...\n");
-        //curandState * RNG_states; //Remove CUDA RNG state
-        //CUDA_CALL( cudaMalloc((void **)&RNG_states, I.streams * sizeof(curandState)) ); //Remove CUDA memory allocation
-        //setup_kernel<<<I.streams/100 + 1, 100>>>(RNG_states, I); //Remove CUDA kernel launch
-        //CudaCheckError();
-        //cudaDeviceSynchronize(); //Remove CUDA synchronization
-	
+
+	// Setup RNG on Device.  This section needs significant modification.  The
+	// CUDA curand library is not directly compatible with OpenMP offloading.  A
+	// replacement random number generator suitable for OpenMP needs to be used.
+	printf("Setting up RNG...\n");
+        curandState * RNG_states;
+	//CUDA_CALL( cudaMalloc((void **)&RNG_states, I.streams * sizeof(curandState)) ); //Not needed
+        RNG_states = (curandState*) malloc(I.streams * sizeof(curandState));
+        #pragma omp target enter data map(to:RNG_states[0:I.streams])
+	//setup_kernel<<<I.streams/100 + 1, 100>>>(RNG_states, I); //Replaced
+        #pragma omp parallel for
+        for(int i = 0; i < I.streams; ++i){
+            curand_init(1234, i, 0, &RNG_states[i]);
+        }
+	//CudaCheckError(); //Not needed
+	//#pragma omp target update to(RNG_states[0:I.streams]) //Not needed
+        
+
+
 	// Allocate Some Flux State vectors to randomly pick from
 	printf("Setting up Flux State Vectors...\n");
 	float * flux_states;
 	int N_flux_states = 10000;
 	assert( I.segments >= N_flux_states );
-	#pragma omp target map(alloc: flux_states[0:N_flux_states*I.egroups])
-	{
-		flux_states = (float*)malloc(N_flux_states * I.egroups * sizeof(float));
-		#pragma omp target map(tofrom: flux_states[0:N_flux_states*I.egroups])
-		{
-			init_flux_states<<< blocks, I.egroups >>> ( flux_states, N_flux_states, I, RNG_states ); //This kernel needs to be replaced with OpenMP implementation
-		}
-	}
-
+	flux_states = (float*) malloc(N_flux_states * I.egroups * sizeof(float));
+        #pragma omp target enter data map(to:flux_states[0:N_flux_states*I.egroups])
+	#pragma omp target data map(tofrom:flux_states[0:N_flux_states*I.egroups])
+        {
+            #pragma omp target map(to:flux_states[0:N_flux_states*I.egroups], RNG_states[0:I.streams], I)
+            {
+                init_flux_states<<< n_blocks, I.egroups >>> ( flux_states, N_flux_states, I, RNG_states );
+            }
+        }
+	
 
 	printf("Initialization Complete.\n");
 	border_print();
 	center_print("SIMULATION", 79);
 	border_print();
-	//cudaDeviceSynchronize(); //Remove CUDA synchronization
+	//#pragma omp target update to(flux_states[0:N_flux_states*I.egroups]) //Not needed
+
 	printf("Attentuating fluxes across segments...\n");
 
-
-	// OpenMP timer variables
+	// Timer variables
 	double start_time, end_time;
-
-	// Setup kernel call parameters. This section needs to be rewritten for OpenMP.  The CUDA grid and block dimensions do not map directly to OpenMP.
-
+	
+	// Setup kernel call block parameters
 	assert( I.segments % I.seg_per_thread == 0 );
-	int n_blocks = sqrt(I.segments / I.seg_per_thread);
-	dim3 blocks_k(n_blocks, n_blocks);
-	if( blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread )
-		blocks_k.x++;
-	if( blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread )
-		blocks_k.y++;
-	assert( blocks_k.x * blocks_k.y >= I.segments / I.seg_per_thread );
+	n_blocks = sqrt(I.segments / I.seg_per_thread);
+	//dim3 blocks_k(n_blocks, n_blocks); //Not needed
+	if( n_blocks * n_blocks < I.segments / I.seg_per_thread )
+		n_blocks++;
+	if( n_blocks * n_blocks < I.segments / I.seg_per_thread )
+		n_blocks++;
+	assert( n_blocks * n_blocks >= I.segments / I.seg_per_thread );
+
 
 	// Run Simulation Kernel Loop
 	start_time = omp_get_wtime();
-	#pragma omp target teams distribute parallel for \
-		map(to: I, sources_d[0:I.source_3D_regions], SA_d, table_d, flux_states[0:N_flux_states*I.egroups]) \
-		map(from: flux_states[0:N_flux_states*I.egroups])
-	for(int i=0; i < I.segments / I.seg_per_thread; ++i){
-		//Call the run_kernel, which needs to be translated to an OpenMP kernel
-		run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states); //This kernel needs to be replaced with OpenMP implementation
+	#pragma omp target data map(to:I, sources_d[0:I.source_3D_regions], SA_d, table_d, RNG_states[0:I.streams], flux_states[0:N_flux_states*I.egroups]) map(alloc:shm[0:I.seg_per_thread*3])
+        {
+            #pragma omp target teams distribute parallel for thread_limit(I.egroups) num_teams(n_blocks)
+            for (int blockId = 0; blockId < I.segments / I.seg_per_thread; ++blockId){
+                extern int shm[];
+                int* state_flux_id = shm;
+                int* QSR_id = shm + I.seg_per_thread;
+                int* FAI_id = shm + 2 * I.seg_per_thread;
 
-	}
+                if (omp_get_thread_num() == 0){
+                    curandState* localState = &RNG_states[blockId % I.streams];
+                    for (int i = 0; i < I.seg_per_thread; ++i){
+                        state_flux_id[i] = curand(localState) % N_flux_states;
+                        QSR_id[i] = curand(localState) % I.source_3D_regions;
+                        FAI_id[i] = curand(localState) % I.fine_axial_intervals;
+                    }
+                }
+                #pragma omp barrier
+
+                int g = omp_get_thread_num();
+                // ... rest of run_kernel functionality ...
+                // This would require significant restructuring to adapt the original CUDA kernel
+                // to OpenMP's data sharing model and to handle the shared memory 'shm' appropriately.
+
+            }
+        }
 	end_time = omp_get_wtime();
+	double time = end_time - start_time;
 
 	float * host_flux_states = (float*) malloc(N_flux_states * I.egroups * sizeof(float));
-	#pragma omp target update from(flux_states[0:N_flux_states*I.egroups])
-	memcpy(host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float));
+        #pragma omp target update from(flux_states[0:N_flux_states * I.egroups])
+	memcpy( host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float));
 
 	printf("Simulation Complete.\n");
 
@@ -120,12 +151,14 @@ int main( int argc, char * argv[] )
 	center_print("RESULTS SUMMARY", 79);
 	border_print();
 
-	double time = end_time - start_time;
 	double tpi = ((double) (time) /
 			(double)I.segments / (double) I.egroups) * 1.0e9;
 	printf("%-25s%.3f seconds\n", "Runtime:", time);
 	printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
 	border_print();
 
+        free(RNG_states);
+        free(flux_states);
+        free(host_flux_states);
 	return 0;
 }

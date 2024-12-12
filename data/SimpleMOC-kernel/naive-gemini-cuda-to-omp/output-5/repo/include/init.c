@@ -2,19 +2,18 @@
 
 #pragma omp declare target
 __global__ void setup_kernel(curandState *state, Input I)
-#pragma omp end declare target
 {
 	int threadId = blockIdx.x *blockDim.x + threadIdx.x;
 	if( threadId >= I.streams)
 		return;
 	curand_init(1234, threadId, 0, &state[threadId]);
 }
+#pragma omp end declare target
 
 // Initialize global flux states to random numbers on device
 // Slow, poor use of GPU, but fine since it's just initialization code
 #pragma omp declare target
 __global__ void	init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state)
-#pragma omp end declare target
 {
 	int blockId = blockIdx.y * gridDim.x + blockIdx.x; // geometric segment	
 	//int threadId = blockId * blockDim.x + threadIdx.x; // energy group
@@ -29,6 +28,8 @@ __global__ void	init_flux_states( float * flux_states, int N_flux_states, Input 
 		for( int i = 0; i < I.egroups; i++ )
 			flux_states[blockId +i] = curand_uniform(localState);
 }
+#pragma omp end declare target
+
 
 // Gets I from user and sets defaults
 Input set_default_input( void )
@@ -110,31 +111,22 @@ Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays
 {
 	// Allocate & Copy Fine Source Data
 	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-        SA_d->fine_source_arr = (float*) malloc(N_fine * sizeof(float));
-        #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine])
-	memcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float));
-        #pragma omp target exit data map(from: SA_d->fine_source_arr[0:N_fine])
+        SA_d->fine_source_arr = (float *) malloc( N_fine * sizeof(float));
+        memcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float));
 
 
 	// Allocate & Copy Fine Flux Data
-        SA_d->fine_flux_arr = (float*) malloc(N_fine * sizeof(float));
-        #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine])
-	memcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float));
-        #pragma omp target exit data map(from: SA_d->fine_flux_arr[0:N_fine])
+        SA_d->fine_flux_arr = (float *) malloc( N_fine * sizeof(float));
+        memcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float));
 
 	// Allocate & Copy SigT Data
 	long N_sigT = I.source_3D_regions * I.egroups;
-        SA_d->sigT_arr = (float*) malloc(N_sigT * sizeof(float));
-        #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT])
-	memcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float));
-        #pragma omp target exit data map(from: SA_d->sigT_arr[0:N_sigT])
+        SA_d->sigT_arr = (float *) malloc( N_sigT * sizeof(float));
+        memcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float));
 
 	// Allocate & Copy Source Array Data
-	Source * sources_d;
-        sources_d = (Source*) malloc(I.source_3D_regions * sizeof(Source));
-        #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions])
-	memcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source));
-        #pragma omp target exit data map(from: sources_d[0:I.source_3D_regions])
+	Source * sources_d = (Source *) malloc(I.source_3D_regions * sizeof(Source));
+        memcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source));
 
 	return sources_d;
 }

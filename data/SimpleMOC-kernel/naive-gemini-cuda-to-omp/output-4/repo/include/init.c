@@ -1,33 +1,28 @@
 #include "SimpleMOC-kernel_header.h"
 
-#pragma omp declare target
-__global__ void setup_kernel(curandState *state, Input I)
-#pragma omp end declare target
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void setup_kernel(curandState *state, Input I)
 {
-	int threadId = blockIdx.x *blockDim.x + threadIdx.x;
-	if( threadId >= I.streams)
-		return;
-	curand_init(1234, threadId, 0, &state[threadId]);
+    #pragma omp parallel for
+    for(long long threadId = 0; threadId < I.streams; threadId++) {
+        curand_init(1234, threadId, 0, &state[threadId]);
+    }
 }
 
 // Initialize global flux states to random numbers on device
 // Slow, poor use of GPU, but fine since it's just initialization code
-#pragma omp declare target
-__global__ void	init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state)
-#pragma omp end declare target
+void	init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state)
 {
-	int blockId = blockIdx.y * gridDim.x + blockIdx.x; // geometric segment	
-	//int threadId = blockId * blockDim.x + threadIdx.x; // energy group
-
-	if(blockId >= N_flux_states)
-		return;
-
-	// Assign RNG state
-	curandState * localState = &state[blockId % I.streams];
-
-	if( threadIdx.x == 0 )
-		for( int i = 0; i < I.egroups; i++ )
-			flux_states[blockId +i] = curand_uniform(localState);
+    #pragma omp parallel for
+    for(long long blockId = 0; blockId < N_flux_states; blockId++) {
+        // Assign RNG state
+        curandState * localState = &state[blockId % I.streams];
+        for( int i = 0; i < I.egroups; i++ )
+            flux_states[blockId * I.egroups + i] = curand_uniform(localState);
+    }
 }
 
 // Gets I from user and sets defaults
@@ -56,14 +51,14 @@ double mem_estimate( Input I )
 	nbytes += I.source_3D_regions * sizeof(Source);
 
 	// Fine Source Data
-	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+	long long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
 	nbytes += N_fine * sizeof(float);
 
 	// Fine Flux Data
 	nbytes += N_fine * sizeof(float);
 
 	// SigT Data
-	long N_sigT = I.source_3D_regions * I.egroups;
+	long long N_sigT = I.source_3D_regions * I.egroups;
 	nbytes += N_sigT * sizeof(float);
 
 	// Return MB
@@ -76,31 +71,33 @@ Source * initialize_sources( Input I, Source_Arrays * SA )
 	Source * sources = (Source *) malloc( I.source_3D_regions * sizeof(Source));
 
 	// Allocate Fine Source Data
-	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+	long long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
 	SA->fine_source_arr = (float *) malloc( N_fine * sizeof(float));
-	for( int i = 0; i < I.source_3D_regions; i++ )
+	for( long long i = 0; i < I.source_3D_regions; i++ )
 		sources[i].fine_source_id = i*I.fine_axial_intervals*I.egroups;
 
 	// Allocate Fine Flux Data
 	SA->fine_flux_arr = (float *) malloc( N_fine * sizeof(float));
-	for( int i = 0; i < I.source_3D_regions; i++ )
+	for( long long i = 0; i < I.source_3D_regions; i++ )
 		sources[i].fine_flux_id = i*I.fine_axial_intervals*I.egroups;
 
 	// Allocate SigT Data
-	long N_sigT = I.source_3D_regions * I.egroups;
+	long long N_sigT = I.source_3D_regions * I.egroups;
 	SA->sigT_arr = (float *) malloc( N_sigT * sizeof(float));
-	for( int i = 0; i < I.source_3D_regions; i++ )
+	for( long long i = 0; i < I.source_3D_regions; i++ )
 		sources[i].sigT_id = i * I.egroups;
 
 	// Initialize fine source and flux to random numbers
-	for( long i = 0; i < N_fine; i++ )
+    #pragma omp parallel for
+	for( long long i = 0; i < N_fine; i++ )
 	{
 		SA->fine_source_arr[i] = (float) rand() / RAND_MAX;
 		SA->fine_flux_arr[i] = (float) rand() / RAND_MAX;
 	}
 
 	// Initialize SigT Values
-	for( int i = 0; i < N_sigT; i++ )
+    #pragma omp parallel for
+	for( long long i = 0; i < N_sigT; i++ )
 		SA->sigT_arr[i] = (float) rand() / RAND_MAX;
 
 	return sources;
@@ -109,24 +106,26 @@ Source * initialize_sources( Input I, Source_Arrays * SA )
 Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h )
 {
 	// Allocate & Copy Fine Source Data
-        long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-        #pragma omp target enter data map(alloc: SA_d->fine_source_arr[0:N_fine])
-        #pragma omp target update from(SA_h->fine_source_arr[0:N_fine]) to(SA_d->fine_source_arr[0:N_fine])
-	
+	long long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+	//cudaMalloc((void **) &SA_d->fine_source_arr, N_fine * sizeof(float)); //removed since we are not using CUDA
+    SA_d->fine_source_arr = (float *) malloc(N_fine * sizeof(float));
+	memcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float));
 
 	// Allocate & Copy Fine Flux Data
-        #pragma omp target enter data map(alloc: SA_d->fine_flux_arr[0:N_fine])
-        #pragma omp target update from(SA_h->fine_flux_arr[0:N_fine]) to(SA_d->fine_flux_arr[0:N_fine])
+	//cudaMalloc((void **) &SA_d->fine_flux_arr, N_fine * sizeof(float)); //removed since we are not using CUDA
+    SA_d->fine_flux_arr = (float *) malloc(N_fine * sizeof(float));
+	memcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float));
 
 	// Allocate & Copy SigT Data
-	long N_sigT = I.source_3D_regions * I.egroups;
-        #pragma omp target enter data map(alloc: SA_d->sigT_arr[0:N_sigT])
-        #pragma omp target update from(SA_h->sigT_arr[0:N_sigT]) to(SA_d->sigT_arr[0:N_sigT])
+	long long N_sigT = I.source_3D_regions * I.egroups;
+	//cudaMalloc((void **) &SA_d->sigT_arr, N_sigT * sizeof(float)); //removed since we are not using CUDA
+    SA_d->sigT_arr = (float *) malloc(N_sigT * sizeof(float));
+	memcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float));
 
 	// Allocate & Copy Source Array Data
-	Source * sources_d;
-        #pragma omp target enter data map(alloc: sources_d[0:I.source_3D_regions])
-        #pragma omp target update from(sources_h[0:I.source_3D_regions]) to(sources_d[0:I.source_3D_regions])
+	//cudaMalloc((void **) &sources_d, I.source_3D_regions * sizeof(Source)); //removed since we are not using CUDA
+    Source * sources_d = (Source *) malloc(I.source_3D_regions * sizeof(Source));
+	memcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source));
 
 	return sources_d;
 }
@@ -164,27 +163,6 @@ Table buildExponentialTable( void )
 	return table;
 }
 
-void __cudaCheckError( const char *file, const int line )
-{
-#ifdef CUDA_ERROR_CHECK
-    cudaError err = cudaGetLastError();
-    if ( cudaSuccess != err )
-    {
-        fprintf( stderr, "cudaCheckError() failed at %s:%i : %s\n",
-                 file, line, cudaGetErrorString( err ) );
-        exit( -1 );
-    }
- 
-    // More careful checking. However, this will affect performance.
-    // Comment away if needed.
-    err = cudaDeviceSynchronize();
-    if( cudaSuccess != err )
-    {
-        fprintf( stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
-                 file, line, cudaGetErrorString( err ) );
-        exit( -1 );
-    }
-#endif
- 
-    return;
+#ifdef __cplusplus
 }
+#endif

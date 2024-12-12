@@ -10,15 +10,15 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -fopenmp") # Add -fopenmp flag
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -fopenmp")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp) #Change .cu to .cpp
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
-# Add OpenMP target
 add_executable(XSBench ${SOURCE})
-target_link_libraries(XSBench m) #Link math library
+
+target_link_libraries(XSBench ${OpenMP_CXX_FLAGS})
 
 
 install(TARGETS XSBench DESTINATION bin)

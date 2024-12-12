@@ -1,5 +1,5 @@
-```cpp
-#include "XSbench_header.cuh"
+```c++
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory.  No equivalent for OpenMP offload here; manage memory directly.
+    // Release device memory (Not needed for OpenMP offload)
     release_memory(SD);
 
     // Final Hash Step
@@ -108,4 +108,4 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-**Note:** This translation removes all CUDA-specific code (like `cudaMalloc`, `cudaMemcpy`, `<<<...>>>`, etc.). The  `Simulation.cu`, `GridInit.cu`, and other `.cu` files will require significant changes to utilize OpenMP offloading.  The memory management will need to be handled differently, and the kernels will need to be rewritten using OpenMP pragmas for offloading.  The `thrust` library calls will also need to be replaced with OpenMP-compatible alternatives.  This response only addresses the `Main.cu` file as requested.  A complete translation would require a comprehensive rewrite of the entire codebase.
+**Note:**  This translation removes CUDA-specific functions and replaces `cudaMalloc`, `cudaMemcpy`,  `cudaFree`, and  `cudaDeviceSynchronize`.  The OpenMP offload model will handle data movement and execution on the target device automatically (if available and configured properly).  You will need to adapt the `run_event_based_simulation_*` functions and kernel functions within `Simulation.c` to use OpenMP offloading directives (`#pragma omp target`, `#pragma omp teams distribute parallel for`, etc.) to achieve parallel execution.  The `thrust` library calls will also need to be replaced with standard OpenMP or other parallel constructs for the reduction and sorting operations.  The Makefile and other files will also require changes to compile and link correctly for OpenMP offloading.  Error checking for offloading (equivalent to `gpuErrchk`) needs to be implemented.  Finally, remember to link against the OpenMP and potentially other necessary libraries.

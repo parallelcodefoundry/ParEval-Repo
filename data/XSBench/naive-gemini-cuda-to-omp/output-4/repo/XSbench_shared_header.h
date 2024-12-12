@@ -5,6 +5,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
 #include <omp.h>
 
 
@@ -31,10 +33,23 @@ typedef struct{
   double host_to_device_time;
 } Profile;
 
+//Helper function to get time
+double get_time(void){
+  double time;
+  #ifdef _OPENMP
+    time = omp_get_wtime();
+  #else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    time = ts.tv_sec + 1e-9 * ts.tv_nsec;
+  #endif
+  return time;
+}
+
 inline void print_profile(Profile profile, Inputs in) {
   if (in.filename) {
     FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_time_ms,num_iterations,num_warmups\n");
+    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
     fprintf(output, "%f,%f,%f,%d,%d\n",
             profile.host_to_device_time*1000,
             profile.kernel_time*1000,
@@ -44,7 +59,7 @@ inline void print_profile(Profile profile, Inputs in) {
     fclose(output);
   }
   else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_time_ms,num_iterations,num_warmups\n");
+    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
     printf("%f,%f,%f,%d,%d\n",
            profile.host_to_device_time*1000,
            profile.kernel_time*1000,

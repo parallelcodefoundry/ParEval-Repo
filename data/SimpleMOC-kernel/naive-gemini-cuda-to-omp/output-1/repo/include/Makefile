@@ -28,7 +28,8 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -Iinclude -fopenmp -foffload=-march=sm_$(SM_VERSION) -L$(CUDA_LIBS)
+override CFLAGS += -foffload=-m$(SM_VERSION) -fopenmp -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/include -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+
 
 # Linker Flags
 LDFLAGS = -lm -lcurand
@@ -52,10 +53,6 @@ endif
 ifeq ($(TABLE), yes)
 	CFLAGS += -DTABLE
 endif
-
-# CUDA Libraries
-CUDA_LIBS ?= /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
-
 
 #===============================================================================
 # Targets to Build

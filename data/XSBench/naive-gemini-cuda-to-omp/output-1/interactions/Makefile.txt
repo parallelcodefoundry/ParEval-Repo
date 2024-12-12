@@ -7,7 +7,7 @@ COMPILER    ?= llvm
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
-CUDA_ARCH   ?= 80
+CUDA_ARCH  ?= 80
 
 #===============================================================================
 # Program name & source code list
@@ -30,17 +30,15 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -foffload=-m64 -foffload=targets=$(CUDA_ARCH)
+CFLAGS := -fopenmp -foffload=-lm
 
 # Linker Flags
 LDFLAGS = -lm
 
-# Compiler
-ifeq ($(COMPILER),gcc)
-  CC = gcc
-endif
+# LLVM Compiler
 ifeq ($(COMPILER),llvm)
   CC = clang
+  CFLAGS += -O3 -march=native -fopenmp-targets=nvptx64-nvidia-cuda11.2 -mcpu=sm_$(CUDA_ARCH)
 endif
 
 # Debug Flags
@@ -64,17 +62,17 @@ endif
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.h XSbench_shared_header.h Makefile
+$(program): $(obj) XSbench_header.h Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.c XSbench_header.h XSbench_shared_header.h Makefile
+%.o: %.c XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.h XSbench_shared_header.h
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)

@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 // Moves all required data structures to the GPU's memory space
 SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD )
@@ -29,36 +29,38 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
     // Shallow copy of CPU simulation data to GPU simulation data
     SimulationData GSD = SD;
 
-    #pragma omp target enter data map(alloc: GSD.num_nucs[0:GSD.length_num_nucs])
+    //Use OpenMP target directives to offload data
+    #pragma omp target enter data map(to: GSD.num_nucs[0:GSD.length_num_nucs])
     sz = GSD.length_num_nucs * sizeof(int);
     #pragma omp target update to(GSD.num_nucs[0:GSD.length_num_nucs])
+
     total_sz += sz;
 
-    #pragma omp target enter data map(alloc: GSD.concs[0:GSD.length_concs])
+    #pragma omp target enter data map(to: GSD.concs[0:GSD.length_concs])
     sz = GSD.length_concs * sizeof(double);
     #pragma omp target update to(GSD.concs[0:GSD.length_concs])
     total_sz += sz;
 
-    #pragma omp target enter data map(alloc: GSD.mats[0:GSD.length_mats])
+    #pragma omp target enter data map(to: GSD.mats[0:GSD.length_mats])
     sz = GSD.length_mats * sizeof(int);
     #pragma omp target update to(GSD.mats[0:GSD.length_mats])
     total_sz += sz;
 
     if (SD.length_unionized_energy_array != 0) {
-        #pragma omp target enter data map(alloc: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
+        #pragma omp target enter data map(to: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
         sz = GSD.length_unionized_energy_array * sizeof(double);
         #pragma omp target update to(GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
         total_sz += sz;
     }
 
     if (SD.length_index_grid != 0) {
-        #pragma omp target enter data map(alloc: GSD.index_grid[0:GSD.length_index_grid])
+        #pragma omp target enter data map(to: GSD.index_grid[0:GSD.length_index_grid])
         sz = GSD.length_index_grid * sizeof(int);
         #pragma omp target update to(GSD.index_grid[0:GSD.length_index_grid])
         total_sz += sz;
     }
 
-    #pragma omp target enter data map(alloc: GSD.nuclide_grid[0:GSD.length_nuclide_grid])
+    #pragma omp target enter data map(to: GSD.nuclide_grid[0:GSD.length_nuclide_grid])
     sz = GSD.length_nuclide_grid * sizeof(NuclideGridPoint);
     #pragma omp target update to(GSD.nuclide_grid[0:GSD.length_nuclide_grid])
     total_sz += sz;
@@ -70,9 +72,8 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
     total_sz += sz;
     GSD.length_verification = in.lookups;
 
-
-    // Synchronize - Not directly equivalent, but ensures data is ready on the device.
-    // Could add an explicit omp target wait construct if needed based on execution behavior.
+    // Synchronize -  Not directly equivalent to CUDA's synchronization, needs adjustment based on OpenMP implementation
+    //  Consider using omp_get_wtime() to measure time before and after offloading blocks to check for completion.
 
     if(mype == 0 ) printf("Offload Intialization complete. Allocated %.0lf MB of data on offload device.\n", total_sz/1024.0/1024.0 );
 
@@ -80,7 +81,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
 
 }
 
-// Release device memory
+// Release offload memory
 void release_device_memory(SimulationData GSD) {
     #pragma omp target exit data map(delete: GSD.num_nucs, GSD.concs, GSD.mats, GSD.unionized_energy_array, GSD.index_grid, GSD.nuclide_grid, GSD.verification)
 }
@@ -142,6 +143,7 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
     // Sort so that each nuclide has data stored in ascending energy order.
     for( int i = 0; i < in.n_isotopes; i++ )
         qsort( &SD.nuclide_grid[i*in.n_gridpoints], in.n_gridpoints, sizeof(NuclideGridPoint), NGP_compare);
+
 
     // Allocate Verification Array
     size_t sz = in.lookups * sizeof(unsigned long);

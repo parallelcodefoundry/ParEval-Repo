@@ -2,26 +2,29 @@
 # Makefile for OpenMP offloading microXOR
 
 CXX ?= clang++
-SM_VERSION ?= 80
-CXXFLAGS ?= -fopenmp -foffload=-march=sm_${SM_VERSION} -Iinclude -std=c++17
-LDFLAGS ?= -fopenmp -lcudart #Note: -lcudart might not be necessary depending on your OpenMP offloading setup.  It's included for potential compatibility.
+CXXFLAGS ?= -std=c++17 -fopenmp -foffload=-march=sm_$(SM_VERSION) -Iinclude
+LDFLAGS ?= -fopenmp -lcudart #Note: -lcudart may not be needed depending on your compiler
 
 ifeq ($(DEBUG), yes)
-    CXXFLAGS += -g -G
+	CXXFLAGS += -g -O0
 else
-    CXXFLAGS += -O3
+	CXXFLAGS += -O3
 endif
 
 SRC = src
 INC = include
 OBJ = obj
-OBJS = $(patsubst $(SRC)/%.cu,$(OBJ)/%.o,$(wildcard $(SRC)/*.cu))
 EXE = microXOR.exe
 
-$(EXE): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
 
-$(OBJ)/%.o: $(SRC)/%.cu $(INC)/microXOR.hpp
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 obj:

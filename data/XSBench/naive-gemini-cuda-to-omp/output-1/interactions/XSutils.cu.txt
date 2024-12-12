@@ -1,5 +1,5 @@
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 
 int double_compare(const void * a, const void * b)
 {
@@ -67,18 +67,8 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-	#ifdef MPI
-	return MPI_Wtime();
-	#endif
-
 	#ifdef OPENMP
 	return omp_get_wtime();
-	#endif
-
-	#ifdef __cplusplus
-	// If using C++, we can do this:
-	unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
-	return (double) us_since_epoch / 1.0e6;
 	#else
 	struct timeval timecheck;
 
@@ -91,4 +81,3 @@ double get_time(void)
 	#endif
 }
 ```
-  The OpenMP offloading model doesn't directly replace CUDA's `__host__ __device__` keywords.  The CUDA functions are largely unchanged because they operate on host data in this translation, and OpenMP offloading is used for larger data structures in other files (like `GridInit.cu`).  The `get_time` function is already compatible with OpenMP's `omp_get_wtime()`. No changes are needed in this file for a basic OpenMP offload translation.  The significant changes will be in other files to manage data movement between host and (potentially) a device.

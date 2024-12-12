@@ -1,28 +1,31 @@
 # Makefile for OpenMP offloading microXOR
 
-CXX ?= $(CXX_COMPILER)
-SM_VERSION ?= $(SM_VERSION)
+CXX ?= clang++
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -std=c++17
+LDFLAGS ?= -lcudart
+
+ifeq ($(SM_VERSION), )
+  $(error SM_VERSION must be set, e.g., make SM_VERSION=80)
+endif
+
+ifeq ($(CXX_COMPILER), )
+  $(error CXX_COMPILER must be set, e.g., make CXX_COMPILER=g++)
+endif
+
+CXXFLAGS += -mcpu=sm_$(SM_VERSION)
+
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -I$(INC) -std=c++17 -fPIC -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=native
-LDFLAGS ?= -lcudart -fopenmp
-
-ifeq ($(DEBUG), yes)
-	CXXFLAGS += -g -O0
-else
-	CXXFLAGS += -O3
-endif
-
-CXXFLAGS += -D__CUDA_ARCH__=$(SM_VERSION) # Define CUDA architecture for OpenMP target
+EXE = microXOR.exe
 
 CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
 DEPS = $(INC)/microXOR.hpp
 OBJS = $(CPPFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
-EXE = microXOR.exe
+
 
 $(EXE): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
 $(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
 	$(CXX) $(CXXFLAGS) -c $< -o $@

@@ -14,10 +14,10 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -fopenmp")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
 add_executable(XSBench ${SOURCE})
 
-target_link_libraries(XSBench  gomp) # Link with OpenMP library
+target_link_libraries(XSBench ${OpenMP_LIBRARIES})
 
 install(TARGETS XSBench DESTINATION bin)

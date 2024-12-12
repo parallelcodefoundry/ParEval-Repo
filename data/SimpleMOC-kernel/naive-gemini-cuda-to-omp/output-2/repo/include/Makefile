@@ -27,16 +27,11 @@ obj = $(source:.c=.o)
 # Sets Flags
 #===============================================================================
 
-# Regular clang Compiler
-ifeq ($(COMPILER),clang)
-  CC = clang
-endif
-
 # Standard Flags
-override CFLAGS += -fopenmp -foffload=-march=native -I.  $(shell if [ -d "/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/" ]; then echo "-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/"; fi)
+override CFLAGS += -foffload=-foffload-arch=$(SM_VERSION) -I/usr/local/cuda/include $(shell $(COMPILER) --print-file-name=libomp.so) -fopenmp -lm -L$(CUDA_MATH_LIBS)
 
 # Linker Flags
-LDFLAGS = -lm -lcurand -fopenmp
+LDFLAGS = -lcurand -fopenmp
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -59,14 +54,21 @@ ifeq ($(TABLE), yes)
 endif
 
 #===============================================================================
+# CUDA MATH LIBS
+#===============================================================================
+
+CUDA_MATH_LIBS ?= /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+
+
+#===============================================================================
 # Targets to Build
 #===============================================================================
 
 $(program): $(obj) SimpleMOC-kernel_header.h
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

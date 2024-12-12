@@ -29,15 +29,15 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -fno-stack-protector -march=native -ffast-math
+CFLAGS := -fopenmp -foffload=-march=native -foffload=-mllvm -foffload=-mattr=+avx2
 
 # Linker Flags
 LDFLAGS = -lm
 
-# OpenMP Offloading Flags
+# Compiler selection
 ifeq ($(COMPILER),llvm)
   CC = clang
-  CFLAGS += -fsycl -foffload=-march=nvptx64 -foffload=-m64 -foffload=-mavx2 -foffload=-ffast-math -foffload=-O3 -foffload=--cuda-gpu-arch=$(CUDA_ARCH)
+  CFLAGS += -O3 -fPIC # Add -fPIC for shared libraries if needed
 endif
 
 
@@ -57,6 +57,12 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
+
+# CUDA Architecture
+ifeq ($(COMPILER),llvm)
+  CFLAGS += -foffload=$(CUDA_ARCH)
+endif
+
 
 #===============================================================================
 # Targets to Build

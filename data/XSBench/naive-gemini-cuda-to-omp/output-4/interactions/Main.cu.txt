@@ -1,5 +1,5 @@
-```cpp
-#include "XSbench_header.cuh"
+```c++
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory
+    // Release device memory  (No equivalent needed for OpenMP offload)
     release_memory(SD);
 
     // Final Hash Step
@@ -107,4 +107,5 @@ int main(int argc, char *argv[]) {
     return is_invalid_result;
 }
 ```
-Remember that  you will also need to translate the other `.cu` files to their OpenMP offload equivalents and adjust the `XSbench_header.cuh` file accordingly to remove CUDA specific includes and functions.  The Makefile will also need significant changes to compile with OpenMP offloading.  This translation requires a substantial rewrite, not just a simple substitution of keywords.  The performance characteristics will likely also differ significantly.
+
+**Note:** This translation removes all CUDA-specific code (like `cudaMalloc`, `cudaMemcpy`, `<<<...>>>`, etc.).  The  `Simulation.c`, `GridInit.c`, `XSutils.c`, and `Materials.c` files would also need to be translated to remove CUDA dependencies and adapt to OpenMP offloading.  The `thrust` library calls would need to be replaced with OpenMP-compatible alternatives.  A significant portion of the code, especially the kernel functions, will need substantial rewriting to utilize OpenMP's parallel constructs effectively.  The memory management will also need to be adapted; the OpenMP offload model doesn't have the same device memory concept as CUDA.  Error checking will need to be adjusted accordingly.  Finally,  the Makefile and CMakeLists.txt would require changes to reflect the switch to OpenMP compilation and linking.
