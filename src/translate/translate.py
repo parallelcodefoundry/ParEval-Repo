@@ -45,7 +45,7 @@ def get_translator_cls(method: str, naive_llm: str):
         if naive_llm == "gemini":
             return NaiveGeminiTranslator
         if "llama" in naive_llm:
-            return NaiveVLLMTranslator
+            return NaiveOllamaTranslator
         else:
             return NaiveOpenAITranslator
     else:

@@ -1,28 +1,14 @@
-Here is the translated Makefile:
-```makefile
-#===============================================================================
+Here's how you can translate the Makefile to use the OpenMP-offload execution model.
+
+```make
 # User Options
-#===============================================================================
+COMPILER ?= clang
+CUDA_ARCH ?= 80
+OPTIMIZE ?= yes
+DEBUG    ?= no
+PROFILE  ?= no
 
-COMPILER    ?= nvidia
-OPTIMIZE    ?= yes
-DEBUG       ?= no
-PROFILE     ?= no
-SM_VERSION  ?= 80
-
-CXX         = clang++
-LD          = clang++
-
-# OpenMP flags
-OPENMPFLAGS = -fopenmp -std=c++14
-
-# Offload flag
-OFFLOAD     = -fopenacc
-
-#===============================================================================
 # Program name & source code list
-#===============================================================================
-
 program = XSBench
 
 source = \
@@ -35,16 +21,15 @@ Materials.cu
 
 obj = $(source:.cu=.o)
 
-#===============================================================================
-# Sets Flags
-#===============================================================================
+# Sets Flags for OpenMP offload
+CFLAGS := -fopenmp -D__CUDA_ARCH__=$(CUDA_ARCH) -std=c++14
 
-# Standard Flags
-CFLAGS := -O3
-
-# OpenMP Compiler Flags
-OMP_CXXFLAGS = $(OPENMPFLAGS) -arch=sm_$(SM_VERSION)
-OMP_LDFLAGS  = $(OFFLOAD)
+# Sets Flags for compiler choice (clang or other)
+ifeq ($(COMPILER),clang)
+  CC = clang++
+else ifeq ($(COMPILER),gcc)
+  CC = g++
+endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -61,15 +46,12 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-#===============================================================================
-# Targets to Build
-#===============================================================================
-
+# Target to Build
 $(program): $(obj) XSbench_header.cuh Makefile
-	$(CXX) $(OMP_CXXFLAGS) $(CFLAGS) $(obj) -o $@ $(OMP_LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ -fopenacc
 
 %.o: %.cu XSbench_header.cuh Makefile
-	$(CXX) $(OMP_CXXFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
@@ -84,27 +66,12 @@ run:
 io.cu:
 #include "XSbench_header.cuh"
 
-// Prints program logo
-void logo(int version)
-{
-	border_print();
-	printf(
-	"                   __   __ ___________                 _                        \n"
-	"                   \\ \\ / //  ___| ___ \\               | |                       \n"
-	"                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
-	"                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
-	"                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
-	"                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
-	       );
-	border_print();
-	center_print("Developed at Argonne National Laboratory", 79);
-	char v[100];
-	sprintf(v, "Version: %d", version);
-	center_print(v, 79);
-	border_print();
-}
-
 // ...
 
 ```
-Note that I've added the OpenMP flags and changed the compiler to clang++. The `OFFLOAD` flag is used to enable offloading to a GPU.
+
+This Makefile includes the necessary flags to compile the code with OpenMP and offloading. The `CFLAGS` variable now includes `-fopenmp` for OpenMP support, `-D__CUDA_ARCH__=$(CUDA_ARCH)` to specify the CUDA architecture (assuming you're using a system with an NVIDIA GPU), and `-std=c++14` for C++14 compliance.
+
+The compiler choice is set to clang or gcc depending on the `COMPILER` variable. If you want to use another compiler, you can modify this section accordingly.
+
+Note that I've also included `-fopenacc` in the link step (`$(CC) $(CFLAGS) $(obj) -o $@ -fopenacc`) to enable offloading support for OpenACC-compliant compilers like clang.

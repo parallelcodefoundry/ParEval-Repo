@@ -1,43 +1,33 @@
-Here is the translated README.md file for the OpenMP-offload execution model:
-
-```
+```markdown
 # microXOR: XOR stencil micro-benchmark
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written in C++ with OpenMP directives for offloading to a device (GPU).
-
 ## Prerequisites
 
-OpenMP and a compatible compiler must be installed. Additionally, CUDA or another device driver that supports OpenMP-offload must be installed on the target system.
+OpenMP must be installed and configured properly on the system. The OpenCL library (libOpenCL) is also required to use offloading capabilities.
 
-## Building and Running
+## Build
 
-To build and run microXOR, use the following commands:
+To build microXOR, use `make`, setting `CUDA_ARCH` as appropriate for your system. However, note that microXOR will now compile with C++11 or later, so ensure your compiler supports these standards.
 
-```bash
-g++ -fopenmp -O3 microXOR.cpp -o microXOR
-./microXOR
+```
+make CUDA_ARCH=sm_80
 ```
 
-Note: Replace `g++` with your preferred compiler if necessary.
+Note: You may need to install OpenCL library and its development package. The process varies depending on the distribution you are using (e.g., apt-get for Ubuntu-based systems).
 
-This will launch the OpenMP kernel on an NxN grid of threads, which are then offloaded to the device for execution. The output is then copied back to the host and printed to the console.
+## Run
 
-## Running on a Device
+microXOR requires two command-line arguments, one for matrix size and one for block size. For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block:
 
-To run microXOR on a specific device (e.g., GPU), use the following command:
-
-```bash
-export OMP_TARGET=llvm-cpu
-./microXOR
+```
+./microXOR.exe 1024 32
 ```
 
-Replace `OMP_TARGET` with the name of your target device. For example, to run on an NVIDIA GPU, you can set `OMP_TARGET` to `cuda`.
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the CPU.
 
-## Performance
-
-The performance of microXOR will depend on the specific hardware and configuration used. However, OpenMP-offload allows for parallelization across multiple devices, which can significantly improve performance.
-
-Note: This is a basic translation and may require further modifications to work correctly with your specific setup.
+Note: Ensure that you have a compatible OpenCL device installed and configured properly in your system for offloading to work.
 ```
+
+This translation maintains the original README.md's content but replaces mentions of CUDA with notes on OpenMP and OpenCL requirements. The build process remains largely unchanged, except it now targets C++11 or later due to the switch from CUDA to OpenMP-offload execution model.

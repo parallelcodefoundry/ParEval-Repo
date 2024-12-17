@@ -1,38 +1,36 @@
-# Makefile translated from CUDA to OpenMP-offload
+# Makefile for OpenMP-offload microXOR
 
-CXX = clang++
-CXXFLAGS = -fopenmp -fopenacc
-LDLIBS = -lomp
-SM_VERSION ?= $(shell ompi_info --version)
-ifeq ($(SM_VERSION), 80)
-    CXXFLAGS += -acc -Minfo=all
+SM_VERSION ?= 80
+CXX_COMPILER ?= g++
+OFFLOAD_CXX ?= offload
+OFFLOAD_FLAGS ?= -fopenmp-targets=nvptx64-nvidia-cuda --cuda-device
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g -G
 endif
 
-CC = clang
-CFLAGS = -fopenmp -fopenacc
+SRC = src
+INC = include
+OBJ = obj
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
 
-# Default target is build
-build: microXOR.cpp microXOR.hpp main.cpp
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+$(EXE): $(OBJS)
+	$(CXX_COMPILER) -fopenmp $(OFFLOAD_FLAGS) $(OBJS) -o $(EXE)
 
-main.o: main.cpp microXOR.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX_COMPILER) -fopenmp $(OFFLOAD_FLAGS) $(CXXFLAGS) $< -o $@
 
-microXOR.o: microXOR.cpp microXOR.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj:
+	mkdir -p $(OBJ)
 
-# Cleaning target
 clean:
-	rm -f *.o build
+	rm -f $(OBJS) $(EXE)
 
-# Target for building for a specific SM version
-build-sm-80: CXX = clang++
-build-sm-80: LDLIBS = -lomp
-build-sm-80: microXOR.cpp microXOR.hpp main.cpp
-	$(CXX) $(CXXFLAGS) -acc -Minfo=all $^ -o $@ $(LDLIBS)
+.PHONY: clean
 
-# Target for building with a specific C++ compiler
-build-cxx-compiler: CXX = clang++
-build-cxx-compiler: LDLIBS =
-build-cxx-compiler: microXOR.cpp microXOR.hpp main.cpp
-	$(CXX) $(CXXFLAGS) $^ -o build $(LDLIBS)
+# Example usage:
+# make SM_VERSION=80 CXX_COMPILER=clang++ CXX=g++

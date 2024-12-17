@@ -1,46 +1,102 @@
-#include <omp.h>
-#include <cuda_runtime.h>
+#include "SimpleMOC_kernel_header.h"
 
-// Define a pragma for offloading OpenMP loops to the GPU
-#define OMP_TARGET_DEVICE_API cuda
+int main( int argc, char * argv[] )
+{
+	int version = 4;
 
-// Function to initialize device variables on the GPU
-void init_device_variables(float **device_sources) {
-    // Initialize device sources array
-    cudaMalloc((void **) device_sources, sizeof(Source));
-}
+	srand(time(NULL));
 
-int main() {
-    omp_set_dynamic(0);     /* Dynamism is turned off by default */
-    omp_set_num_threads(1);  /* Number of threads per block */
+	Input I = set_default_input();
+	read_CLI( argc, argv, &I );
+	
+	// Calculate Number of 3D Source Regions
+	I.source_3D_regions = (int) ceil((double)I.source_2D_regions *
+		I.coarse_axial_intervals / I.decomp_assemblies_ax);
 
-    int num_steps = 100;
-    float *device_sources;
+	logo(version);
 
-    init_device_variables(&device_sources);
+	print_input_summary(I);
+	
+	center_print("INITIALIZATION", 79);
+	border_print();
 
-    // Main simulation loop
-#pragma omp parallel for schedule(dynamic, 1) omp_target(cuda)
-    for (int i = 0; i < num_steps; i++) {
-        // Offload this iteration to the GPU
-        #pragma omp target map(device_sources[omp_get_num_threads()][i])
-        {
-            // Perform some computation on the device sources array
-            // This can be replaced with actual code that offloads to the GPU
-            printf("Offloaded computation: %d\n", i);
-        }
-    }
+	// Build Source Data
+	printf("Building Source Data Arrays...\n");
+	Source_Arrays SA_h, SA_d;
+	Source * sources_h = initialize_sources(I, &SA_h); 
+	Source * sources_d = initialize_device_sources( I, &SA_h, &SA_d, sources_h);
 
-    // Check for CUDA errors
-    cudaDeviceSynchronize();
-    cudaError_t err = cudaGetLastError();
-    if (cudaSuccess != err) {
-        fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString(err));
-        exit(1);
-    }
+	// Build Exponential Table
+	Table * table_d = NULL;
+	#ifdef TABLE
+	printf("Building Exponential Table...\n");
+	Table table = buildExponentialTable();
+	CUDA_CALL( cudaMalloc((void **) &table_d, sizeof(Table)) );
+	CUDA_CALL( cudaMemcpy(table_d, &table, sizeof(Table), cudaMemcpyHostToDevice) );
+	#endif
 
-    // Clean up
-    cudaFree(device_sources);
+	// Setup CUDA blocks / threads
+	int n_blocks = sqrt(I.segments);
+	dim3 blocks(n_blocks, n_blocks);
+	if( blocks.x * blocks.y < I.segments )
+		blocks.x++;
+	if( blocks.x * blocks.y < I.segments )
+		blocks.y++;
+	assert( blocks.x * blocks.y >= I.segments );
 
-    return 0;
+	// Setup CUDA RNG on Device
+	printf("Setting up CUDA RNG...\n");
+	curandState * RNG_states;
+	CUDA_CALL( cudaMalloc((void **)&RNG_states, I.streams * sizeof(curandState)) );
+	setup_kernel<<<I.streams/100 + 1, 100>>>(RNG_states, I);
+	CudaCheckError();
+	cudaDeviceSynchronize();
+
+	// Allocate Some Flux State vectors to randomly pick from
+	printf("Setting up Flux State Vectors...\n");
+	float * flux_states;
+	int N_flux_states = 10000;
+	assert( I.segments >= N_flux_states );
+	CUDA_CALL( cudaMalloc((void **) &flux_states, N_flux_states * I.egroups * sizeof(float)) );
+	init_flux_states<<< blocks, I.egroups >>> ( flux_states, N_flux_states, I, RNG_states );
+
+
+	printf("Initialization Complete.\n");
+	border_print();
+	center_print("SIMULATION", 79);
+	border_print();
+	cudaDeviceSynchronize();
+	printf("Attentuating fluxes across segments...\n");
+
+	#pragma omp offload target(nvdevice:0) shared(I, sources_d, SA_d, table_d, RNG_states, flux_states)
+	{
+		int n_blocks_k = sqrt(I.segments / I.seg_per_thread);
+		dim3 blocks_k(n_blocks_k, n_blocks_k);
+		if( blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread )
+			blocks_k.x++;
+		if( blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread )
+			blocks_k.y++;
+		assert( blocks_k.x * blocks_k.y >= I.segments / I.seg_per_thread );
+
+		run_kernel <<< blocks_k, I.egroups >>> (I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
+	}
+
+	cudaDeviceSynchronize();
+
+	float * host_flux_states = (float*) malloc(N_flux_states * I.egroups * sizeof(float));
+	CUDA_CALL( cudaMemcpy( host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost));
+
+	printf("Simulation Complete.\n");
+
+	border_print();
+	center_print("RESULTS SUMMARY", 79);
+	border_print();
+
+	double tpi = ((double) (time/1000.0) /
+			(double)I.segments / (double) I.egroups) * 1.0e9;
+	printf("%-25s%.3f seconds\n", "Runtime:", time / 1000.0);
+	printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
+	border_print();
+
+	return 0;
 }

@@ -1,5 +1,3 @@
-Here is the README.md file translated to the OpenMP-offload execution model:
-
 ```markdown
 # microXOR: XOR stencil micro-benchmark
 
@@ -7,43 +5,34 @@ This is microXOR, a stencil computation benchmark computing an XOR operation ove
 
 ## Prerequisites
 
-OpenMP and offloading capabilities must be installed. This code has been tested with GCC 9.3.0 and OpenMPI 4.1.0 on Linux.
+C++17 must be installed.
 
-## Compiling the Code
+## Build and Run
 
-To compile the code, use:
+To build microXOR for CPU execution using OpenMP offloading to the GPU, use `g++` (or your C++ compiler of choice) with the following command:
+
 ```bash
-gcc -fopenmp -o microXOR microXOR.c -lomp
+g++ -std=c++17 -fopenmp -fPIC -Iinclude -c src/microXOR.cpp -o obj/microXOR.o
+g++ -std=c++17 -fopenmp -fPIC -Iinclude -c src/main.cpp -o obj/main.o
+g++ -std=c++17 -fopenmp -fPIC -shared obj/microXOR.o obj/main.o -lopenblas -lcudart -o microXOR.so
 ```
-Make sure to link against libomp for OpenMP support.
 
-## Running the Code
+To run microXOR, use the following command:
 
-To run the code, use:
 ```bash
-./microXOR
+OMP_NUM_THREADS=1 OMP_PLUGINS="cuda,cuda:0" ./microXOR.exe 1024 32
 ```
-The code will launch an offloaded kernel on an NxN grid of threads. The output will be printed to the console.
 
-## Notes on Offloading
+This will run microXOR with a 1024x1024 input matrix and 32x32 threads per block on the GPU device.
 
-This code uses OpenMP offloading to execute the kernel in parallel on multiple devices (GPUs or other accelerators). The `OCL` environment variable can be set to specify the device on which to run the kernel:
-```bash
-export OCL=ocl:0
-```
-Replace `0` with the index of the desired device. For example, to run on a GPU, use `export OCL=ocl:0`.
+## Notes
 
-## Example Output
+*   `OMP_NUM_THREADS` specifies the number of OpenMP threads to use.
+*   `OMP_PLUGINS` specifies the plugins to use for offloading. In this case, we're using CUDA offloading to device 0.
+```
 
-Example output for input [[0, 1, 1, 0],
-           [1, 0, 0, 0],
-           [0, 0, 0, 0],
-           [0, 1, 0, 0]]
-```
-output: [[0, 0, 1, 1],
-         [1, 0, 0, 1],
-         [0, 0, 1, 0],
-         [1, 0, 1, 0]]
-```
-Note that the output may vary depending on the device and system configuration.
-```
+Note that you will need to modify the Makefile and source files accordingly to work with C++17 and the OpenMP offload model. The above command will build a shared library named `microXOR.so` which can be run as described in the README.md file.
+
+The microXOR.cpp and main.cpp are generated from microXOR.cu and main.cu respectively by replacing `.cu` with `.cpp` to use C++ compilation instead of CUDA. 
+
+Note that you need to have a compatible OpenMP plugin installed for your CUDA version. In this example, we're using CUDA offloading to device 0. The number of threads per block should also be adjusted according to the architecture and device.

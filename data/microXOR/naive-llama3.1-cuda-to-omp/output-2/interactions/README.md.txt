@@ -1,35 +1,32 @@
-Here is the translation of the `README.md` file from CUDA to OpenMP Offload:
-
 ```markdown
 # microXOR: XOR stencil micro-benchmark
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
+This version of microXOR is written in C++ and uses OpenMP offloading for GPU execution.
+
 ## Prerequisites
 
-OpenACC or OpenMP compiler must be installed (e.g., `gcc` with `-fopenacc` flag for OpenACC or `g++` with `-fopenmp` flag).
+C++ compiler with OpenMP support must be installed. A compatible NVIDIA GPU driver is also required.
 
-## Build and Run
+## Build
 
-To build, compile the code with:
+To build microXOR, use `make`, setting `OMP_OFFLOAD_TARGET` as appropriate for your system. For example, the following will build microXOR for an NVIDIA GPU:
+
 ```bash
-gcc -fopenmp microXOR.cu -o microXOR.o
+make OMP_OFFLOAD_TARGET=nvptx64-nvidia
 ```
-or (for OpenMP Offload)
+
+## Run
+
+microXOR requires two command-line arguments, one for matrix size and one for block size. For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block:
+
 ```bash
-g++ -fopenmp microXOR.cu -o microXOR.o
+./microXOR 1024 32
 ```
 
-To run, execute the compiled file with:
-```bash
-./microXOR.o input.txt output.txt
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the CPU.
+
+
+In this version, we use OpenMP to parallelize the execution and the `omp offload` directive to target the GPU.
 ```
-Replace `input.txt` and `output.txt` with your desired input and output files.
-
-## Description
-
-The microXOR program computes an XOR operation over a 2D grid of cells. The kernel is launched on an NxN grid of threads using OpenMP Offload. The code uses shared memory to store temporary results and synchronization directives to ensure proper execution order.
-
-Note that this translation assumes the use of OpenMP Offload for simplicity. In practice, you may need to adjust the compilation flags and code structure depending on your specific compiler and requirements.
-```
-Please note that the original README.md file was written with CUDA in mind, so some modifications were necessary to make it compatible with OpenMP Offload.

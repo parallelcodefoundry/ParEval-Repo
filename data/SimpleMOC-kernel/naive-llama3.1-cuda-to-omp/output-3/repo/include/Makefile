@@ -1,27 +1,66 @@
-CC = clang
-CXX = clang++
-CFLAGS = -fopenmp-targets=nvptx64-nvidia-cuda -D__CUDA_ARCH__=800
-CXXFLAGS = $(CFLAGS) -std=c++11
+#===============================================================================
+# User Options
+#===============================================================================
 
-all: program
+SM_VERSION  ?= 80
+CXX          ?= clang
+LIBS         ?= -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
 
-program: main.o init_source_arrays.o translate_device_sources.o build_exponential_table.o __cudaCheckError.o
-    $(CXX) $^ -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcublas -lcudart -o program
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-main.o: main.c
-    $(CC) $(CFLAGS) -c $<
+program = SimpleMOC-kernel
 
-init_source_arrays.o: init_source_arrays.c
-    $(CC) $(CFLAGS) -c $<
+source = \
+main.c \
+kernel.c \
+init.c \
+io.c
 
-translate_device_sources.o: translate_device_sources.c
-    $(CC) $(CFLAGS) -c $<
+obj = $(source:.c=.o)
 
-build_exponential_table.o: build_exponential_table.c
-    $(CC) $(CFLAGS) -c $<
+#===============================================================================
+# Sets Flags
+#===============================================================================
 
-__cudaCheckError.o: __cudaCheckError.c
-    $(CC) $(CFLAGS) -c $<
+# OpenMP Compiler Flags
+CXXFLAGS += -fopenmp
+
+# Standard GCC Flags
+override CXXFLAGS += -I/usr/local/cuda/include -arch sm_$(SM_VERSION) 
+
+# Linker Flags
+LDFLAGS = -lm -lcurand -lomp
+
+# Profiling Flags
+CXXFLAGS += -pg
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CXX) $(CXXFLAGS) $(obj) -o $@ $(LIBS) $(LDFLAGS)
+
+%.o: %.c
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-    rm -f *.o program
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) SimpleMOC-kernel_header.h
+
+run:
+	./$(program)
+
+
+# Offloading flags for CUDA
+ifeq ($(shell uname), Linux)
+    OFFLOAD_DIR := /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/offload/12.2/targets/x86_64-linux/bin/
+else ifeq ($(shell uname | grep -iq win), yes)
+    OFFLOAD_DIR := "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.x\bin"
+endif
+
+OFFLOAD_FLAGS = -Xoffload-arch=$(SM_VERSION) -Xoffload-target=gpu -g

@@ -1,83 +1,10 @@
 #include "XSbench_header.cuh"
 
-// Moves all required data structures to the GPU's memory space
-SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD )
-{
-        if(mype == 0) printf("Allocating and moving simulation data to GPU memory space...\n");
-
-        ////////////////////////////////////////////////////////////////////////////////
-        // SUMMARY: Simulation Data Structure Manifest for "SD" Object
-        // Here we list all heap arrays (and lengths) in SD that would need to be
-        // offloaded manually if using an accelerator with a seperate memory space
-        ////////////////////////////////////////////////////////////////////////////////
-
-        size_t sz;
-        size_t total_sz = 0;
-
-        // Shallow copy of CPU simulation data to GPU simulation data
-        SimulationData GSD = SD;
-
-        #pragma omp target data map(to:GSD)
-        {
-            // Move data to GPU memory space
-            if (in.grid_type == UNIONIZED) {
-                sz = in.n_isotopes * in.n_gridpoints * sizeof(double);
-                total_sz += sz;
-                cudaMalloc((void **) &GSD.unionized_energy_array, sz);
-                cudaMemcpy(GSD.unionized_energy_array, SD.unionized_energy_array, sz, cudaMemcpyHostToDevice);
-
-                sz = in.n_isotopes * in.n_gridpoints * in.n_isotopes * sizeof(int);
-                total_sz += sz;
-                cudaMalloc((void **) &GSD.index_grid, sz);
-                cudaMemcpy(GSD.index_grid, SD.index_grid, sz, cudaMemcpyHostToDevice);
-            }
-
-            if (in.grid_type == HASH) {
-                sz = in.hash_bins * in.n_isotopes * sizeof(int);
-                total_sz += sz;
-                cudaMalloc((void **) &GSD.index_grid, sz);
-                cudaMemcpy(GSD.index_grid, SD.index_grid, sz, cudaMemcpyHostToDevice);
-            }
-
-            sz = in.n_isotopes * sizeof(NuclideGridPoint) * in.n_gridpoints;
-            total_sz += sz;
-            cudaMalloc((void **) &GSD.nuclide_grid, sz);
-            cudaMemcpy(GSD.nuclide_grid, SD.nuclide_grid, sz, cudaMemcpyHostToDevice);
-
-            sz = in.lookups * sizeof(unsigned long);
-            total_sz += sz;
-            cudaMalloc((void **) &GSD.verification, sz);
-        }
-
-        // Synchronize
-        #pragma omp target data map(from:GSD)
-        {
-            gpuErrchk( cudaPeekAtLastError() );
-            gpuErrchk( cudaDeviceSynchronize() );
-        }
-
-        if(mype == 0 ) printf("GPU Intialization complete. Allocated %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0 );
-
-        return GSD;
-}
-
-// Release device memory
-void release_device_memory(SimulationData GSD) {
-    #pragma omp target data map(to:GSD)
-    {
-        cudaFree(GSD.num_nucs);
-        cudaFree(GSD.concs);
-        cudaFree(GSD.mats);
-        if (GSD.length_unionized_energy_array > 0) cudaFree(GSD.unionized_energy_array);
-        cudaFree(GSD.nuclide_grid);
-        cudaFree(GSD.verification);
-    }
-}
-
-// Prepare Nuclide Energy Grids, Unionized Energy Grid, & Material Data
+// Function to initialize nuclide grids in parallel using OpenMP
+#pragma omp declare target
 SimulationData grid_init_do_not_profile( Inputs in, int mype )
 {
-    // Structure to hold all allocated simuluation data arrays
+    // Structure to hold all allocated simulation data arrays
     SimulationData SD;
 
     // Keep track of how much data we're allocating
@@ -87,26 +14,17 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
     uint64_t seed = 42;
 
     ////////////////////////////////////////////////////////////////////
-    // Initialize Nuclide Grids
+    // Initialize Nuclide Grids in parallel using OpenMP Offload
     ////////////////////////////////////////////////////////////////////
 
-    if(mype == 0) printf("Intializing nuclide grids...\n");
-
-    // First, we need to initialize our nuclide grid. This comes in the form
-    // of a flattened 2D array that hold all the information we need to define
-    // the cross sections for all isotopes in the simulation.
-    // The grid is composed of "NuclideGridPoint" structures, which hold the
-    // energy level of the grid point and all associated XS data at that level.
-    // An array of structures (AOS) is used instead of
-    // a structure of arrays, as the grid points themselves are accessed in
-    // a random order, but all cross section interaction channels and the
-    // energy level are read whenever the gridpoint is accessed, meaning the
-    // AOS is more cache efficient.
-
-    // Initialize Nuclide Grid
-    SD.length_nuclide_grid = in.n_isotopes * in.n_gridpoints;
-    #pragma omp target data map(to:SD)
+    #pragma omp target enter data map(to: SD.nuclide_grid[:SD.length_nuclide_grid], SD.unionized_energy_array[:SD.length_unionized_energy_array], SD.index_grid[:SD.length_index_grid])
     {
+        if(mype == 0) printf("Intializing nuclide grids...\n");
+
+        // First, we need to initialize our nuclide grid. This comes in the form
+        // of a flattened 2D array that hold all the information we need to define
+        // the cross sections for all isotopes in the simulation.
+        SD.length_nuclide_grid = in.n_isotopes * in.n_gridpoints;
         SD.nuclide_grid     = (NuclideGridPoint *) malloc( SD.length_nuclide_grid * sizeof(NuclideGridPoint));
         assert(SD.nuclide_grid != NULL);
         nbytes += SD.length_nuclide_grid * sizeof(NuclideGridPoint);
@@ -122,7 +40,7 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
 
         // Sort so that each nuclide has data stored in ascending energy order.
         for( int i = 0; i < in.n_isotopes; i++ )
-                qsort( &SD.nuclide_grid[i*in.n_gridpoints], in.n_gridpoints, sizeof(NuclideGridPoint), NGP_compare);
+            qsort( &SD.nuclide_grid[i*in.n_gridpoints], in.n_gridpoints, sizeof(NuclideGridPoint), NGP_compare);
 
         // error debug check
         /*
@@ -135,91 +53,67 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         */
     }
 
-    // Allocate Verification Array
-    size_t sz = in.lookups * sizeof(unsigned long);
-    #pragma omp target data map(to:SD)
+    #pragma omp target data map(to: SD.unionized_energy_array[:SD.length_unionized_energy_array], SD.index_grid[:SD.length_index_grid])
     {
-        SD.verification = (unsigned long *) malloc(sz);
-        nbytes += sz;
-    }
-
-    ////////////////////////////////////////////////////////////////////
-    // Initialize Acceleration Structure
-    ////////////////////////////////////////////////////////////////////
-
-    if( in.grid_type == NUCLIDE )
-    {
-        SD.length_unionized_energy_array = 0;
-        SD.length_index_grid = 0;
-    }
-
-    if( in.grid_type == UNIONIZED )
-    {
-        if(mype == 0) printf("Intializing unionized grid...\n");
-
-        // Allocate space to hold the union of all nuclide energy data
-        SD.length_unionized_energy_array = in.n_isotopes * in.n_gridpoints;
-        #pragma omp target data map(to:SD)
+        if (in.grid_type == UNIONIZED)
         {
+            if(mype == 0) printf("Intializing unionized grid...\n");
+
+            // Allocate space to hold the union of all nuclide energy data
+            SD.length_unionized_energy_array = in.n_isotopes * in.n_gridpoints;
             SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
             assert(SD.unionized_energy_array != NULL );
             nbytes += SD.length_unionized_energy_array * sizeof(double);
 
             // Copy energy data over from the nuclide energy grid
             for( int i = 0; i < SD.length_unionized_energy_array; i++ )
-                    SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
+                SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
 
             // Sort unionized energy array
             qsort( SD.unionized_energy_array, SD.length_unionized_energy_array, sizeof(double), double_compare);
 
             // Allocate space to hold the acceleration grid indices
             SD.length_index_grid = SD.length_unionized_energy_array * in.n_isotopes;
-            #pragma omp target data map(to:SD)
+            SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+            assert(SD.index_grid != NULL);
+            nbytes += SD.length_index_grid * sizeof(int);
+
+            // Generates the double indexing grid
+            int * idx_low = (int *) calloc( in.n_isotopes, sizeof(int));
+            assert(idx_low != NULL );
+            double * energy_high = (double *) malloc( in.n_isotopes * sizeof(double));
+            assert(energy_high != NULL );
+
+            for( int i = 0; i < in.n_isotopes; i++ )
+                energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + 1].energy;
+
+            for( long e = 0; e < SD.length_unionized_energy_array; e++ )
             {
-                SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
-                assert(SD.index_grid != NULL);
-                nbytes += SD.length_index_grid * sizeof(int);
-
-                // Generates the double indexing grid
-                int * idx_low = (int *) calloc( in.n_isotopes, sizeof(int));
-                assert(idx_low != NULL );
-                double * energy_high = (double *) malloc( in.n_isotopes * sizeof(double));
-                assert(energy_high != NULL );
-
-                for( int i = 0; i < in.n_isotopes; i++ )
-                        energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + 1].energy;
-
-                for( long e = 0; e < SD.length_unionized_energy_array; e++ )
+                double unionized_energy = SD.unionized_energy_array[e];
+                for( long i = 0; i < in.n_isotopes; i++ )
                 {
-                    double unionized_energy = SD.unionized_energy_array[e];
-                    for( long i = 0; i < in.n_isotopes; i++ )
+                    if( unionized_energy < energy_high[i]  )
+                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                    else if( idx_low[i] == in.n_gridpoints - 2 )
+                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                    else
                     {
-                        if( unionized_energy < energy_high[i]  )
-                            SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                        else if( idx_low[i] == in.n_gridpoints - 2 )
-                            SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                        else
-                        {
-                            idx_low[i]++;
-                            SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                            energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
-                        }
+                        idx_low[i]++;
+                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                        energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
                     }
                 }
-
-                free(idx_low);
-                free(energy_high);
             }
-        }
-    }
 
-    if( in.grid_type == HASH )
-    {
-        if(mype == 0) printf("Intializing hash grid...\n");
-        SD.length_unionized_energy_array = 0;
-        SD.length_index_grid  = in.hash_bins * in.n_isotopes;
-        #pragma omp target data map(to:SD)
+            free(idx_low);
+            free(energy_high);
+        }
+
+        if (in.grid_type == HASH)
         {
+            if(mype == 0) printf("Intializing hash grid...\n");
+            SD.length_unionized_energy_array = 0;
+            SD.length_index_grid  = in.hash_bins * in.n_isotopes;
             SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
             assert(SD.index_grid != NULL);
             nbytes += SD.length_index_grid * sizeof(int);
@@ -240,15 +134,13 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         }
     }
 
-    ////////////////////////////////////////////////////////////////////
-    // Initialize Materials and Concentrations
-    ////////////////////////////////////////////////////////////////////
-    if(mype == 0) printf("Intializing material data...\n");
-
-    // Set the number of nuclides in each material
-    SD.num_nucs  = load_num_nucs(in.n_isotopes);
-    #pragma omp target data map(to:SD)
+    #pragma omp target update from(data: SD)
     {
+        // Initialize Materials and Concentrations
+        if(mype == 0) printf("Intializing material data...\n");
+
+        // Set the number of nuclides in each material
+        SD.num_nucs  = load_num_nucs(in.n_isotopes);
         SD.length_num_nucs = 12; // There are always 12 materials in XSBench
 
         // Intialize the flattened 2D grid of material data. The grid holds
@@ -266,7 +158,7 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         SD.length_concs = SD.length_mats;
 
         if(mype == 0) printf("Intialization complete. Allocated %.0lf MB of data on CPU.\n", nbytes/1024.0/1024.0 );
-    }
 
-    return SD;
+        return SD;
+    }
 }

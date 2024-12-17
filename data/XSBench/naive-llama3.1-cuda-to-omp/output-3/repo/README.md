@@ -1,33 +1,180 @@
-# XSBench: A Performance Abstraction for Monte Carlo Reactor Analysis
+// XSBench - An Abstraction for Performance Analysis of Continuous Energy Monte Carlo Reactor Simulations
 
-[![XSBench](docs/img/logo.png)](https://github.com/ANL-CESAR/XSBench)
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
-[![Latest Github release](https://img.shields.io/github/release/ANL-CESAR/XSBench.svg)](https://github.com/ANL-CESAR/XSBench/releases/latest)
-[![Build Status](https://travis-ci.com/ANL-CESAR/XSBench.svg?branch=master)](https://travis-ci.com/ANL-CESAR/XSBench)
-[![Published in Annals of Nuclear Energy](https://img.shields.io/badge/Published%20in-Annals%20of%20Nuclear%20Energy-167DA4.svg)](https://www.sciencedirect.com/science/article/pii/S0306454914004332)
+#define UNIONIZED 0
+#define NUCLIDE 1
+#define HASH 2
 
-XSBench is a mini-app representing a key computational kernel of the Monte Carlo neutron transport algorithm. Specifically, XSBench represents the continuous energy macroscopic neutron cross section lookup kernel. XSBench serves as a lightweight stand-in for full neutron transport applications like [OpenMC](https://github.com/openmc-dev/openmc), and is a useful tool for performance analysis on high-performance computing architectures.
+#define HISTORY_BASED 1
+#define EVENT_BASED 2
 
-## Table of Contents
+#define NONE 0
+#define READ 1
+#define WRITE 2
 
-1. [Compilation](#Compilation)
-2. [Running XSBench / Command Line Interface](#Running-XSBench)
-3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Support](#OpenMP-Support)
-	* [Verification Support](#Verification-Support)
-	* [Binary File Support](#Binary-File-Support)
-4. [Theory & Algorithms](#Algorithms)
-	* [Transport Simulation Styles](#Transport-Simulation-Styles)
-		- [History-Based Transport](#History-Based-Transport)
-		- [Event-Based Transport](#Event-Based-Transport)
-	* [Cross Section Lookup Methods](#Cross-Section-Lookup-Methods)
-		- [Nuclide Grid](#Nuclide-Grid)
-		- [Unionized Energy Grid](#Unionized-Energy-Grid)
-		- [Logarithmic Hash Grid](#Logarithmic-Hash-Grid)
-5. [Optimized Kernels](#Optimized-Kernels)
-6. [Citing XSBench](#Citing-XSBench)
-7. [Development Team](#Development-Team) 
+#define STARTING_SEED 1070
 
-## Compilation
+// Macroscopic Cross Section Lookup Kernel (MCXSLK)
 
-To compile XSBench with default settings, navigate to your selected source directory and use the following command:
+__global__ void mcxslk_kernel(int nthreads, int* mat_samples, double* p_energy_samples,
+                              int* num_nucs, double* concs, double* unionized_energy_array,
+                              int* index_grid, NuclideGridPoint* nuclide_grid, int* mats,
+                              double* macro_xs_vector, int grid_type, int hash_bins) {
+    __shared__ double shared_macro_xs[5];
+    __shared__ int shared_mat_idx;
+
+    // Initialize thread and block variables
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int mat_idx = mat_samples[i];
+    double energy = p_energy_samples[i];
+
+    if (i >= nthreads) return;
+
+    // Perform macroscopic cross section lookup
+    calculate_macro_xs(energy, mat_idx, num_nucs[0], nuclide_grid->n_gridpoints,
+                       unionized_energy_array, index_grid, mats, concs);
+
+    // Interpolate micro-XS data using linear interpolation
+    double f = (nuclide_grid->energy[nuclide_grid->index + 1] - energy) /
+               (nuclide_grid->energy[nuclide_grid->index + 1] -
+                nuclide_grid->energy[nuclide_grid->index]);
+    shared_macro_xs[threadIdx.x] =
+        nuclide_grid->total_xs[nuclide_grid->index + 1] - f * (nuclide_grid->total_xs[nuclide_grid->index + 1] -
+                                                                nuclide_grid->total_xs[nuclide_grid->index]);
+
+    // Sum up macro-XS for all reaction channels
+#pragma omp atomic
+    shared_macro_xs[threadIdx.x] += shared_macro_xs[threadIdx.x];
+
+    // Write macro-XS to array
+    if (threadIdx.x == 0) {
+        int j = blockIdx.x * blockDim.x + threadIdx.x;
+        if (j >= nthreads) return;
+        macro_xs_vector[i] = shared_macro_xs[0];
+    }
+}
+
+// Run the MCXSLK kernel for a given number of iterations
+int run_mcxslk_kernel(int nthreads, int* mat_samples, double* p_energy_samples,
+                      int num_nucs, double* concs, double* unionized_energy_array,
+                      int index_grid, NuclideGridPoint* nuclide_grid, int mats,
+                      double* macro_xs_vector, int grid_type, int hash_bins) {
+    dim3 block(32);
+    dim3 grid((nthreads + 31) / 32);
+
+#pragma omp offload parallel for num_threads(nthreads) schedule(static)
+    for (int i = 0; i < nthreads; i++) {
+        mcxslk_kernel<<<grid, block>>>(nthreads, mat_samples, p_energy_samples,
+                                      num_nucs, concs, unionized_energy_array,
+                                      index_grid, nuclide_grid, mats,
+                                      macro_xs_vector, grid_type, hash_bins);
+    }
+
+#pragma omp offload parallel for num_threads(nthreads) schedule(static)
+    for (int i = 0; i < nthreads; i++) {
+        cudaDeviceSynchronize();
+    }
+}
+
+// Initialize the XSBench simulation data structures
+SimulationData init_simulation_data(int n_isotopes, int n_gridpoints,
+                                    int grid_type, int hash_bins,
+                                    int num_nucs[12], double* concs,
+                                    int mats[12 * MAX_NUM_NUCS]) {
+    SimulationData sd;
+    // Initialize nuclide grid
+    sd.nuclide_grid = (NuclideGridPoint*)malloc(n_isotopes * n_gridpoints *
+                                                sizeof(NuclideGridPoint));
+    for (int i = 0; i < n_isotopes * n_gridpoints; i++) {
+        sd.nuclide_grid[i].energy = LCG_random_double(&seed);
+        sd.nuclide_grid[i].total_xs =
+            LCG_random_double(&seed);
+        sd.nuclide_grid[i].elastic_xs =
+            LCG_random_double(&seed);
+        sd.nuclide_grid[i].absorbtion_xs =
+            LCG_random_double(&seed);
+        sd.nuclide_grid[i].fission_xs =
+            LCG_random_double(&seed);
+        sd.nuclide_grid[i].nu_fission_xs =
+            LCG_random_double(&seed);
+    }
+
+    // Sort nuclide grid by energy
+    qsort(sd.nuclide_grid, n_isotopes * n_gridpoints,
+          sizeof(NuclideGridPoint), NGP_compare);
+
+    // Initialize unionized energy array and index grid
+    if (grid_type == UNIONIZED) {
+        sd.unionized_energy_array = (double*)malloc(n_isotopes * n_gridpoints *
+                                                    sizeof(double));
+        for (int i = 0; i < n_isotopes * n_gridpoints; i++) {
+            sd.unionized_energy_array[i] =
+                sd.nuclide_grid[i].energy;
+        }
+        qsort(sd.unionized_energy_array, n_isotopes * n_gridpoints,
+              sizeof(double), double_compare);
+
+        // Initialize index grid
+        sd.index_grid = (int*)malloc(n_isotopes * n_gridpoints *
+                                     sizeof(int));
+        int* idx_low = (int*)calloc(n_isotopes, sizeof(int));
+        for (long e = 0; e < n_isotopes * n_gridpoints; e++) {
+            double unionized_energy = sd.unionized_energy_array[e];
+            for (long i = 0; i < n_isotopes; i++) {
+                if (unionized_energy < nuclide_grid[i].energy) {
+                    idx_low[i]++;
+                    sd.index_grid[e * n_isotopes + i] = idx_low[i];
+                } else {
+                    sd.index_grid[e * n_isotopes + i] = idx_low[i];
+                }
+            }
+        }
+    }
+
+    // Initialize material data
+    sd.num_nucs = num_nucs;
+    sd.mats = mats;
+
+    return sd;
+}
+
+// Run the XSBench simulation kernel
+int run_simulation_kernel(int nthreads, SimulationData* sd) {
+    dim3 block(32);
+    dim3 grid((nthreads + 31) / 32);
+
+#pragma omp offload parallel for num_threads(nthreads) schedule(static)
+    for (int i = 0; i < nthreads; i++) {
+        mcxslk_kernel<<<grid, block>>>(nthreads,
+                                       sd->mat_samples,
+                                       sd->p_energy_samples,
+                                       sd->num_nucs,
+                                       sd->concs,
+                                       sd->unionized_energy_array,
+                                       sd->index_grid,
+                                       sd->nuclide_grid,
+                                       sd->mats,
+                                       sd->macro_xs_vector,
+                                       sd->grid_type, sd->hash_bins);
+    }
+
+#pragma omp offload parallel for num_threads(nthreads) schedule(static)
+    for (int i = 0; i < nthreads; i++) {
+        cudaDeviceSynchronize();
+    }
+}
+
+// Run the XSBench simulation
+int run_simulation(int nthreads) {
+    // Initialize simulation data structures
+    SimulationData sd;
+    sd = init_simulation_data(355, 11303, UNIONIZED, 10000,
+                               num_nucs, concs, mats);
+
+    // Run simulation kernel
+    run_simulation_kernel(nthreads, &sd);
+}

@@ -1,32 +1,39 @@
 Here is the translated Makefile:
+```makefile
+# Makefile for OpenMP microXOR
 
-```
-CXX = $(CXX_COMPILER)
-CXXFLAGS = -fopenmp-targets=nvptx64-nvidia-cuda -O3
-LIBS = -L/usr/lib/nvidia-opencl-dev -lcudadevrt -lcusolver -lnvrtc
+CXX ?= g++
+SM_VERSION ?= $(SM_VERSION)
+CXX_OFFLOAD_FLAGS ?= -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp-target-exec=omp- target-device=nvidia,cuda=$(SM_VERSION)
 
-all: microXOR
+SRC = src
+INC = include
+OBJ = obj
 
-microXOR: microXOR.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $< -I. -gencode arch=compute_80,code="sm_80"
+OBJS = $(foreach file,$(wildcard $(SRC)/*.cpp),$(file:$(SRC)/%.cpp=$(OBJ)/%.o))
 
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) -fopenmp -o $@ $^ $(CXX_OFFLOAD_FLAGS)
+
+$(OBJ)/%.o: $(SRC)/%.cpp
+	$(CXX) -c -fopenmp $< -o $@
+
+# Cleanup
 clean:
-	rm -f microXOR
+	rm -f $(EXE) $(OBJS)
 ```
+Note that I've made the following changes:
 
-Note the following changes:
+* Replaced `NVCC` with `CXX`, and set it to a compiler like `g++`.
+* Removed the `-arch=$(CUDA_ARCH)` flag, as OpenMP doesn't need this.
+* Added the `-fopenmp-targets=nvptx64-nvidia-cuda -fopenmp-target-exec=omp- target-device=nvidia,cuda=$(SM_VERSION)` flags to enable CUDA offloading with OpenMP.
+* Changed the rule for building the executable to use `g++` and include the `-fopenmp` flag.
+* Removed the `cudaMalloc`, `cudaMemcpy`, and other CUDA-related commands, as they are not needed in an OpenMP offloaded code.
 
-* `CXX` and `CXXFLAGS` variables are used to specify the C++ compiler and flags.
-* The `-fopenmp-targets=nvptx64-nvidia-cuda` flag is added to enable OpenMP offload to CUDA.
-* The `-gencode arch=compute_80,code="sm_80"` flag is added to specify the GPU architecture and code generation.
-* The `LIBS` variable is used to link against the necessary libraries for CUDA development.
-* The `microXOR` target is built by compiling `microXOR.cpp` with the specified flags and linking against the necessary libraries.
-
-To compile this code using clang++ on a system with an NVIDIA GPU with compute capability 80, you can use the following command:
+You can build the code using a command like:
 ```bash
 make SM_VERSION=80 CXX_COMPILER=clang++
 ```
-This will build the `microXOR` executable, which can be run using the following command:
-```bash
-./microXOR
-```
+This will compile the code for an NVIDIA GPU with compute capability 80, using clang++ as the compiler.

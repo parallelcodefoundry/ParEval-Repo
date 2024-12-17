@@ -1,33 +1,67 @@
-# Define variables for compilation
-SM_VERSION = 80
-CFLAGS = -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
-CXX = clang
+#===============================================================================
+# User Options
+#===============================================================================
 
-# Compiler flags for OpenMP and offload
-OMP_CFLAGS = -fopenmp -fPIC
-OMP_OFFLOAD_CFLAGS = -fopenacc
-CFLAGS += $(OMP_CFLAGS) $(OMP_OFFLOAD_CFLAGS)
+OMP_OFFLOAD    ?= yes
+SM_VERSION  ?= 80
+CFLAGS       += -I/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+CXX          = clang
+NVCC         = nvcc
 
-# Specify the NVIDIA library paths
-LIBPATH = /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# Specify the compiler and linker flags for offload
-NVCC = nvcc
-NVCCFLAGS = -gencode=arch=compute_$(SM_VERSION),code=sm_$(SM_VERSION)
-LDFLAGS = -lcudart
+program = SimpleMOC-kernel
 
-# Specify the source files to compile
-SOURCE_FILES = init.c main.c source_array.c table.c cuda_check_error.c
+source = \
+main.c \
+kernel.c \
+init.c \
+io.c
 
-# Define the target binary
-TARGET = app
+obj = $(source:.c=.o)
 
-# Define the rule for compiling and linking the program
-all: $(TARGET)
+#===============================================================================
+# Sets Flags
+#===============================================================================
 
-$(TARGET): $(SOURCE_FILES)
-    $(CXX) -o $(TARGET) $^ $(CFLAGS) $(NVCCFLAGS) $(LDFLAGS) -lcudart -I/usr/local/cuda-11.4/include
+# Standard Flags
+override CFLAGS += -march=sm_$(SM_VERSION) -I/usr/local/cuda/include -fopenmp-targets=nvptx64-nvidia-cuda
 
-# Clean rule to remove intermediate files and the target binary
+# Offload Flags
+ifeq ($(OMP_OFFLOAD),yes)
+  override CXXFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp-offload
+endif
+
+# Linker Flags
+LDFLAGS = -lm -lcurand
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) SimpleMOC-kernel_header.h
+	$(NVCC) $(CFLAGS) $(CXXFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c
+	$(CXX) $(CFLAGS) -fopenmp-targets=nvptx64-nvidia-cuda -c $< -o $@
+
 clean:
-    rm -f $(TARGET) *.o
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) SimpleMOC-kernel_header.h
+
+run:
+	./$(program)
+
+
+#===============================================================================
+# Offload Options
+#===============================================================================
+
+NVCC_OPTIONS = --gpu-architecture=sm_$(SM_VERSION) --use_fast_math
+ifneq ($(OMP_OFFLOAD),yes)
+  NVCC_OPTIONS += -DNO_OFFLOAD
+endif

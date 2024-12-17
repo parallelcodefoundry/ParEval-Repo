@@ -1,38 +1,79 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
+
+// BASELINE FUNCTIONS
+// All "baseline" code is at the top of this file. The baseline code is a simple port of the original CPU OpenMP code to CUDA with few significant changes or optimizations made.
 
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
-    // Move Data to Device (now using OpenMP offload)
-    SimulationData GSD = move_simulation_data_to_device_offload(in, mype, SD);
+    // Move Data to GPU
+    SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
     profile->host_to_device_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
 
-    if( mype == 0) printf("Running baseline event-based simulation...\n");
-
-    int nthreads = 256;
-    int nblocks = ceil( (double) in.lookups / (double) nthreads);
-
-#pragma omp parallel num_threads(nthreads)
+#pragma offload target(myproc) in(GSD, in, mype, profile)
 {
-    __device__ unsigned long long run_event_based_simulation_baseline_kernel(Inputs in, SimulationData GSD )
-    {
+        int nthreads = 256;
+        int nblocks = ceil( (double) in.lookups / (double) nthreads);
+        if( mype == 0) printf("Running baseline event-based simulation...\n");
+
+        for (int i = 0; i < in.num_iterations + in.num_warmups; i++) {
+            if (i == in.num_warmups) {
+                start = get_time();
+            }
+            xs_lookup_kernel_baseline<<<nblocks, nthreads>>>( in, GSD );
+        }
+}
+
+#pragma offload target(myproc) in(GSD, profile)
+{
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
+    profile->kernel_time = get_time() - start;
+}
+
+#pragma offload target(myproc) in(SD, GSD, profile)
+{
+    gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost));
+    profile->device_to_host_time = get_time() - start;
+
+    unsigned long verification_scalar = 0;
+    for( int i =0; i < in.lookups; i++ )
+            verification_scalar += SD.verification[i];
+
+    release_device_memory(GSD);
+
+    return verification_scalar;
+}
+
+// In this kernel, we perform a single lookup with each thread. Threads within a warp do not really have any relation to each other, and divergence due to high nuclide count fuel material lookups are costly. This kernel constitutes baseline performance.
+__global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
+{
         // The lookup ID. Used to set the seed, and to store the verification value
-        const int i = blockIdx.x * blockDim.x + threadIdx.x;
+        const int i = blockIdx.x *blockDim.x + threadIdx.x;
 
         if( i >= in.lookups )
-            return 0;
+                return;
+
+        // Set the initial seed value
+        uint64_t seed = STARTING_SEED;
+
+        // Forward seed to lookup index (we need 2 samples per lookup)
+        seed = fast_forward_LCG(seed, 2*i);
+
+        // Randomly pick an energy and material for the particle
+        double p_energy = LCG_random_double(&seed);
+        int mat         = pick_mat(&seed);
 
         double macro_xs_vector[5] = {0};
 
         // Perform macroscopic Cross Section Lookup
         calculate_macro_xs(
-                GSD.p_energy_samples[i],        // Sampled neutron energy (in lethargy)
-                GSD.mat_samples[i],             // Sampled material type index neutron is in
+                p_energy,        // Sampled neutron energy (in lethargy)
+                mat,             // Sampled material type index neutron is in
                 in.n_isotopes,   // Total number of isotopes in simulation
                 in.n_gridpoints, // Number of gridpoints per isotope in simulation
                 GSD.num_nucs,     // 1-D array with number of nuclides per material
@@ -47,60 +88,16 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
                 GSD.max_num_nucs  // Maximum number of nuclides present in any material
         );
 
-        // For verification, and to prevent the compiler from optimizing
-        // all work out, we interrogate the returned macro_xs_vector array
-        // to find its maximum value index, then increment the verification
-        // value by that index. In this implementation, we have each thread
-        // write to its thread_id index in an array, which we will reduce
-        // with a thrust reduction kernel after the main simulation kernel.
+        // For verification, and to prevent the compiler from optimizing all work out, we interrogate the returned macro_xs_vector array to find its maximum value index, then increment the verification value by that index. In this implementation, we have each thread write to its thread_id index in an array, which we will reduce with a thrust reduction kernel after the main simulation kernel.
         double max = -1.0;
         int max_idx = 0;
         for(int j = 0; j < 5; j++ )
         {
-            if( macro_xs_vector[j] > max )
-            {
-                max = macro_xs_vector[j];
-                max_idx = j;
-            }
+                if( macro_xs_vector[j] > max )
+                {
+                        max = macro_xs_vector[j];
+                        max_idx = j;
+                }
         }
         GSD.verification[i] = max_idx+1;
-
-        return GSD.verification[i];
-    }
-
-#pragma omp master
-{
-    // Launch kernel
-    start = get_time();
-    int nthreads = 256;
-    int nblocks = ceil( (double) in.lookups / (double) nthreads);
-    __global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
-    {
-        unsigned long long result = run_event_based_simulation_baseline_kernel(in, GSD);
-        GSD.verification[threadIdx.x] = result;
-    }
-    xs_lookup_kernel_baseline<<<nblocks, nthreads>>>(in, GSD);
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
-
-#pragma omp barrier
-
-#pragma omp parallel for
-    {
-        unsigned long long verification_scalar = 0;
-        for (int i = 0; i < in.lookups; i++)
-            verification_scalar += GSD.verification[i];
-    }
-#pragma omp master
-    profile->kernel_time = get_time() - start;
-
-    // Reduce Verification Results
-    gpuErrchk( cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost) );
-    profile->device_to_host_time = get_time() - start;
-}
-
-    __attribute__((offload(mype)));
-}
-
-return verification_scalar;
 }

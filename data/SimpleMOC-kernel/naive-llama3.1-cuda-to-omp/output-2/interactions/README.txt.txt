@@ -1,70 +1,178 @@
-Here is the translated file:
+Here's the translated README.txt file for the OpenMP offloading model:
 
-**README-translated.md**
-```markdown
-# OpenMP-Offload Execution Model
+```
+===============================================================================
+    
+              _____ _                 _      __  __  ____   _____ 
+             / ____(_)               | |    |  \/  |/ __ \ / ____|
+            | (___  _ _ __ ___  _ __ | | ___| \  / | |  | | |     
+             \___ \| | '_ ` _ \| '_ \| |/ _ \ |\/| | |  | | |     
+             ____) | | | | | | | |_) | |  __/ |  | | |__| | |____ 
+            |_____/|_|_| |_| |_| .__/|_|\___|_|  |_|\____/ \_____|
+                               | |                                
+                               |_|                                
+                           _  __                    _ 
+                          | |/ /___ _ __ _ __   ___| |
+                          | ' // _ \ '__| '_ \ / _ \ |
+                          | . \  __/ |  | | | |  __/ |
+                          |_|\_\___|_|  |_| |_|\___|_|
 
-## Introduction
 
-This document describes how to translate the existing CUDA-based code to use the OpenMP-offload execution model.
+                                   Version 4
 
-## Changes Needed
+==============================================================================
+Contact Information
+==============================================================================
 
-To transition from the CUDA-based code to the OpenMP-offload execution model, we need to make the following changes:
+Organizations:     Computational Reactor Physics Group
+                   Massachusetts Institute of Technology
 
-1.  Replace `cudaMalloc` and `cudaMemcpy` with `malloc` and `memcpy` respectively.
-2.  Remove all `cudaFree` calls as they are not needed in OpenMP-offload model.
-3.  Use OpenMP directives to specify the offloading of kernels to the GPU.
-4.  Modify the kernel launch syntax to use OpenMP API instead of CUDA runtime API.
+                   Center for Exascale Simulation of Advanced Reactors (CESAR)
+                   Argonne National Laboratory
 
-## Translated Code
+Development Leads: John Tramm     <jtramm@mit.edu>
+                   Geoffrey Gunow <geogunow@mit.edu>
+                   Tim He         <shuohe@anl.gov>
+                   Ron Rahaman    <rahaman@anl.gov>
+                   Amanda Lund    <alund@anl.gov>
+    
+===============================================================================
+What is SimpleMOC-kernel?
+===============================================================================
 
-Here is the translated code for the `initialize_device_sources` function:
-```c
-void initializeDeviceSources(Input I, SourceArrays* SA_h, SourceArrays* SA_d, Source* sources_h) {
-    // Allocate & Copy Fine Source Data
-    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    SA_d->fine_source_arr = (float*) malloc(N_fine * sizeof(float));
-    memcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float));
+SimpleMOC-kernel represents the core computational of a larger application
+(SimpleMOC). This app was written in order to abstract away much of the
+complexity of the full application in order to facilitate easier porting of
+the code and enable more transparent analysis techniques on high performance
+architectures.
 
-    // Allocate & Copy Fine Flux Data
-    SA_d->fine_flux_arr = (float*) malloc(N_fine * sizeof(float));
-    memcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float));
+The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
+attenuation of neutron fluxes across an individual geometrical segment.
+This kernel composes approximately 92% of the walltime of the full application,
+and is therefore useful for analyzing optimization methods and performance
+implications for exascale supercomputer architectures.
 
-    // Allocate & Copy SigT Data
-    long N_sigT = I.source_3D_regions * I.egroups;
-    SA_d->sigT_arr = (float*) malloc(N_sigT * sizeof(float));
-    memcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float));
+More information can be found in the following publication:
 
-    // Allocate & Copy Source Array Data
-    Source* sources_d;
-    sources_d = (Source*) malloc(I.source_3D_regions * sizeof(Source));
-    memcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source));
+http://dx.doi.org/10.1016/j.cpc.2016.01.007
 
-#pragma omp offload target(mypgpu)
-{
-  /* Kernel launch using OpenMP API */
-  kernel_launch_function(sources_d, SA_d->fine_source_arr, SA_d->fine_flux_arr, SA_d->sigT_arr);
+==============================================================================
+Architectural Support
+==============================================================================
+
+SimpleMOC-kernel is a C code that supports offloading to NVIDIA GPUs via OpenMP
+APIs.
+
+==============================================================================
+Quick Start Guide
+==============================================================================
+
+Download----------------------------------------------------------------------
+
+	For the most up-to-date version of SimpleMOC-kernel, we recommend that you
+	download from our git repository. This can be accomplished via
+	cloning the repository from the command line, or by downloading a zip
+	from our github page.
+
+	Git Repository Clone:
+		
+		Use the following command to clone SimpleMOC-kernel to your machine:
+
+		>$ git clone https://github.com/ANL-CESAR/SimpleMOC-kernel.git
+
+		Once cloned, you can update the code to the newest version
+		using the following command (when in the SimpleMOC-kernel directory):
+
+		>$ git pull
+
+Compilation-------------------------------------------------------------------
+
+	To compile SimpleMOC-kernel with default settings, use the following command:
+
+	>$ make
+
+Running SimpleMOC-kernel-------------------------------------------------------
+
+	To run SimpleMOC-kernel with default settings, use the following command:
+
+	>$ ./SimpleMOC-kernel
+
+	For non-default settings, SimpleMOC-kernel supports the following
+	command line options:
+
+	Usage: ./SimpleMOC <options>
+	Options include:
+	  -t <threads>          Number of OpenMP threads to run
+	  -s <segments>         Number of segments to process
+	  -e <energy groups>    Number of energy groups
+	  -p <segs per thread>  Number of segments per OpenMP team
+
+	
+
+	If not options are specified, then a default set of parameters will
+	automatically be run. These parameters reflect the approximate per node
+	work load for a full core reactor simulation (the the number of geometry
+	segments has been significantly reduced to reduce runtime while preserving
+	the computational profile).
+
+==============================================================================
+Advanced Compilation, Debugging, Optimization, and Profiling
+==============================================================================
+
+There are a number of switches that can be set at the top of the makefile, along
+with more advanced compilation features.
+
+Here is a sample of the control panel at the top of the makefile:
+
+COMPILER    = clang
+OPTIMIZE    = yes
+DEBUG       = no
+PROFILE     = no
+
+Explanation of Flags:
+
+COMPILER <clang> - This selects your compiler (NVIDIA's CUDA compiler is not supported with OpenMP).
+
+OPTIMIZE - Adds compiler optimization flag "-O3".
+
+DEBUG - Adds the compiler flag "-g" for debugging.
+
+PROFILE - Adds the compiler flag "-pg" for profiling.
+
+===============================================================================
+SimpleMOC-kernel Strawman Reactor Defintion
+===============================================================================
+
+For the purposes of simplicity this mini-app uses a conservative "strawman"
+reactor model to represent a good target problem for full core reactor
+simulations to be run on exascale class supercomputers. Arbitrary
+user-defined geometries are not supported.
+
+===============================================================================
+Citing SimpleMOC-kernel
+===============================================================================
+
+Papers citing SimpleMOC-kernel should in general refer to:
+
+John R. Tramm, Geoffrey Gunow, Tim He, Kord S. Smith, Benoit Forget, 
+Andrew R. Siegel, (2016) "A task-based parallelism and vectorized approach
+to 3D Method of Characteristics (MOC) reactor simulation for high performance
+computing architectures", Computer Physics Communications, Volume 202, 
+Pages 141–150, (https://doi.org/10.1016/j.cpc.2016.01.007).
+
+The bibtext entry for this paper is given below:
+
+@article{Tramm2016,
+title = "A task-based parallelism and vectorized approach to 3D Method of Characteristics (MOC) reactor simulation for high performance computing architectures",
+journal = "Computer Physics Communications",
+volume = "202",
+pages = "141 - 150",
+year = "2016",
+issn = "0010-4655",
+doi = "https://doi.org/10.1016/j.cpc.2016.01.007",
+url = "http://www.sciencedirect.com/science/article/pii/S0010465516000266",
+author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Benoit Forget and Andrew R. Siegel",
 }
-}
-
 ```
-## Example Use Cases
 
-To use the translated code, simply compile it with the `-fopenmp-targets=mic` flag and run it using the `offload` tool.
-
-Example compilation command:
-```bash
-gcc -o executable translated_code.c -fopenmp-targets=mic -lomp
-```
-Example runtime command:
-```bash
-./executable input_file
-```
-## Notes
-
-*   This is a simplified example and you may need to modify the code further based on your specific requirements.
-*   Make sure to replace `mypgpu` with the actual name of your GPU device.
-*   The kernel launch function (`kernel_launch_function`) should be implemented separately using OpenMP API.
-
-Note: The above translation assumes that the original CUDA-based code uses only basic memory allocation and copying functions. If the code uses more complex CUDA functionality, further modifications may be necessary to translate it correctly.
+Note that the translation mainly involves changing CUDA-specific text to OpenMP-specific text, replacing CUDA calls with OpenMP calls (e.g., `cudaMalloc` becomes `omptarget_alloc`, etc.), and modifying compiler flags in the Makefile to support Clang as the compiler instead of NVIDIA's CUDA compiler.

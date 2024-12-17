@@ -1,77 +1,103 @@
-// microXOR driver (OpenMP version)
+// microXOR main function (OpenMP-offload version)
 
-#include "microXOR.cuh"
-#include <omp.h>
+#include "microXOR.hpp"
 
-int main(int argc, char** argv) {
-    if (argc != 3) {
-        std::cerr << "Usage: ./microXOR.exe N BLOCK_SIZE" << std::endl;
-        return 1;
+void cleanup(int *input, int *output) {
+  delete[] input;
+  delete[] output;
+}
+
+int main(int argc, char **argv) {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " N blockEdge" << std::endl;
+    return 1;
+  }
+
+  size_t N = std::stoi(argv[1]);
+  size_t blockEdge = std::stoi(argv[2]);
+
+  if (N % blockEdge != 0) {
+    std::cerr << "N must be divisible by blockEdge" << std::endl;
+    return 1;
+  }
+  if (blockEdge < 2 || blockEdge > 32) {
+    std::cerr << "blockEdge must be between 2 and 32" << std::endl;
+    return 1;
+  }
+  if (N < 4) {
+    std::cerr << "N must be at least 4" << std::endl;
+    return 1;
+  }
+
+  int *input = new int[N * N];
+  int *output = new int[N * N];
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<int> dis(0, 1);
+  for (size_t i = 0; i < N * N; i++) {
+    input[i] = dis(gen);
+  }
+
+  int *d_input, *d_output;
+  d_input = new int[N * N];
+  d_output = new int[N * N];
+
+  // Copy input to offloaded memory
+  #pragma omp target data map(d_input[0:N*N]) map(d_output[0:N*N])
+  {
+    for (size_t i = 0; i < N * N; i++) {
+      d_input[i] = input[i];
     }
+  }
 
-    int N = atoi(argv[1]);
-    int blockSize = atoi(argv[2]);
+  // Offload kernel execution to device
+  #pragma omp target offload use_device_ptr(d_input, d_output) teams distribute parallel for
+  {
+    for (size_t i = 0; i < N * N; i++) {
+      int count = 0;
+      if (i > 0 && d_input[(i-1)*N] == 1) count++;
+      if (i < N*N - 1 && d_input[(i+1)*N] == 1) count++;
+      if (d_input[i] == 1) count++; // Added a check here
+      if (count == 1) {
+        d_output[i] = 1;
+      } else {
+        d_output[i] = 0;
+      }
+    }
+  }
 
-    // Allocate input and output arrays on the host
-    int* input = (int*)malloc(N * N * sizeof(int));
-    int* output = (int*)malloc(N * N * sizeof(int));
+  // Copy output from offloaded memory back to host
+  #pragma omp target data map(d_input[0:N*N]) map(d_output[0:N*N])
+  {
+    for (size_t i = 0; i < N * N; i++) {
+      output[i] = d_output[i];
+    }
+  }
 
-    // Initialize input array
-    for (size_t i = 0; i < N; i++) {
-        for (size_t j = 0; j < N; j++) {
-            input[i*N + j] = rand() % 2;
+  // Validate the output
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      if (count == 1) {
+        if (output[i*N + j] != 1) {
+          std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+          cleanup(input, output);
+          return 1;
         }
-    }
-
-    // Create OpenMP device team with the number of threads equal to BLOCK_SIZE
-    omp_set_num_threads(blockSize);
-#pragma omp target teams distribute parallelize(collapse(4))
-    {
-        // Allocate input and output arrays on the device
-        int* d_input = (int*)omp_target_alloc(N * N * sizeof(int));
-        int* d_output = (int*)omp_target_alloc(N * N * sizeof(int));
-
-        // Copy input array to the device
-        omp_target_memcpy(d_input, input, N * N * sizeof(int), omp_direction_from_host);
-
-        // Launch kernel on an NxN grid of threads
-        cellsXOR<<<omp_get_num_teams(), blockSize>>>(d_input, d_output, N);
-
-        // Copy output array from the device to the host
-        omp_target_memcpy(output, d_output, N * N * sizeof(int), omp_direction_to_host);
-    }
-
-    // Validate the output
-    for (size_t i = 0; i < N; i++) {
-        for (size_t j = 0; j < N; j++) {
-            int count = 0;
-            if (i > 0 && input[(i-1)*N + j] == 1) count++;
-            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-            if (j > 0 && input[i*N + (j-1)] == 1) count++;
-            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-            if (count == 1) {
-                if (output[i*N + j] != 1) {
-                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-                    return 1;
-                }
-            } else {
-                if (output[i*N + j] != 0) {
-                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-                    return 1;
-                }
-            }
+      } else {
+        if (output[i*N + j] != 0) {
+          std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+          cleanup(input, output);
+          return 1;
         }
+      }
     }
-
-    std::cout << "Validation passed." << std::endl;
-
-    // Free device memory
-    omp_target_free(d_input);
-    omp_target_free(d_output);
-
-    // Clean up host memory
-    free(input);
-    free(output);
-
-    return 0;
+  }
+  std::cout << "Validation passed." << std::endl;
+  cleanup(input, output);
+  return 0;
 }

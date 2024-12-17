@@ -1,125 +1,129 @@
-Here is the translation of the provided code into an OpenMP-offload executable model:
+Here is the translation of the README.txt file to the OpenMP-offload execution model:
+```markdown
+==============================================================================
+SimpleMOC-kernel: A Task-Based Parallelism and Vectorized Approach to 3D Method of Characteristics (MOC) Reactor Simulation for High Performance Computing Architectures
+==============================================================================
 
-```c
-// Offload directive to indicate that this kernel should be executed on a device (GPU)
-#pragma offload target(mic) in(sources)
+Table of Contents
+=================
 
-int main() {
-  // Initialize the random number generator for reproducibility
-  srand(0);
+* [Introduction](#introduction)
+* [Architectural Support](#architectural-support)
+* [Quick Start Guide](#quick-start-guide)
+* [Advanced Compilation, Debugging, Optimization, and Profiling](#advanced-compilation-debugging-optimization-and-profiling)
+* [SimpleMOC-kernel Strawman Reactor Definition](#simplemoc-kernel-strawman-reactor-definition)
+* [Citing SimpleMOC-kernel](#citing-simplemoc-kernel)
 
-  int source_3D_regions = 1024;
-  Input *input = malloc(sizeof(Input));
-  Source_Arrays *source_arrays_host = malloc(sizeof(Source_Arrays));
+==============================================================================
+Introduction
+==============================================================================
 
-  // Initialize host-side data structures and memory
-  initializeHostData(input, source_arrays_host);
-  sources = initialize_sources(source_arrays_host);
+SimpleMOC-kernel represents the core computational of a larger application (SimpleMOC). This app was written in order to abstract away much of the complexity of the full application in order to facilitate easier porting of the code and enable more transparent analysis techniques on high performance architectures.
 
-  // Offload the execution of this kernel to a device (GPU)
-#pragma offload target(mic) in(sources) out(result)
+The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the attenuation of neutron fluxes across an individual geometrical segment. This kernel composes approximately 92% of the walltime of the full application, and is therefore useful for analyzing optimization methods and performance implications for exascale supercomputer architectures.
 
-  kernel_offload(sources, input, source_arrays_host);
+More information can be found in the following publication:
 
-  return 0;
-}
+http://dx.doi.org/10.1016/j.cpc.2016.01.007
 
-void kernel_offload(Source *sources, Input *input, Source_Arrays *source_arrays_host) {
-  // Offload directive to indicate that this kernel should be executed on a device (GPU)
-#pragma offload target(mic) in(sources) out(result)
+==============================================================================
+Architectural Support
+==============================================================================
 
-  // Initialize the host-side data structures and memory
-  initializeDeviceData(input, source_arrays_host);
+SimpleMOC-kernel is a C code that supports the OpenMP-offload execution model.
 
-  // Allocate memory for device-side data structures
-  Source_Arrays *source_arrays_device = malloc(sizeof(Source_Arrays));
-  cudaMalloc((void **)&source_arrays_device->fine_source_arr, input->num_sources * sizeof(float));
+==============================================================================
+Quick Start Guide
+==============================================================================
 
-  // Copy host-side data to device-side data structures
-  cudaMemcpy(source_arrays_device->fine_source_arr, source_arrays_host->fine_source_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
+Download----------------------------------------------------------------------
 
-  // Perform kernel operations on the device (GPU)
-  kernel_kernel(sources, input, source_arrays_device);
+	For the most up-to-date version of SimpleMOC-kernel, we recommend that you download from our git repository. This can be accomplished via cloning the repository from the command line, or by downloading a zip from our github page.
 
-  return;
-}
+	Git Repository Clone:
+		
+		Use the following command to clone SimpleMOC-kernel to your machine:
 
-void kernel_kernel(Source *sources, Input *input, Source_Arrays *source_arrays_device) {
-  // Offload directive to indicate that this kernel should be executed on a device (GPU)
-#pragma offload target(mic) in(sources) out(result)
+		>$ git clone https://github.com/ANL-CESAR/SimpleMOC-kernel.git
 
-  // Perform kernel operations on the device (GPU)
-  kernel_cuda_kernel(sources, input, source_arrays_device);
+		Once cloned, you can update the code to the newest version
+		using the following command (when in the SimpleMOC-kernel directory):
 
-  return;
-}
+		>$ git pull
 
-void initializeHostData(Input *input, Source_Arrays *source_arrays_host) {
-  // Initialize host-side data structures and memory
-  srand(0);
-  int num_sources = 1024;
+Compilation-------------------------------------------------------------------
 
-  // Allocate memory for host-side arrays
-  source_arrays_host->fine_source_arr = malloc(num_sources * sizeof(float));
-  source_arrays_host->fine_flux_arr = malloc(num_sources * sizeof(float));
-  source_arrays_host->sigT_arr = malloc(num_sources * sizeof(float));
+	To compile SimpleMOC-kernel with default settings, use the following command:
 
-  // Initialize host-side data to random values
-  for (int i = 0; i < num_sources; i++) {
-    source_arrays_host->fine_source_arr[i] = (float)rand() / RAND_MAX;
-    source_arrays_host->fine_flux_arr[i] = (float)rand() / RAND_MAX;
-    source_arrays_host->sigT_arr[i] = (float)rand() / RAND_MAX;
-  }
+	>$ make
 
-  return;
-}
+Running SimpleMOC-kernel-------------------------------------------------------
 
-void initializeDeviceData(Input *input, Source_Arrays *source_arrays_host) {
-  // Allocate memory for device-side arrays
-  cudaMalloc((void **)&source_arrays_host->fine_source_arr, input->num_sources * sizeof(float));
-  cudaMalloc((void **)&source_arrays_host->fine_flux_arr, input->num_sources * sizeof(float));
-  cudaMalloc((void **)&source_arrays_host->sigT_arr, input->num_sources * sizeof(float));
+	To run SimpleMOC-kernel with default settings, use the following command:
 
-  // Copy host-side data to device-side arrays
-  cudaMemcpy(source_arrays_host->fine_source_arr, source_arrays_host->fine_source_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(source_arrays_host->fine_flux_arr, source_arrays_host->fine_flux_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(source_arrays_host->sigT_arr, source_arrays_host->sigT_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
+	>$ ./SimpleMOC-kernel
 
-  return;
-}
+	For non-default settings, SimpleMOC-kernel supports the following
+	command line options:
 
-void initializeDeviceSources(Source *sources, Input *input, Source_Arrays *source_arrays_device) {
-  // Allocate memory for device-side arrays
-  cudaMalloc((void **)&source_arrays_device->fine_source_arr, input->num_sources * sizeof(float));
-  cudaMalloc((void **)&source_arrays_device->fine_flux_arr, input->num_sources * sizeof(float));
-  cudaMalloc((void **)&source_arrays_device->sigT_arr, input->num_sources * sizeof(float));
+	Usage: ./SimpleMOC-kernel <options>
+	Options include:
+	  -t <threads>          Number of threads to run
+	  -s <segments>         Number of segments to process
+	  -e <energy groups>    Number of energy groups
+	  -p <segs per thread>  Number of segments per OpenMP thread
 
-  // Copy host-side data to device-side arrays
-  cudaMemcpy(source_arrays_device->fine_source_arr, source_arrays_host->fine_source_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(source_arrays_device->fine_flux_arr, source_arrays_host->fine_flux_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
-  cudaMemcpy(source_arrays_device->sigT_arr, source_arrays_host->sigT_arr, input->num_sources * sizeof(float), cudaMemcpyHostToDevice);
+If not options are specified, then a default set of parameters will automatically be run. These parameters reflect the approximate per node work load for a full core reactor simulation (the number of geometry segments has been significantly reduced to reduce runtime while preserving the computational profile).
 
-  return;
-}
+==============================================================================
+Advanced Compilation, Debugging, Optimization, and Profiling
+==============================================================================
 
-void kernel_cuda_kernel(Source *sources, Input *input, Source_Arrays *source_arrays_device) {
-  // Perform kernel operations on the device (GPU)
-  cuda_kernel(sources, input, source_arrays_device);
+There are a number of switches that can be set at the top of the Makefile, along with more advanced compilation features.
+
+Here is a sample of the control panel at the top of the Makefile:
+
+COMPILER    = clang++
+OPTIMIZE    = yes
+DEBUG       = no
+PROFILE     = no
+
+Explanation of Flags:
+
+COMPILER <clang++> - This selects your compiler (Clang++ is only one supported).
+
+OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
+
+DEBUG - Adds the compiler flag "-g".
+
+PROFILE - Adds the compiler flag "-pg".
+
+==============================================================================
+SimpleMOC-kernel Strawman Reactor Definition
+==============================================================================
+
+For the purposes of simplicity this mini-app uses a conservative "strawman" reactor model to represent a good target problem for full core reactor simulations to be run on exascale class supercomputers. Arbitrary user-defined geometries are not supported.
+
+==============================================================================
+Citing SimpleMOC-kernel
+==============================================================================
+
+Papers citing SimpleMOC-kernel should in general refer to:
+
+John R. Tramm, Geoffrey Gunow, Tim He, Kord S. Smith, Benoit Forget, Andrew R. Siegel, (2016) "A task-based parallelism and vectorized approach to 3D Method of Characteristics (MOC) reactor simulation for high performance computing architectures", Computer Physics Communications, Volume 202, Pages 141–150, (https://doi.org/10.1016/j.cpc.2016.01.007).
+
+The bibtext entry for this paper is given below:
+
+@article{Tramm2016,
+title = "A task-based parallelism and vectorized approach to 3D Method of Characteristics (MOC) reactor simulation for high performance computing architectures",
+journal = "Computer Physics Communications",
+volume = "202",
+pages = "141 - 150",
+year = "2016",
+issn = "0010-4655",
+doi = "https://doi.org/10.1016/j.cpc.2016.01.007",
+url = "http://www.sciencedirect.com/science/article/pii/S0010465516000266",
+author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Benoit Forget and Andrew R. Siegel",
 }
 ```
-
-This code is an example of how OpenMP-offload directives can be used to offload execution of kernels to a device (GPU). The code assumes that you have already set up your environment with OpenMP and offloading capabilities. Note that this is just one possible way to translate the original code into an OpenMP-offload executable model, and there may be other ways to do so depending on your specific needs.
-
-Also note that some parts of the code (e.g., `kernel_cuda_kernel`) are not explicitly defined in the provided example, as they would depend on the actual implementation details of the kernel being offloaded. You will need to provide the implementation for these functions according to your requirements.
-
-To compile this code using GCC or Clang with OpenMP support:
-
-```bash
-$ gcc -g -o example example.c -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp
-```
-
-Or, for a MIC architecture (Knights Corner) target:
-
-```bash
-$ icc -g -o example example.c -qoffload-architecture=mic:rocm
-```
+Note that I've kept the same structure and content as the original README.txt file, but replaced all mentions of CUDA with OpenMP-offload.

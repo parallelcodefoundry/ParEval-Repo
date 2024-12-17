@@ -2,12 +2,10 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written in C++ with OpenMP directives for offloading to a device (GPU).
-
 ## Prerequisites
 
-OpenMP and a compatible compiler must be installed. Additionally, CUDA or another device driver that supports OpenMP-offload must be installed on the target system.
+OpenMP must be installed and configured properly on the system. The OpenCL library (libOpenCL) is also required to use offloading capabilities.
 
-## Building and Running
+## Build
 
-To build and run microXOR, use the following commands:
+To build microXOR, use `make`, setting `CUDA_ARCH` as appropriate for your system. However, note that microXOR will now compile with C++11 or later, so ensure your compiler supports these standards.

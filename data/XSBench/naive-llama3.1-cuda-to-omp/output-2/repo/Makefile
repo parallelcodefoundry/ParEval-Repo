@@ -1,6 +1,9 @@
 # User Options
-CUDA_ARCH ?=
-COMPILER    ?= llvm
+COMPILER    ?= clang-ompoffload
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+CUDA_ARCH   ?= 80
 
 # Program name & source code list
 program = XSBench
@@ -16,23 +19,24 @@ Materials.cu
 obj = $(source:.cu=.o)
 
 # Sets Flags
-CFLAGS := -Wall -Wextra
+CFLAGS := 
 LDFLAGS = -lm
 
-# NVIDIA Compiler
-ifeq ($(COMPILER),llvm)
-  CC = clang++
-  CFLAGS += -g -O3 -std=c++14 -fopenmp-targets=nvptx64-nvidia-cuda=8.0 -DCUDA_ARCH=$(CUDA_ARCH)
+# LLVM Compiler with OpenMP and Offload Support
+ifeq ($(COMPILER),clang-ompoffload)
+  CC = clang++ -fopenmp-targets=nvptx64-nvidia-cuda=11.1
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
 endif
 
 # Profiling Flags
 ifeq ($(PROFILE),yes)
   CFLAGS += -pg
+  LDFLAGS  += -pg
 endif
 
 # Optimization Flags
@@ -40,18 +44,23 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+# Offload Options (default: all available NVIDIA devices)
+CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda=11.1 \
+          -foffload=cuda,targets=nvptx64-nvidia-cuda=11.1 \
+          --cuda-gpu-arch=$(CUDA_ARCH)
+
 # Targets to Build
-$(program): $(obj) XSbench_header.cuh Makefile
+$(program): $(obj) XSbench_header.h Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu XSbench_header.cuh Makefile
+%.o: %.cu XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.cuh
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)

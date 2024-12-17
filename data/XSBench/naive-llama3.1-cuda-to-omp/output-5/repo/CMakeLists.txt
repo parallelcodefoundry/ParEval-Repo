@@ -4,20 +4,27 @@ project(
     XSBench_OpenMP
     VERSION 1.0
     LANGUAGES CXX OFFLOAD
-
 )
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
+# Define OpenMP flags
+set(CMAKE_OPENMP_FLAGS "-fopenmp")
+set(CMAKE_OFFLOAD_FLAGS "-fopenacc")
 
-add_executable(XSBench ${SOURCE})
+# Add source files
+add_executable(XSBench Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
-target_link_libraries(XSBench OpenMP::OpenMP_CXX_OFFLOAD)
+# Specify include directories for OpenMP offload
+target_include_directories(XSBench PRIVATE ${OPENMP_INCLUDE_DIR})
 
-# Define offload targets
-set_target_properties(XSBench PROPERTIES OFFLOAD_TARGETS nvidia)
+# Link against OpenMP libraries
+target_link_libraries(XSBench PUBLIC ${OPENMP_LIBRARIES} ${CUDART_LIBRARY})
 
-include_directories(/usr/local/cuda/include /usr/lib/x86_64-linux-gnu/openmp)
+install(TARGETS XSBench DESTINATION bin)

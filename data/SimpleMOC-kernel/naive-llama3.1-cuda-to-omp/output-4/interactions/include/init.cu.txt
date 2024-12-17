@@ -1,35 +1,105 @@
-Here is the translated `include/init.cu` file for OpenMP offloading:
+Here is the translation of `include/init.cu` to OpenMP Offload:
 ```c
-#include <omp.h>
-#include <cuda_runtime.h>
+#include "SimpleMOC-kernel_header.h"
 
-#define CUDA_ERROR_CHECK
+// Offload declaration for setup_kernel function
+__attribute__((offload(accelerator_type="cuda"))) 
+void setup_kernel(curandState *state, Input I) {
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    if (threadId >= I.streams)
+        return;
 
-Table buildExponentialTable( void )
-{
+    curand_init(1234, threadId, 0, &state[threadId]);
+}
+
+// Offload declaration for init_flux_states function
+__attribute__((offload(accelerator_type="cuda"))) 
+void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state) {
+    int blockId = blockIdx.y * gridDim.x + blockIdx.x; // geometric segment
+    //int threadId = blockId * blockDim.x + threadIdx.x; // energy group
+
+    if (blockId >= N_flux_states)
+        return;
+
+    // Assign RNG state
+    curandState *localState = &state[blockId % I.streams];
+
+    if (threadIdx.x == 0) {
+        for (int i = 0; i < I.egroups; i++) {
+            flux_states[blockId + i] = curand_uniform(localState);
+        }
+    }
+}
+
+// Offload declaration for initialize_sources function
+__attribute__((offload(accelerator_type="cuda"))) 
+Source *initialize_sources(Input I, Source_Arrays *SA) {
+    // Allocate & Copy Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    float *fine_source_arr_device = (float *) omp_target_alloc(N_fine * sizeof(float), &SA->fine_source_arr);
+    cudaMemcpy(fine_source_arr_device, SA->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Fine Flux Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    float *sigT_arr_device = (float *) omp_target_alloc(N_sigT * sizeof(float), &SA->sigT_arr);
+    cudaMemcpy(sigT_arr_device, SA->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Initialize fine source and flux to random numbers
+    for (long i = 0; i < N_fine; i++) {
+        fine_source_arr_device[i] = (float) rand() / RAND_MAX;
+    }
+
+    // Initialize SigT Values
+    for (int i = 0; i < N_sigT; i++) {
+        sigT_arr_device[i] = (float) rand() / RAND_MAX;
+    }
+
+    return (Source *) malloc(I.source_3D_regions * sizeof(Source));
+}
+
+// Offload declaration for initialize_device_sources function
+__attribute__((offload(accelerator_type="cuda"))) 
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
+    // Allocate & Copy Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    float *fine_source_arr_device = (float *) omp_target_alloc(N_fine * sizeof(float), &SA_d->fine_source_arr);
+    cudaMemcpy(fine_source_arr_device, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Fine Flux Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    float *sigT_arr_device = (float *) omp_target_alloc(N_sigT * sizeof(float), &SA_d->sigT_arr);
+    cudaMemcpy(sigT_arr_device, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+
+    // Allocate & Copy Source Array Data
+    Source *sources_device;
+    cudaMalloc((void **)&sources_device, I.source_3D_regions * sizeof(Source));
+    cudaMemcpy(sources_device, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
+
+    return sources_device;
+}
+
+// Offload declaration for buildExponentialTable function
+__attribute__((offload(accelerator_type="cuda"))) 
+Table buildExponentialTable() {
     // define table
     Table table;
 
     //float precision = 0.01;
-    float maxVal = 10.0;    
+    float maxVal = 10.0;   
 
     // compute number of arry values
-    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
-    int N = 353; 
+    int N = 353;   
 
     // compute spacing
     float dx = maxVal / (float) N;
 
-    #pragma omp target teams distribute parallel for
-    for(int n = 0; n < N; n++)
-    {
-        // store linear segment information (slope and y-intercept)
-        float exponential = exp( - n * dx );
-        table.values[ 2*n ] = - exponential;
-        table.values[ 2*n + 1 ] = 1 + ( n * dx - 1 ) * exponential;
+    // store linear segment information (slope and y-intercept)
+    for (int n = 0; n < N; n++) {
+        // compute slope and y-intercept for ( 1 - exp(-x) )
+        float exponential = exp(-n * dx);
+        table.values[2 * n] = -exponential;
+        table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;
     }
-
-    #pragma omp target update from(table)
 
     // assign data to table
     table.dx = dx;
@@ -39,58 +109,21 @@ Table buildExponentialTable( void )
     return table;
 }
 
-void __omp_cudaCheckError( const char *file, const int line )
-{
-#ifdef CUDA_ERROR_CHECK
-    cudaError err = cudaGetLastError();
-    if ( cudaSuccess != err )
-    {
-        fprintf( stderr, "cudaCheckError() failed at %s:%i : %s\n",
-                 file, line, cudaGetErrorString( err ) );
-        exit( -1 );
-    }
- 
-    // More careful checking. However, this will affect performance.
-    // Comment away if needed.
-    err = cudaDeviceSynchronize();
-    if( cudaSuccess != err )
-    {
-        fprintf( stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
-                 file, line, cudaGetErrorString( err ) );
-        exit( -1 );
-    }
-#endif
- 
-    return;
-}
+// Offload declaration for set_default_input function
+__attribute__((offload(accelerator_type="cuda"))) 
+Input set_default_input(void) {
+    Input I;
 
-Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h )
-{
-    #pragma omp target teams distribute parallel for
-    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    cudaMalloc((void **) &SA_d->fine_source_arr, N_fine * sizeof(float));
-    cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+    I.source_2D_regions = 5000;
+    I.coarse_axial_intervals = 27;
+    I.fine_axial_intervals = 5;
+    I.decomp_assemblies_ax = 20; // Number of subdomains per assembly axially
+    I.segments = 50000000;
+    I.egroups = 128;
+    I.streams = 10000;
+    I.seg_per_thread = 100;
 
-    #pragma omp target teams distribute parallel for
-    cudaMalloc((void **) &SA_d->fine_flux_arr, N_fine * sizeof(float));
-    cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
-
-    #pragma omp target teams distribute parallel for
-    long N_sigT = I.source_3D_regions * I.egroups;
-    cudaMalloc((void **) &SA_d->sigT_arr, N_sigT * sizeof(float));
-    cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
-
-    #pragma omp target teams distribute parallel for
-    Source * sources_d;
-    cudaMalloc((void **) &sources_d, I.source_3D_regions * sizeof(Source));
-    cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
-
-    return sources_d;
+    return I;
 }
 ```
-Note that the following changes were made:
-
-* The `#pragma omp target` directives were added to specify which functions should be offloaded to the GPU.
-* The `parallel for` clause was used to parallelize the loops in the `buildExponentialTable` and `initialize_device_sources` functions.
-* The `update from(table)` clause was used to update the host-side table with the results of the computation on the device.
-* The `CUDA_ERROR_CHECK` macro was defined to enable error checking for CUDA calls.
+Note that the `omp_target_alloc` function is used to allocate memory on the device, and the `cudaMemcpy` function is used to copy data from host to device. Also note that the offload attributes are added to each function declaration.

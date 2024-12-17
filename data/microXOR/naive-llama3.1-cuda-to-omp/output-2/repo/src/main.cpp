@@ -1,86 +1,82 @@
-// microXOR main function translated for OpenMP-offload
+#include "microXOR.hpp"
 
-#include <omp.h>
-#include "microXOR.cuh"
-#include <stdio.h>
+void cleanup(int *input, int *output) {
+  delete[] input;
+  delete[] output;
+}
 
-#define N 1024
-#define BLOCK_SIZE_X 32
-#define BLOCK_SIZE_Y 32
+int main(int argc, char **argv) {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " N blockEdge" << std::endl;
+    return 1;
+  }
 
-int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s <matrix_size> <threads_per_block>\n", argv[0]);
-        return -1;
-    }
+  size_t N = std::stoi(argv[1]);
+  size_t blockEdge = std::stoi(argv[2]);
 
-    int matrix_size = atoi(argv[1]);
-    int threads_per_block_x = BLOCK_SIZE_X;
-    int threads_per_block_y = BLOCK_SIZE_Y;
+  if (N % blockEdge != 0) {
+    std::cerr << "N must be divisible by blockEdge" << std::endl;
+    return 1;
+  }
+  if (blockEdge < 2 || blockEdge > 32) {
+    std::cerr << "blockEdge must be between 2 and 32" << std::endl;
+    return 1;
+  }
+  if (N < 4) {
+    std::cerr << "N must be at least 4" << std::endl;
+    return 1;
+  }
 
-    // Validate the input
-    if (matrix_size <= 0) {
-        printf("Matrix size must be greater than zero\n");
-        return -1;
-    }
+  int *input = new int[N * N];
+  int *output = new int[N * N];
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution<int> dis(0, 1);
+  for (size_t i = 0; i < N * N; i++) {
+    input[i] = dis(gen);
+  }
 
-    // Allocate memory on host and device
-    int* input_host = (int*)malloc(matrix_size * matrix_size * sizeof(int));
-    int* output_host = (int*)malloc(matrix_size * matrix_size * sizeof(int));
+  int *d_input, *d_output;
+  // Initialize OpenMP Offload
+  #pragma omp offload target(map: d_input[0:N*N], d_output[0:N*N])
+  {
+    cudaMalloc(&d_input, N * N * sizeof(int));
+    cudaMalloc(&d_output, N * N * sizeof(int));
 
-    int* d_input;
-    int* d_output;
+    cudaMemcpy(d_input, input, N * N * sizeof(int), cudaMemcpyHostToDevice);
 
-    cudaMalloc((void**)&d_input, matrix_size * matrix_size * sizeof(int));
-    cudaMalloc((void**)&d_output, matrix_size * matrix_size * sizeof(int));
+    dim3 threadsPerBlock(blockEdge, blockEdge);
+    dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    cellsXOR<<<numBlocks, threadsPerBlock>>>(d_input, d_output, N);
 
-    // Initialize input data
-    for (int i = 0; i < matrix_size; i++) {
-        for (int j = 0; j < matrix_size; j++) {
-            if (i == 1 && j == 2) input_host[i*matrix_size + j] = 1;
-            else if (i == 3 && j == 4) input_host[i*matrix_size + j] = 1;
-            // Initialize other cells randomly
+    cudaMemcpy(output, d_output, N * N * sizeof(int), cudaMemcpyDeviceToHost);
+  }
+
+  // Validate the output
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      if (count == 1) {
+        if (output[i*N + j] != 1) {
+          std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+          cleanup(input, output);
+          return 1;
         }
-    }
-
-    // Copy input data to device
-    cudaMemcpy(d_input, input_host, matrix_size * matrix_size * sizeof(int), cudaMemcpyHostToDevice);
-
-    // Launch kernel on multiple blocks
-#pragma omp target teams distribute parallel for map(to: input[0:N*N], output[0:N*N]) \
-                num_teams((matrix_size + threads_per_block_x - 1) / threads_per_block_x),\
-                thread_limit(threads_per_block_x)
-    {
-        cellsXOR<<<dim3(matrix_size/threads_per_block_x, matrix_size/threads_per_block_y),
-                   dim3(threads_per_block_x, threads_per_block_y)>>>(d_input, d_output, matrix_size);
-    }
-
-    // Copy output data from device to host
-    cudaMemcpy(output_host, d_output, matrix_size * matrix_size * sizeof(int), cudaMemcpyDeviceToHost);
-
-    // Validate the output
-    for (int i = 0; i < matrix_size; i++) {
-        for (int j = 0; j < matrix_size; j++) {
-            int count = 0;
-            if (i > 0 && input_host[(i-1)*matrix_size + j] == 1) count++;
-            if (i < matrix_size-1 && input_host[(i+1)*matrix_size + j] == 1) count++;
-            if (j > 0 && input_host[i*matrix_size + (j-1)] == 1) count++;
-            if (j < matrix_size-1 && input_host[i*matrix_size + (j+1)] == 1) count++;
-
-            if ((count == 1) != (output_host[i*matrix_size + j] == 1)) {
-                printf("Validation failed at (%d, %d)\n", i, j);
-                return -1;
-            }
+      } else {
+        if (output[i*N + j] != 0) {
+          std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+          cleanup(input, output);
+          return 1;
         }
+      }
     }
-
-    printf("Validation passed.\n");
-
-    // Clean up
-    free(input_host);
-    free(output_host);
-    cudaFree(d_input);
-    cudaFree(d_output);
-
-    return 0;
+  }
+  std::cout << "Validation passed." << std::endl;
+  cleanup(input, output);
+  return 0;
 }

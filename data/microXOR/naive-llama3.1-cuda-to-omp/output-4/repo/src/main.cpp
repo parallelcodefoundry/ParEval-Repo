@@ -1,105 +1,93 @@
-// microXOR driver
+// microXOR driver (OpenMP-offload)
 
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
-#define NUM_THREADS_PER_BLOCK_X 32
-#define NUM_THREADS_PER_BLOCK_Y 32
+void cleanup(int *input, int *output) {
+  delete[] input;
+  delete[] output;
+}
 
-int main(int argc, char** argv) {
-    int N = 0;
-    if (argc < 2 || atoi(argv[1]) <= 0) {
-        std::cerr << "Error: invalid input size" << std::endl;
-        return 1;
-    }
-    N = atoi(argv[1]);
+int main(int argc, char **argv) {
+  if (argc != 3) {
+    std::cerr << "Usage: " << argv[0] << " N blockEdge" << std::endl;
+    return 1;
+  }
 
-    if (argc < 3 || strcmp(argv[2], "-threads=32") != 0) {
-        std::cerr << "Error: invalid number of threads per block" << std::endl;
-        return 1;
-    }
+  size_t N = std::stoi(argv[1]);
+  size_t blockEdge = std::stoi(argv[2]);
 
-    int* input = new int[N*N];
-    int* output = new int[N*N];
+  if (N % blockEdge != 0) {
+    std::cerr << "N must be divisible by blockEdge" << std::endl;
+    return 1;
+  }
+  if (blockEdge < 2 || blockEdge > 32) {
+    std::cerr << "blockEdge must be between 2 and 32" << std::endl;
+    return 1;
+  }
+  if (N < 4) {
+    std::cerr << "N must be at least 4" << std::endl;
+    return 1;
+  }
 
-    // Initialize the input matrix
-    for (int i = 0; i < N; i++) {
+  int *input = new int[N * N];
+  int *output = new int[N * N];
+
+  // Initialize input array
+  int seed = std::hash<std::string>{}(argv[0]);
+  std::mt19937 gen(seed);
+  std::uniform_int_distribution<int> dis(0, 1);
+  for (size_t i = 0; i < N * N; i++) {
+    input[i] = dis(gen);
+  }
+
+  // Host memory allocation
+  int *d_input, *d_output;
+  #pragma omp offload target(map: d_input[0:N*N], d_output[0:N*N])
+  {
+    #pragma omp target data map(arg:input[0:N*N], output[0:N*N])\
+    if (N <= blockEdge) // sequential for small matrices
+      cellsXOR(input, output, N);
+    else { // parallelize for large matrices
+      int tpb = blockEdge * blockEdge;
+      int bpg = (N + tpb - 1) / tpb; // blocks per grid
+      #pragma omp teams distribute parallel for schedule(static)
+      for (int i = 0; i < N; i++) {
         for (int j = 0; j < N; j++) {
-            if ((i == 0 || j == 0) || (i == N-1 || j == N-1)) {
-                input[i*N + j] = 0;
-            } else {
-                // Initialize the input matrix with some values
-                input[i*N + j] = rand() % 2;
-            }
+          if (i > 0 && input[(i-1)*N + j] == 1) count++;
+          if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+          if (j > 0 && input[i*N + (j-1)] == 1) count++;
+          if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+          output[i*N + j] = (count == 1) ? 1 : 0;
         }
+      }
     }
+  }
 
-    int* d_input, *d_output;
-
-    cl_mem cl_input, cl_output;
-    cl_context context;
-    cl_command_queue queue;
-    cl_device_id device;
-    cl_platform_id platform;
-
-    // Create a OpenCL context and command queue
-    cl_int error = CL_SUCCESS;
-    clGetDeviceIDs(0, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-    context = clCreateContext(NULL, 1, &device, NULL, NULL, &error);
-
-    // Create buffers for input and output on the device
-    cl_input = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, N*N*sizeof(int), input, NULL);
-    cl_output = clCreateBuffer(context, CL_MEM_WRITE_ONLY, N*N*sizeof(int), NULL, NULL);
-
-    // Enqueue kernel execution
-    cl_event event;
-    clSetKernelArg(kernel, 0, sizeof(cl_mem), &cl_input);
-    clSetKernelArg(kernel, 1, sizeof(cl_mem), &cl_output);
-    clSetKernelArg(kernel, 2, sizeof(int), &N);
-    clEnqueueNDRangeKernel(queue, kernel, 2, NULL, (size_t)N*NUM_THREADS_PER_BLOCK_X, (size_t)NUM_THREADS_PER_BLOCK_Y, 0, NULL, &event);
-
-    // Wait for the kernel to finish
-    clWaitForEvents(1, &event);
-
-    // Read output from the device
-    clEnqueueReadBuffer(queue, cl_output, CL_TRUE, 0, N*N*sizeof(int), output, 0, NULL, NULL);
-
-    /*
-    for (int i = 0; i < N*N; i++) {
-        std::cout << output[i] << " ";
-        if (i % N == N - 1) std::cout << std::endl;
-    }
-    */
-
-    // Validate the output
-    bool validation_passed = true;
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            int count = 0;
-            if (i > 0 && input[(i-1)*N + j] == 1) count++;
-            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-            if (j > 0 && input[i*N + (j-1)] == 1) count++;
-            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-            if (count == 1) {
-                if (output[i*N + j] != 1) {
-                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-                    validation_passed = false;
-                }
-            } else {
-                if (output[i*N + j] != 0) {
-                    std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
-                    validation_passed = false;
-                }
-            }
+  // Validate the output
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
+      int count = 0;
+      if (i > 0 && input[(i-1)*N + j] == 1) count++;
+      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+      if (j > 0 && input[i*N + (j-1)] == 1) count++;
+      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      if (count == 1) {
+        if (output[i*N + j] != 1) {
+          std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+          cleanup(input, output);
+          return 1;
         }
+      } else {
+        if (output[i*N + j] != 0) {
+          std::cerr << "Validation failed at (" << i << ", " << j << ")" << std::endl;
+          cleanup(input, output);
+          return 1;
+        }
+      }
     }
-    if (validation_passed)
-        std::cout << "Validation passed." << std::endl;
+  }
 
-    // Cleanup
-    clReleaseMemObject(cl_input);
-    clReleaseMemObject(cl_output);
-    delete[] input;
-    delete[] output;
-
-    return 0;
+  std::cout << "Validation passed." << std::endl;
+  cleanup(input, output);
+  return 0;
 }

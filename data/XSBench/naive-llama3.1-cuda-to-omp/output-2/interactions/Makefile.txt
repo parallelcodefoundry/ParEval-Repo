@@ -1,9 +1,12 @@
 Here is the translated Makefile:
 
-```make
+```
 # User Options
-CUDA_ARCH ?=
-COMPILER    ?= llvm
+COMPILER    ?= clang-ompoffload
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+CUDA_ARCH   ?= 80
 
 # Program name & source code list
 program = XSBench
@@ -19,23 +22,24 @@ Materials.cu
 obj = $(source:.cu=.o)
 
 # Sets Flags
-CFLAGS := -Wall -Wextra
+CFLAGS := 
 LDFLAGS = -lm
 
-# NVIDIA Compiler
-ifeq ($(COMPILER),llvm)
-  CC = clang++
-  CFLAGS += -g -O3 -std=c++14 -fopenmp-targets=nvptx64-nvidia-cuda=8.0 -DCUDA_ARCH=$(CUDA_ARCH)
+# LLVM Compiler with OpenMP and Offload Support
+ifeq ($(COMPILER),clang-ompoffload)
+  CC = clang++ -fopenmp-targets=nvptx64-nvidia-cuda=11.1
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
 endif
 
 # Profiling Flags
 ifeq ($(PROFILE),yes)
   CFLAGS += -pg
+  LDFLAGS  += -pg
 endif
 
 # Optimization Flags
@@ -43,23 +47,26 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+# Offload Options (default: all available NVIDIA devices)
+CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda=11.1 \
+          -foffload=cuda,targets=nvptx64-nvidia-cuda=11.1 \
+          --cuda-gpu-arch=$(CUDA_ARCH)
+
 # Targets to Build
-$(program): $(obj) XSbench_header.cuh Makefile
+$(program): $(obj) XSbench_header.h Makefile
 	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cu XSbench_header.cuh Makefile
+%.o: %.cu XSbench_header.h Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.cuh
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)
 ```
 
-Note that I've added the `-fopenmp-targets=nvptx64-nvidia-cuda=8.0` flag to enable OpenMP offloading to NVIDIA GPUs with CUDA 8.0 compatibility. You may need to adjust this flag depending on your specific GPU and compiler versions.
-
-Also, make sure to set `CUDA_ARCH` and `COMPILER` variables when compiling the code, for example: `make CUDA_ARCH=80 COMPILER=llvm`.
+Note that I have modified the Makefile to use clang++ instead of nvcc, and added flags for OpenMP and offload support. The `CUDA_ARCH` variable is used to specify the target architecture (in this case, NVIDIA GPU with compute capability 80). Also note that you may need to adjust the compiler version in the flag `-fopenmp-targets=nvptx64-nvidia-cuda=11.1` depending on your specific system and CUDA version.

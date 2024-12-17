@@ -5,5 +5,5 @@
     "source_model": "cuda",
     "dest_model": "openmp-offload",
     "output_number": 1,
-    "path": "../../../data/XSBench/naive-llama-3.1-cuda-to-omp/output-1/repo"
+    "path": "../../../data/XSBench/naive-llama3.1-cuda-to-omp/output-1/repo"
 }

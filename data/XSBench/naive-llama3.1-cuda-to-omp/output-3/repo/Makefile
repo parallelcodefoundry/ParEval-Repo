@@ -1,17 +1,13 @@
-#===============================================================================
-# User Options
-#===============================================================================
+CUDA_ARCH ?= 80
+COMPILER ?= llvm
 
-COMPILER    ?= clang
-CUDA_ARCH   ?= 80
-OPTIMIZE    ?= yes
-DEBUG       ?= no
-PROFILE     ?= no
-MPI         ?= no
+CC = ${COMPILER} -fopenmp
+CXX = ${CC}
+LD = ${CC}
 
-#===============================================================================
-# Program name & source code list
-#===============================================================================
+CFLAGS = -Wall -Wextra -O3 -arch=$(CUDA_ARCH)
+LDFLAGS = -lm
+OPENMP_CFLAGS = -fopenmp-targets=nvptx64-nvvm34.9
 
 program = XSBench
 
@@ -25,45 +21,17 @@ Materials.cu
 
 obj = $(source:.cu=.o)
 
-#===============================================================================
-# Sets Flags
-#===============================================================================
+$(program): $(obj) XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(OPENMP_CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-# Standard Flags
-CFLAGS := -std=c++14
-
-# OpenMP Flags
-CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda=10.0
-
-# Linker Flags
-LDFLAGS = -lm -lopenomp
-
-# Compiler
-ifeq ($(COMPILER),clang)
-  CC = clang++
-endif
-ifeq ($(COMPILER),gcc)
-  CC = g++
-endif
-ifeq ($(COMPILER),nvcc)
-  CC = nvcc
-endif
-
-#===============================================================================
-# Targets to Build
-#===============================================================================
-
-$(program): $(obj) XSbench_header.cuh Makefile
-	$(CC) -O3 $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
-
-%.o: %.cu XSbench_header.cuh Makefile
-	$(CC) -c $(CFLAGS) -fopenmp-targets=nvptx64-nvidia-cuda=10.0 $< -o $@
+%.o: %.c XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(OPENMP_CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.cuh
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)

@@ -1,47 +1,46 @@
-```Makefile
-# Makefile translated from CUDA to OpenMP-offload
+Here is the translated Makefile in one code block:
 
-CXX = clang++
-CXXFLAGS = -fopenmp -fopenacc
-LDLIBS = -lomp
-SM_VERSION ?= $(shell ompi_info --version)
-ifeq ($(SM_VERSION), 80)
-    CXXFLAGS += -acc -Minfo=all
+```
+# Makefile for OpenMP-offload microXOR
+
+SM_VERSION ?= 80
+CXX_COMPILER ?= g++
+OFFLOAD_CXX ?= offload
+OFFLOAD_FLAGS ?= -fopenmp-targets=nvptx64-nvidia-cuda --cuda-device
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g -G
 endif
 
-CC = clang
-CFLAGS = -fopenmp -fopenacc
+SRC = src
+INC = include
+OBJ = obj
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
 
-# Default target is build
-build: microXOR.cpp microXOR.hpp main.cpp
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+$(EXE): $(OBJS)
+	$(CXX_COMPILER) -fopenmp $(OFFLOAD_FLAGS) $(OBJS) -o $(EXE)
 
-main.o: main.cpp microXOR.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX_COMPILER) -fopenmp $(OFFLOAD_FLAGS) $(CXXFLAGS) $< -o $@
 
-microXOR.o: microXOR.cpp microXOR.hpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+obj:
+	mkdir -p $(OBJ)
 
-# Cleaning target
 clean:
-	rm -f *.o build
+	rm -f $(OBJS) $(EXE)
 
-# Target for building for a specific SM version
-build-sm-80: CXX = clang++
-build-sm-80: LDLIBS = -lomp
-build-sm-80: microXOR.cpp microXOR.hpp main.cpp
-	$(CXX) $(CXXFLAGS) -acc -Minfo=all $^ -o $@ $(LDLIBS)
+.PHONY: clean
 
-# Target for building with a specific C++ compiler
-build-cxx-compiler: CXX = clang++
-build-cxx-compiler: LDLIBS =
-build-cxx-compiler: microXOR.cpp microXOR.hpp main.cpp
-	$(CXX) $(CXXFLAGS) $^ -o build $(LDLIBS)
+# Example usage:
+# make SM_VERSION=80 CXX_COMPILER=clang++ CXX=g++
 ```
 
-Note that I've made the following changes:
-- Replaced `CXX` with `clang++`, as OpenMP-offload requires a C++ compiler.
-- Added `-fopenmp` to enable OpenMP support.
-- Removed CUDA-specific flags and libraries (e.g., `-device-cuda`, `-ccbin=/usr/bin/nvcc`, `--gpu-architecture=sm_80`).
-- Replaced the build target with a generic one that compiles all `.cpp` files in the directory. You can change this to suit your specific needs.
-- Added targets for building for a specific SM version (e.g., `build-sm-80`) and using a specific C++ compiler (e.g., `build-cxx-compiler`). These targets allow you to customize the build process by specifying additional flags or libraries as needed.
+Note that I've assumed the user will use `g++` as the compiler and `nvptx64-nvidia-cuda` as the offload target. You can modify these to suit your needs.
+
+Also note that you'll need to replace `.cu` files with `.cpp` files, since CUDA code is not compatible with OpenMP-offload. In this Makefile, I've replaced `microXOR.cu` and `main.cu` with `microXOR.cpp` and `main.cpp`, respectively.
+
+Finally, make sure to install the necessary tools (e.g., `nvptx64-nvidia-cuda`) for offloading to work correctly.

@@ -1,33 +1,62 @@
-#ifndef __SIMPLE_MOC_KERNEL_HEADER__
-#define __SIMPLE_MOC_KERNEL_HEADER__
+#ifndef __SimpleMOC_header
+#define __SimpleMOC_header
 
 #include <omp.h>
+#include <cuda.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
 
-// Define the number of threads for OpenMP
-#define NUM_THREADS 4
+// OpenMP Error Handling Macro (not applicable for offloading)
+#define CUDA_ERROR_CHECK
 
-// Define a function to initialize device sources
-void init_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
+// User inputs
+typedef struct {
+    int source_2D_regions;
+    int source_3D_regions;
+    int coarse_axial_intervals;
+    int fine_axial_intervals;
+    int decomp_assemblies_ax; // Number of subdomains per assembly axially
+    long segments;
+    int egroups;
+    int nthreads;
+    int streams;
+    int seg_per_thread;
+} Input;
 
-// Define a kernel function to perform computation on the device
-__global__
-void compute_kernel( Input I, Source_Arrays * SA_d ) {
-    // Get the global thread ID
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+// Source Region Structure
+typedef struct {
+    long fine_flux_id;
+    long fine_source_id;
+    long sigT_id;
+} Source;
 
-    // Perform computation based on the input and source arrays
-    if (tid < I.source_3D_regions) {
-        // Access source array data using offloaded pointers
-        float fine_source_val = SA_d->fine_source_arr[tid];
-        float fine_flux_val = SA_d->fine_flux_arr[tid];
-        float sigT_val = SA_d->sigT_arr[tid];
+// Source Arrays
+typedef struct {
+    float *fine_flux_arr;
+    float *fine_source_arr;
+    float *sigT_arr;
+} Source_Arrays;
 
-        // Perform computation using the accessed values
-        // ...
-    }
-}
+// Table structure for computing exponential
+typedef struct {
+    float values[706];
+    float dx;
+    float maxVal;
+    int N;
+} Table;
 
-// Define a function to build an exponential table for linear interpolation
-Table build_exponential_table( void );
+// Offload kernel functions
+extern "C" __attribute__((noinline)) void run_kernel(offload_target(hsa, cl), Input *I, Source **S,
+        Source_Arrays *SA, Table *table, curandState *state, float *state_fluxes, int N_state_fluxes);
 
-#endif  // __SIMPLE_MOC_KERNEL_HEADER__
+// Offload kernel functions
+extern "C" __attribute__((noinline)) void interpolateTable(offload_target(hsa, cl), Table *table, float x,
+        float *out);
+
+#endif // __SimpleMOC_header

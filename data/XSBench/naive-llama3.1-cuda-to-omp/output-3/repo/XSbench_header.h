@@ -1,12 +1,12 @@
 #ifndef __XSBENCH_HEADER_H__
 #define __XSBENCH_HEADER_H__
 
-#include<stdio.h>
-#include<stdlib.h>
-#include<math.h>
-#include<assert.h>
-#include<omp.h>
-#include <openacc.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+#include <cuda.h>
+#include <omp.h>
 
 // Grid types
 #define UNIONIZED 0
@@ -24,96 +24,48 @@
 
 #define STARTING_SEED 1070
 
-#pragma acc routine seq
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-        if (code != cudaSuccess)
-        {
-                fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-                if (abort) exit(code);
-        }
-}
+#ifdef __cplusplus
+typedef struct NuclideGridPoint {
+    double energy;
+    double total_xs;
+    double elastic_xs;
+    double absorbtion_xs;
+    double fission_xs;
+    double nu_fission_xs;
+} NuclideGridPoint;
+#endif
+
+#pragma offload_attribute(push)
+#pragma offload_attribute(align:64)
+
+typedef struct SimulationData {
+    int * num_nucs;                     // Length = length_num_nucs;
+    double * concs;                     // Length = length_concs
+    int * mats;                         // Length = length_mats
+    double * unionized_energy_array;    // Length = length_unionized_energy_array
+    int * index_grid;                   // Length = length_index_grid
+    NuclideGridPoint * nuclide_grid;    // Length = length_nuclide_grid
+    int length_num_nucs;
+    int length_concs;
+    int length_mats;
+    int length_unionized_energy_array;
+    long length_index_grid;
+    int length_nuclide_grid;
+    int max_num_nucs;
+    unsigned long * verification;
+    int length_verification;
+} SimulationData;
+
+#pragma offload_attribute(pop)
 
 // Structures
-typedef struct{
-        double energy;
-        double total_xs;
-        double elastic_xs;
-        double absorbtion_xs;
-        double fission_xs;
-        double nu_fission_xs;
+typedef struct {
+    double energy;
+    double total_xs;
+    double elastic_xs;
+    double absorbtion_xs;
+    double fission_xs;
+    double nu_fission_xs;
 } NuclideGridPoint;
-
-#pragma acc routine seq
-inline int double_compare(const void * a, const void * b)
-{
-	double A = *((double *) a);
-	double B = *((double *) b);
-
-	if( A > B )
-		return 1;
-	else if( A < B )
-		return -1;
-	else
-		return 0;
-}
-
-#pragma acc routine seq
-inline int NGP_compare(const void * a, const void * b)
-{
-	NuclideGridPoint A = *((NuclideGridPoint *) a);
-	NuclideGridPoint B = *((NuclideGridPoint *) b);
-
-	if( A.energy > B.energy )
-		return 1;
-	else if( A.energy < B.energy )
-		return -1;
-	else
-		return 0;
-}
-
-// RNG Used for Verification Option.
-// This one has a static seed (must be set manually in source).
-// Park & Miller Multiplicative Conguential Algorithm
-// From "Numerical Recipes" Second Edition
-#pragma acc routine seq
-inline double rn_v(void)
-{
-	static unsigned long seed = 1337;
-	double ret;
-	unsigned long n1;
-	unsigned long a = 16807;
-	unsigned long m = 2147483647;
-	n1 = ( a * (seed) ) % m;
-	seed = n1;
-	ret = (double) n1 / m;
-	return ret;
-}
-
-#pragma acc routine seq
-inline size_t estimate_mem_usage( Inputs in )
-{
-	size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );
-	size_t all_nuclide_grids   = in.n_isotopes * single_nuclide_grid;
-	size_t size_UEG		   = in.n_isotopes*in.n_gridpoints*sizeof(double) + in.n_isotopes*in.n_gridpoints*in.n_isotopes*sizeof(int);
-	size_t size_hash_grid	   = in.hash_bins * in.n_isotopes * sizeof(int);
-	size_t memtotal;
-
-	if( in.grid_type == UNIONIZED )
-		memtotal	  = all_nuclide_grids + size_UEG;
-	else if( in.grid_type == NUCLIDE )
-		memtotal	  = all_nuclide_grids;
-	else
-		memtotal	  = all_nuclide_grids + size_hash_grid;
-
-	memtotal	  = ceil(memtotal / (1024.0*1024.0));
-	return memtotal;
-}
-
-#pragma acc routine seq
-inline double get_time(void)
-{
-        return omp_get_wtime();
-}
 
 #endif // __XSBENCH_HEADER_H__

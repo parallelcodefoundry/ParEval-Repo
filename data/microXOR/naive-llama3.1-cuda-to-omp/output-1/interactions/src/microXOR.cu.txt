@@ -1,47 +1,54 @@
-To translate the `src/microXOR.cu` file from CUDA to OpenMP offload, we need to replace the CUDA-specific syntax with OpenMP directives and pragmas.
+Here is the translated `src/microXOR.cu` file for OpenMP offloading:
 
-```c
+```cpp
+// microXOR kernel
+
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
-__attribute__((noinline)) int cellsXOR_offload(const int *input, int *output, size_t N) {
-  #pragma omp offload target(nvptx64-nvidia-arch=sm_70) in(input[0:N*N]) out(output[0:N*N])
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
+#pragma offload_attribute(push)
+#pragma offload_attribute(alloc, omp:parallel_for)
+__attribute__((noinline))
+void cellsXOR(int* input, int* output, size_t N) {
+  #pragma offload target(mic)
+  {
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i < N && j < N) {
       int count = 0;
-      if (i > 0 && input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+
+      // Consider neighbors and not input_{i,j} when computing output_{i,j}.
+      #pragma offload target(mic)
+      {
+        if (i > 0 && input[(i-1)*N + j] == 1) count++;
+        if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+        if (j > 0 && input[i*N + (j-1)] == 1) count++;
+        if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+      }
+
       output[i*N + j] = (count == 1) ? 1 : 0;
     }
   }
+#pragma offload_attribute(pop)
 }
+
+// We now need to call the cellsXOR function from main using OpenMP parallel for directive.
 ```
 
-However, the `omp offload` directive is not supported for NVIDIA architectures. We need to use a different approach to offload the computation to the GPU.
+Note: Since you are moving from CUDA, where memory management is handled internally, we're assuming that we will handle memory allocation and deallocation manually in this code.
 
-```c
-#include <cuda_runtime.h>
-#include "microXOR.cuh"
+Also note that we have made the following changes:
+1. Changed the file extension to `.cpp` as it's now a C++ code.
+2. Included `omp.h` for OpenMP parallelism directives.
+3. Wrapped the function with offloading attributes (`#pragma offload_attribute(push)` and `#pragma offload_attribute(pop)`) to enable offloading.
+4. Added OpenMP parallel for directive at the top of the function (`#pragma offload target(mic)`) to enable offloading.
+5. Manually allocated memory using `new` in main function instead of using CUDA's memory allocation functions.
 
-__attribute__((noinline)) int cellsXOR_offload(const int *input, int *output, size_t N) {
-  cudaDeviceProp deviceProp;
-  cudaGetDeviceProperties(&deviceProp, 0);
-  if (deviceProp.major < 3 || deviceProp.major > 5) {
-    // Handle unsupported architectures
-  }
+Also, note that you will need to compile this code with an offloading enabled compiler (e.g. Intel C++ Compiler). For example:
 
-  dim3 threadsPerBlock(blockDim.x, blockDim.y);
-  dim3 numBlocks((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                 (N + threadsPerBlock.y - 1) / threadsPerBlock.y);
-
-  cellsXOR<<<numBlocks, threadsPerBlock>>>(input, output, N);
-
-  return cudaDeviceSynchronize();
-}
+```bash
+icc -o microXOR microXOR.cpp -g -fopenmp-targets=mic -fopenmp-thread-limit=4
 ```
 
-The `cellsXOR_offload` function now uses the CUDA API to launch the kernel on the GPU. The OpenMP offload directive is not used in this case.
-
-Please note that you need to compile this code with a compiler that supports OpenMP and CUDA, such as GCC or Clang with the `-fopenmp` and `-cuda` flags.
+This is just a basic translation of the CUDA kernel to OpenMP offloaded code. The actual implementation may require additional optimizations and tuning for your specific use case.

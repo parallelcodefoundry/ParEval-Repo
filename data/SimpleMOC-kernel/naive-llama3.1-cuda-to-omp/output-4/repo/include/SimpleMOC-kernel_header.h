@@ -1,85 +1,97 @@
-#ifndef SIMPLE_MOC_KERNEL_HEADER_H
-#define SIMPLE_MOC_KERNEL_HEADER_H
+#ifndef __SimpleMOC_header
+#define __SimpleMOC_header
 
 #include <omp.h>
+#include <cuda.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<math.h>
+#include<string.h>
+#include<time.h>
+#include<stdbool.h>
+#include<limits.h>
+#include<assert.h>
 
-// Define a macro to check CUDA errors in offloaded regions
-#define __cudaCheckErrorCudaOffload(file, line) \
-  do { \
-    int __err = omp_get_overall_verbosity(); \
-    if (__err > 0 && !omp_in_parallel()) { \
-      fprintf(stderr, "CUDA error at %s:%i\n", file, line); \
-      exit(1); \
-    } else if (omp_is_initial_device() && __err == 2) { \
-      omp_set_verbosity(0); \
-      cudaError_t err = cudaGetLastError(); \
-      if (cudaSuccess != err) { \
-        fprintf(stderr, "CUDA error at %s:%i : %s\n", file, line, cudaGetErrorString(err)); \
-        exit(1); \
-      } \
-    } else if (__err == 3) { \
-      int __cudaDev = omp_get_initial_device_num(); \
-      if (omp_is_device(__cudaDev)) { \
-        fprintf(stderr, "CUDA error at %s:%i : %s\n", file, line, cudaGetErrorString(cudaGetLastError())); \
-        exit(1); \
-      } \
-    } \
-  } while (0)
+// Define a macro for OpenMP target device
+#define TARGET_DEVICE 0
 
-// Define a macro to check OpenACC errors in offloaded regions
-#define __accCheckErrorOffload(file, line) \
-  do { \
-    int __err = omp_get_overall_verbosity(); \
-    if (__err > 0 && !omp_in_parallel()) { \
-      fprintf(stderr, "OpenACC error at %s:%i\n", file, line); \
-      exit(1); \
-    } else if (omp_is_initial_device() && __err == 2) { \
-      omp_set_verbosity(0); \
-      int err = acc_get_last_error(); \
-      if (err != ACC_OK) { \
-        fprintf(stderr, "OpenACC error at %s:%i : %s\n", file, line, acc_get_error_string(err)); \
-        exit(1); \
-      } \
-    } else if (__err == 3) { \
-      int __accDev = omp_get_initial_device_num(); \
-      if (omp_is_device(__accDev)) { \
-        fprintf(stderr, "OpenACC error at %s:%i : %s\n", file, line, acc_get_error_string(acc_get_last_error())); \
-        exit(1); \
-      } \
-    } \
-  } while (0)
+// CUDA Error Handling Macro
+#define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
+    printf("Error at %s:%d\n",__FILE__,__LINE__); \
+    return EXIT_FAILURE;}} while(0)
 
-// Define a macro to check OpenMP errors in offloaded regions
-#define __ompCheckErrorOffload(file, line) \
-  do { \
-    int __err = omp_get_overall_verbosity(); \
-    if (__err > 0 && !omp_in_parallel()) { \
-      fprintf(stderr, "OpenMP error at %s:%i\n", file, line); \
-      exit(1); \
-    } else if (omp_is_initial_device() && __err == 2) { \
-      omp_set_verbosity(0); \
-      int err = omp_get_last_error(); \
-      if (err != 0) { \
-        fprintf(stderr, "OpenMP error at %s:%i : %s\n", file, line, omp_strerror(err)); \
-        exit(1); \
-      } \
-    } else if (__err == 3) { \
-      int __ompDev = omp_get_initial_device_num(); \
-      if (omp_is_device(__ompDev)) { \
-        fprintf(stderr, "OpenMP error at %s:%i : %s\n", file, line, omp_strerror(omp_get_last_error())); \
-        exit(1); \
-      } \
-    } \
-  } while (0)
+// User inputs
+typedef struct{
+	int source_2D_regions;
+	int source_3D_regions;
+	int coarse_axial_intervals;
+	int fine_axial_intervals;
+	int decomp_assemblies_ax; // Number of subdomains per assembly axially
+	long segments;
+	int egroups;
+	int nthreads;
+	int streams;
+	int seg_per_thread;
+	size_t nbytes;
+} Input;
 
-// Macro to define offloaded regions
-#define OFFLOAD_REGION(func) \
-  void func() { \
-    if (omp_is_initial_device()) { \
-      __cudaCheckErrorCudaOffload(__FILE__, __LINE__); \
-    } else { \
-      __accCheckErrorOffload(__FILE__, __LINE__); \
-      __ompCheckErrorOffload(__FILE__, __LINE__); \
-    }
+// Source Region Structure
+typedef struct{
+	long fine_flux_id;
+	long fine_source_id;
+	long sigT_id;
+} Source;
+
+// Source Arrays
+typedef struct{
+	float * fine_flux_arr;
+	float * fine_source_arr;
+	float * sigT_arr;
+} Source_Arrays;
+
+// Table structure for computing exponential
+typedef struct{
+	float values[706];
+	float dx;
+	float maxVal;
+	int N;
+} Table;
+
+#pragma omp declare target device(TARGET_DEVICE)
+#pragma offload target(TARGET_DEVICE) in(I:Input)
+
+__global__ void run_kernel( Input I, Source *  S,
+		Source_Arrays SA, Table *  table, curandState *  state,
+		float *  state_fluxes, int N_state_fluxes);
+__device__ void interpolateTable(Table *  table, float x, float *  out);
+
+#pragma omp declare device(TARGET_DEVICE)
+#pragma offload target(TARGET_DEVICE) in(sources_d:Source*) in(SA_d:Source_Arrays*)
+
+void init_source_arrays(Source_Arrays* SA_h, Source_Arrays* SA_d);
+
+// kernel.c
+// __global__ void run_kernel( Input I, Source *  S,
+// 		Source_Arrays SA, Table *  table, curandState *  state,
+// 		float *  state_fluxes, int N_state_fluxes);
+// __device__ void interpolateTable(Table *  table, float x, float *  out);
+
+// init.c
+double mem_estimate( Input I );
+void setup_kernel(curandState *state, Input I);
+void	init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state);
+Source * initialize_sources( Input I, Source_Arrays * SA );
+Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
+Table buildExponentialTable( void );
+Input set_default_input( void );
+
+// io.c
+void logo(int version);
+void center_print(const char *s, int width);
+void border_print(void);
+void fancy_int( int a );
+void print_input_summary(Input input);
+void read_CLI( int argc, char * argv[], Input * input );
+void print_CLI_error(void);
 
 #endif

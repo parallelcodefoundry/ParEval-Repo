@@ -1,51 +1,52 @@
-#include <stdio.h>
-#include <omp.h>
+#include "SimpleMOC-kernel_header.h"
 
-void __cudaCheckError(const char *file, const int line)
+// Prints program logo
+void logo(int version)
 {
-#ifdef CUDA_ERROR_CHECK
-    // Removed CUDA-related code and replaced with OpenMP offloading macros
-    #pragma offload target(mic:0) in(file) out(line)
-    {
-        printf("offload error: %s:%d\n", file, line);
-        exit(1);
-    }
-#endif
+    border_print();
+    printf(
+"   __           __        ___        __   __           ___  __        ___     \n"
+"  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
+"  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
+"\n"
+"                         ������������������������������   ������������������������������  ������������������\n" 
+"                        ���������������������������������   ���������������������������������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ������������������������������������������������������������������������������������  ���������\n"
+"                         ��������������������� ��������������������� ��������������������� ���������  ���������\n"
+    );
+    printf("\n");
+    border_print();
+    printf("\n");
 
-    return;
+    center_print("Developed at", 79);
+    center_print("The Massachusetts Institute of Technology", 79);
+    center_print("and", 79);
+    center_print("Argonne National Laboratory", 79);
+    printf("\n");
+    char v[100];
+    sprintf(v, "Version: %d", version);
+    center_print(v, 79);
+    printf("\n");
+    border_print();
 }
 
-Table buildExponentialTable(void)
+// Prints Section titles in center of 80 char terminal
+void center_print(const char *s, int width)
 {
-    // define table
-    Table table;
-
-    //float precision = 0.01;
-    float maxVal = 10.0;    
-
-    // compute number of arry values
-    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
-    int N = 353; 
-
-    // compute spacing
-    float dx = maxVal / (float) N;
-
-    // store linear segment information (slope and y-intercept)
-#pragma offload target(mic:0) in(N, maxVal, dx) out(table.values[:2*N]) 
-{
-    #pragma omp parallel for num_threads(4) schedule(static, 1)
-    for (int n = 0; n < N; n++)
-    {
-        float exponential = exp(-n * dx);
-        table.values[2*n] = -exponential;
-        table.values[2*n + 1] = 1 + (n * dx - 1) * exponential;
+    int length = strlen(s);
+    int i;
+    for (i=0; i<=(width-length)/2; i++) {
+        fprintf(stderr, " ");
     }
+    fprintf(stderr, "%s\n", s);
 }
 
-    // assign data to table
-    table.dx = dx;
-    table.maxVal = maxVal - table.dx;
-    table.N = N;
-
-    return table;
+// Prints a border
+void border_print(void)
+{
+    printf(
+"==================================================================="
+"=============\n");
 }

@@ -1,67 +1,177 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <time.h>
 #include <omp.h>
+#include "SimpleMOC-kernel_header.h"
 
-#define CUDA_ERROR_CHECK 0
+// Prints program logo
+void logo(int version)
+{
+    border_print();
+    printf(
+"   __           __        ___        __   __           ___  __        ___     \n"
+"  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
+"  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
+"\n"
+"                         ������������������������������   ������������������������������  ������������������\n" 
+"                        ���������������������������������   ���������������������������������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ������������������������������������������������������������������������������������  ���������\n"
+"                         ��������������������� ��������������������� ��������������������� ���������  ���������\n"
+    );
+    printf("\n");
+    border_print();
+    printf("\n");
 
-// Define a struct to represent the table data
-typedef struct {
-    float dx;
-    float maxVal;
-    int N;
-    float values[2*N];
-} Table;
-
-Table buildExponentialTable(void) {
-    // define table
-    Table table;
-
-    //float precision = 0.01;
-    float maxVal = 10.0;	
-
-    // compute number of arry values
-    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
-    int N = 353; 
-
-    // compute spacing
-    float dx = maxVal / (float) N;
-
-    // store linear segment information (slope and y-intercept)
-    #pragma omp parallel for num_threads(4) default(none) shared(N, dx, table.values)
-    for (int n = 0; n < N; n++) {
-        float exponential = exp(-n * dx);
-        table.values[2*n] = -exponential;
-        table.values[2*n + 1] = 1 + (n * dx - 1) * exponential;
-    }
-
-    // assign data to table
-    table.dx = dx;
-    table.maxVal = maxVal - table.dx;
-    table.N = N;
-
-    return table;
+    center_print("Developed at", 79);
+    center_print("The Massachusetts Institute of Technology", 79);
+    center_print("and", 79);
+    center_print("Argonne National Laboratory", 79);
+    printf("\n");
+    char v[100];
+    sprintf(v, "Version: %d", version);
+    center_print(v, 79);
+    printf("\n");
+    border_print();
 }
 
-void __ompCheckError(const char *file, const int line) {
-#ifdef CUDA_ERROR_CHECK
-    printf("Error at %s:%i\n", file, line);
+// Prints Section titles in center of 80 char terminal
+void center_print(const char *s, int width)
+{
+    int length = strlen(s);
+    int i;
+    for (i=0; i<=(width-length)/2; i++) {
+        fputs(" ", stdout);
+    }
+    fputs(s, stdout);
+    fputs("\n", stdout);
+}
+
+// Prints a border
+void border_print(void)
+{
+    printf(
+"==================================================================="
+"=============\n");
+}
+
+// Prints comma separated integers - for ease of reading
+void fancy_int( int a )
+{
+    if( a < 1000 )
+        printf("%d\n",a);
+
+    else if( a >= 1000 && a < 1000000 )
+        printf("%d,%03d\n", a / 1000, a % 1000);
+
+    else if( a >= 1000000 && a < 1000000000 )
+        printf("%d,%03d,%03d\n", a / 1000000, (a % 1000000) / 1000, a % 1000 );
+
+    else if( a >= 1000000000 )
+        printf("%d,%03d,%03d,%03d\n",
+               a / 1000000000,
+               (a % 1000000000) / 1000000,
+               (a % 1000000) / 1000,
+               a % 1000 );
+    else
+        printf("%d\n",a);
+}
+
+// Prints out the summary of User input
+void print_input_summary(Input I)
+{
+    center_print("INPUT SUMMARY", 79);
+    border_print();
+
+    cudaDeviceProp prop;
+    int device;
+    cudaGetDevice(&device);
+    cudaGetDeviceProperties ( &prop, device );
+    printf("%-25s%s\n", "CUDA Device: ", prop.name); 
+    printf("%-25s%d\n", "Energy Groups:", I.egroups);
+    printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
+    printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
+    printf("%-25s%d\n", "Fine Axial Intervals:", I.fine_axial_intervals);
+    printf("%-25s%d\n", "Axial Decomposition:", I.decomp_assemblies_ax);
+    printf("%-25s%d\n", "3D Source Regions:", I.source_3D_regions);
+    printf("%-25s", "Segments:"); fancy_int(I.segments);
+    printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
+    printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
+    printf("%-25s%d\n", "Segments per CUDA block:", I.seg_per_thread);
+#ifdef TABLE
+    printf("%-25s%s\n", "Exponential Table:","ON");
 #else
+    printf("%-25s%s\n", "Exponential Table:","OFF");
 #endif
-    return;
+    border_print();
 }
 
-int main() {
-    Table table = buildExponentialTable();
-    printf("%f\t%f\t%d\n", table.dx, table.maxVal, table.N);
-
-    // OpenMP offloading directives for memory management (assuming you want to transfer data from host to device)
-    #pragma omp target data map(from:table) 
+// reads command line inputs and applies options
+void read_CLI( int argc, char * argv[], Input * input )
+{
+    // Collect Raw Input
+    for( int i = 1; i < argc; i++ )
     {
-        printf("On the device:\n");
-        printf("%f\t%f\t%d\n", table.dx, table.maxVal, table.N);
-    }
+        char * arg = argv[i];
 
-    return 0;
+        // nthreads (-t)
+        if( strcmp(arg, "-t") == 0 )
+        {
+            if( ++i < argc )
+                input->nthreads = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+
+        // segments (-s)
+        else if( strcmp(arg, "-s") == 0 )
+        {
+            if( ++i < argc )
+                input->segments = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+        
+        // egroups (-e)
+        else if( strcmp(arg, "-e") == 0 )
+        {
+            if( ++i < argc )
+                input->egroups = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+        // segments per thread (-p)
+        else if( strcmp(arg, "-p") == 0 )
+        {
+            if( ++i < argc )
+                input->seg_per_thread = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+        // CUDA Device Number (-d)
+        else if( strcmp(arg, "-d") == 0 )
+        {
+            if( ++i < argc )
+            {
+                int device_id = atoi(argv[i]);
+                cudaSetDevice( device_id );
+            }
+            else
+                print_CLI_error();
+        }
+        else
+            print_CLI_error();
+    }
+}
+
+// print error to screen, inform program options
+void print_CLI_error(void)
+{
+    printf("Usage: ./SimpleMOC <options>\n");
+    printf("Options include:\n");
+    printf("  -t <threads>          Number of OpenMP threads to run\n");
+    printf("  -s <segments>         Number of segments to process\n");
+    printf("  -e <energy groups>    Number of energy groups\n");
+    printf("  -p <segs per thread>  Number of segments per CUDA Block\n");
+    printf("  -d <CUDA device ID>   CUDA GPU device ID number\n");
+    printf("See readme for full description of default run values\n");
+    exit(1);
 }

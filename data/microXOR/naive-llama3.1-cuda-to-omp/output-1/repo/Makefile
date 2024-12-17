@@ -1,36 +1,36 @@
-# Use compiler flags to enable OpenMP and offloading
-CXX = $(CXX_COMPILER)
-CXXFLAGS = -fopenmp -march=$(SM_VERSION) -cuda
+# Makefile for OpenMP microXOR
 
-# Directories and files
-SRCDIR = src
-BUILDDIR = build
-BINDIR = bin
+CXX ?= clang++
+SM_VERSION ?= 80
+CXXFLAGS ?= -fopenmp -std=c++17 -march=nvptx64-nvidia-cuda=${SM_VERSION}
+ifeq ($(DEBUG), yes)
+	CXXFLAGS += -g -G
+else
+	CXXFLAGS += -O3
+endif
+LDFLAGS ?= -lcudart
 
-# Source and header files
-SOURCES = $(wildcard $(SRCDIR)/microXOR.cpp) $(wildcard $(SRCDIR)/microXOR.h)
-OBJECTS = $(patsubst $(SRCDIR)/%.cpp, $(BUILDDIR)/%.o, $(SOURCES:.h=.cpp))
+CPPFILES = src/microXOR.cpp src/main.cpp
+HDRS = include/microXOR.hpp
 
-# Build target
-TARGET = $(BINDIR)/microXOR
+OBJS = $(CPPFILES:src/%.cpp=obj/%.o)
 
-# Rules
-$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
-	@mkdir -p $(BUILDDIR)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+
+obj/%.o: src/%.cpp $(HDRS) | obj
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+obj:
+	mkdir -p $(OBJ)
 
-# Clean up
 clean:
-	rm -rf $(BUILDDIR) $(BINDIR)/microXOR
+	rm -f $(OBJS) $(EXE)
 
-# Target to build the executable for a specific SM version
-build-%:
-	$(MAKE) CXX_COMPILER=$(shell which clang++) SM_VERSION=$* TARGET=$(TARGET)
+.PHONY: clean
 
-# Default target
-default: build-80
-
-.PHONY: clean default
+# Define the offload directive
+%.offload.cpp: %.cpp
+	sed -e 's/^/openmp target nvptx64-nvidia-cuda=${SM_VERSION}:\n/' $< > $@

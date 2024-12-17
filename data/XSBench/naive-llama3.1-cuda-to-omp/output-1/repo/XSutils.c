@@ -1,5 +1,6 @@
-#include "XSbench_header.h"
+#include "XSbench_shared_header.h"
 
+// Function to compare double values for sorting
 int double_compare(const void * a, const void * b)
 {
     double A = *((double *) a);
@@ -13,6 +14,7 @@ int double_compare(const void * a, const void * b)
         return 0;
 }
 
+// Function to compare NuclideGridPoint structures for sorting
 int NGP_compare(const void * a, const void * b)
 {
     NuclideGridPoint A = *((NuclideGridPoint *) a);
@@ -32,17 +34,18 @@ int NGP_compare(const void * a, const void * b)
 // From "Numerical Recipes" Second Edition
 double rn_v(void)
 {
-    static unsigned long seed = 1337;
+    static uint64_t seed = 1337;
     double ret;
-    unsigned long n1;
-    unsigned long a = 16807;
-    unsigned long m = 2147483647;
+    uint64_t n1;
+    uint64_t a = 16807;
+    uint64_t m = 2147483647;
     n1 = ( a * (seed) ) % m;
     seed = n1;
     ret = (double) n1 / m;
     return ret;
 }
 
+// Function to estimate memory usage
 size_t estimate_mem_usage( Inputs in )
 {
     size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );
@@ -62,6 +65,7 @@ size_t estimate_mem_usage( Inputs in )
     return memtotal;
 }
 
+// Function to get time in seconds
 double get_time(void)
 {
 #ifdef __cplusplus

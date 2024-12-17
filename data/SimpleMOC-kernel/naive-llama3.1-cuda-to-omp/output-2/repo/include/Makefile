@@ -1,37 +1,113 @@
-# Makefile for openmp-offload execution model
+#===============================================================================
+# User Options
+#===============================================================================
 
-SM_VERSION ?= 80
-CXX = clang
-CUDA_DIR = /usr/local/cuda-11.x
+SM_VERSION  ?= 80
 
-ifeq ($(shell uname -s), Linux)
-    CFLAGS += -L$(CUDA_DIR)/lib64 -lcudart -lcusolver -lculibos -lnvrtc_static 
-    CXX = $(CUDA_DIR)/bin/nvcc
-else ifeq ($(shell uname -s), Darwin)
-    CFLAGS += -L/opt/cuda-11.x/targets/x86_64-darwin/lib/stubs -lcudart -lcusolver -lculibos -lnvrtc_static 
-    CXX = $(CUDA_DIR)/bin/nvcc
-endif
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# OpenMP flags for offloading to GPU
-OPENMP_FLAGS = -fopenmp-targets=nvidia-cuda --offload-architecture=sm_$(SM_VERSION)
+program = SimpleMOC-kernel
 
-CFLAGS += -O3 -std=c++11 -D__NVCC__ $(OPENMP_FLAGS)
-LDFLAGS += -lcudart
+source = \
+main.c.o \
+kernel.c.o \
+init.c.o \
+io.c.o
 
-OBJS = init.o main.o utils.o cuda_helper.o
+obj = $(source:.o=.c)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Compiler for OpenMP and offload
+CC = clang -fopenmp
+
+# Standard Flags
+override CFLAGS += -I/usr/local/cuda/include 
+CXXFLAGS = -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+
+# Linker Flags
+LDFLAGS = -lm -lcurand
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj)
+	$(CC) $(CFLAGS) $(CXXFLAGS) -o $@ $(LDFLAGS)
 
 %.o: %.c
-    $(CXX) -c $< -o $@ $(CFLAGS)
-
-init.o: init.c utils.h
-main.o: main.c init.h utils.h
-utils.o: utils.c
-cuda_helper.o: cuda_helper.c
-
-all: program.exe
-
-program.exe: main.o init.o utils.o cuda_helper.o
-    $(CXX) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-    rm -f *.o *.exe
+	rm -rf $(program) $(source)
+
+edit:
+	vim -p $(obj)
+
+run:
+	./$(program)
+
+#===============================================================================
+# Flags for offload to NVIDIA GPU
+#===============================================================================
+
+NVCC = clang++-offload --fopenmp-offload -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+
+CXXFLAGS_offload = $(CXXFLAGS)
+
+# Compilation rule for OpenMP and offload
+%.o_offload: %.c
+	$(NVCC) $(CFLAGS) -c $< -o $@
+
+#===============================================================================
+# Offload Targets to Build
+#===============================================================================
+
+$(program)_offload: $(obj_offload)
+	$(NVCC) $(CFLAGS) -o $@ $(LDFLAGS)
+
+%.o_offload: %.c
+	$(NVCC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(source)
+
+edit:
+	vim -p $(obj)
+
+run:
+	./$(program)_offload
+
+#===============================================================================
+# CUDA-related flags and compilation rules
+#===============================================================================
+
+CUDA_HOME = /usr/local/cuda
+
+NVCC = clang++-offload --fopenmp-offload -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+
+CXXFLAGS_offload = $(CXXFLAGS)
+
+# Compilation rule for OpenMP and offload
+%.o_offload: %.c
+	$(NVCC) -D__CUDA_ARCH__=80 $(CFLAGS) -c $< -o $@
+
+#===============================================================================
+# Offload Targets to Build
+#===============================================================================
+
+$(program)_offload: $(obj_offload)
+	$(NVCC) -D__CUDA_ARCH__=80 $(CFLAGS) -o $@ $(LDFLAGS)
+
+%.o_offload: %.c
+	$(NVCC) -D__CUDA_ARCH__=80 $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program)_offload
+
+edit:
+	vim -p $(obj)

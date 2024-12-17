@@ -1,20 +1,16 @@
 Here is the translated Makefile:
 
 ```make
-#===============================================================================
-# User Options
-#===============================================================================
+CUDA_ARCH ?= 80
+COMPILER ?= llvm
 
-COMPILER    ?= clang
-CUDA_ARCH   ?= 80
-OPTIMIZE    ?= yes
-DEBUG       ?= no
-PROFILE     ?= no
-MPI         ?= no
+CC = ${COMPILER} -fopenmp
+CXX = ${CC}
+LD = ${CC}
 
-#===============================================================================
-# Program name & source code list
-#===============================================================================
+CFLAGS = -Wall -Wextra -O3 -arch=$(CUDA_ARCH)
+LDFLAGS = -lm
+OPENMP_CFLAGS = -fopenmp-targets=nvptx64-nvvm34.9
 
 program = XSBench
 
@@ -28,50 +24,20 @@ Materials.cu
 
 obj = $(source:.cu=.o)
 
-#===============================================================================
-# Sets Flags
-#===============================================================================
+$(program): $(obj) XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(OPENMP_CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-# Standard Flags
-CFLAGS := -std=c++14
-
-# OpenMP Flags
-CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda=10.0
-
-# Linker Flags
-LDFLAGS = -lm -lopenomp
-
-# Compiler
-ifeq ($(COMPILER),clang)
-  CC = clang++
-endif
-ifeq ($(COMPILER),gcc)
-  CC = g++
-endif
-ifeq ($(COMPILER),nvcc)
-  CC = nvcc
-endif
-
-#===============================================================================
-# Targets to Build
-#===============================================================================
-
-$(program): $(obj) XSbench_header.cuh Makefile
-	$(CC) -O3 $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
-
-%.o: %.cu XSbench_header.cuh Makefile
-	$(CC) -c $(CFLAGS) -fopenmp-targets=nvptx64-nvidia-cuda=10.0 $< -o $@
+%.o: %.c XSbench_header.h Makefile
+	$(CC) $(CFLAGS) $(OPENMP_CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.cuh
+	vim -p $(source) XSbench_header.h
 
 run:
 	./$(program)
 ```
 
-Note: The `.cu` files will be compiled with OpenMP enabled, but since they are CUDA sources, the `-fopenmp-targets=nvptx64-nvidia-cuda=10.0` flag is used to enable offloading of OpenMP kernels to a CUDA device.
-
-The `cuda-arch` and `compiler` variables are assumed to be set by the user when running `make`. The rest of the Makefile should work similarly as before, but with OpenMP enabled and CUDA architecture specified.
+This makefile assumes that the user will compile the code using `make CUDA_ARCH=80 COMPILER=llvm` to build the code for a system with an NVIDIA GPU with compute capability 80 and compiler with the clang compiler. It also sets the flags necessary for OpenMP compilation, including the `-fopenmp-targets=nvptx64-nvvm34.9` flag, which tells the compiler to target the nvptx64 architecture with NVVM version 3.4.9.

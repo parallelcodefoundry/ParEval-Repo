@@ -1,4 +1,6 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
+#include <omp.h>
+#include <openacc.h>
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -45,48 +47,62 @@ int main(int argc, char *argv[]) {
     // realistic continuous energy Monte Carlo macroscopic cross section
     // lookup kernel.
     // =====================================================================
-    if (mype == 0) {
-        printf("\n");
-        border_print();
-        center_print("SIMULATION", 79);
-        border_print();
-    }
 
-    // Start Simulation Timer
-    omp_start = get_time();
+#pragma offload target(mype)
+{
+    #pragma acc data copyin(SD.num_nucs[0:SD.length_num_nucs], SD.concs[0:SD.length_concs], SD.mats[0:SD.length_mats])
+    {
+        if (mype == 0) {
+            printf("\n");
+            border_print();
+            center_print("SIMULATION", 79);
+            border_print();
+        }
 
-    #pragma omp offload target(teams)
-    if (in.simulation_method == EVENT_BASED) {
-        if (in.kernel_id == 0)
-            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
-        else if (in.kernel_id == 1)
-            verification = run_event_based_simulation_optimization_1(in, SD, mype);
-        else if (in.kernel_id == 2)
-            verification = run_event_based_simulation_optimization_2(in, SD, mype);
-        else if (in.kernel_id == 3)
-            verification = run_event_based_simulation_optimization_3(in, SD, mype);
-        else if (in.kernel_id == 4)
-            verification = run_event_based_simulation_optimization_4(in, SD, mype);
-        else if (in.kernel_id == 5)
-            verification = run_event_based_simulation_optimization_5(in, SD, mype);
-        else if (in.kernel_id == 6)
-            verification = run_event_based_simulation_optimization_6(in, SD, mype);
-        else {
-            printf("Error: No kernel ID %d found!\n", in.kernel_id);
+        // Start Simulation Timer
+        omp_start = get_time();
+
+        // Run simulation
+        if (in.simulation_method == EVENT_BASED) {
+            #pragma acc kernels
+            for (int i = 0; i < in.lookups; i++) {
+                int mat = SD.mat_samples[i];
+                double p_energy = SD.p_energy_samples[i];
+
+                // Perform macroscopic Cross Section Lookup
+                calculate_macro_xs(
+                        p_energy,        // Sampled neutron energy (in lethargy)
+                        mat,             // Sampled material type index neutron is in
+                        in.n_isotopes,   // Total number of isotopes in simulation
+                        in.n_gridpoints, // Number of gridpoints per isotope in simulation
+                        SD.num_nucs,     // 1-D array with number of nuclides per material
+                        SD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
+                        SD.unionized_energy_array, // 1-D Unionized energy array
+                        SD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+                        SD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+                        SD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+                        macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+                        in.grid_type,    // Lookup type (nuclide, hash, or unionized)
+                        in.hash_bins,    // Number of hash bins used (if using hash lookup type)
+                        SD.max_num_nucs  // Maximum number of nuclides present in any material
+                );
+
+                GSD.verification[i] = max_idx+1;
+            }
+        } else {
+            printf(
+                    "History-based simulation not implemented in CUDA code. Instead,\nuse "
+                    "the event-based method with \"-m event\" argument.\n");
             exit(1);
         }
-    } else {
-        printf(
-                "History-based simulation not implemented in CUDA code. Instead,\nuse "
-                "the event-based method with \"-m event\" argument.\n");
-        exit(1);
-    }
 
-    if (mype == 0) {
-        printf("\n");
-        printf("Simulation complete.\n");
+        if (mype == 0) {
+            printf("\n");
+            printf("Simulation complete.\n");
+        }
     }
-
+#pragma offload target(mype)
+{
     // End Simulation Timer
     omp_end = get_time();
 
@@ -98,7 +114,7 @@ int main(int argc, char *argv[]) {
 
     // Print / Save Results and Exit
     int is_invalid_result =
-        print_results(in, mype, omp_end - omp_start, nprocs, verification);
+            print_results(in, mype, omp_end - omp_start, nprocs, verification);
 
     print_profile(profile, in);
 
