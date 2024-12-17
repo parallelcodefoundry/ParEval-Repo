@@ -19,6 +19,7 @@ from naive.naive_gemini_translator import NaiveGeminiTranslator
 from naive.naive_ollama_translator import NaiveOllamaTranslator
 from naive.naive_vllm_translator import NaiveVLLMTranslator
 from naive.naive_tgi_translator import NaiveTGITranslator
+from agent.top_down_agent import TopDownAgentTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -26,7 +27,7 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive", "agent"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
@@ -38,6 +39,10 @@ def get_args():
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
     naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama3.3", "llama3.2", "llama3.1", "gpt-4o", "tgi", "ollama3.3", "ollama3.2", "ollama3.1"], default="gemini", help="The LLM to use for translation.")
+
+    # subgroup for top-down agent
+    agent_args = parser.add_argument_group("top-down agent")
+    TopDownAgentTranslator.add_args(agent_args)
     return parser.parse_args()
 
 
@@ -53,6 +58,8 @@ def get_translator_cls(method: str, naive_llm: str):
             return NaiveVLLMTranslator
         else:
             return NaiveOpenAITranslator
+    elif method == "agent":
+        return TopDownAgentTranslator
     else:
         raise ValueError(f"Translation method {method} not recognized.")
 
@@ -84,16 +91,15 @@ def main():
 
     # create a Translator object and translate the input repository
     translator_cls = get_translator_cls(args.method, args.naive_llm)
-    translator = translator_cls(input_repo,
-                                args.output,
-                                args.src_model,
-                                args.dst_model,
-                                args.output_id,
-                                args.app_name,
-                                args.naive_llm,
-                                args.config)
-    translator.translate(dry=args.dry, log_interactions=args.log_interactions,
-                         hide_progress=args.hide_progress)
+    translator_args = translator_cls.parse_args(args)
+    translator = translator_cls(
+        input_repo=input_repo, 
+        output_repo=args.output, 
+        src_model=args.src_model, 
+        dst_model=args.dst_model, 
+        **translator_args
+    )
+    translator.translate(dry=args.dry)
 
 
 

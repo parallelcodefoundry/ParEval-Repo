@@ -33,6 +33,10 @@ class Repo:
         if self._exp_meta['path'] != os.path.sep.join(implicit_path.split(os.path.sep)[-len(explicit_path_steps):]):
             raise ValueError("The provided path in the exp_meta file does not match the path of the exp_meta file.")
         return self(implicit_path, self._exp_meta)
+    
+    @property
+    def path(self) -> os.PathLike:
+        return self._path
 
     def get_meta_dict(self) -> dict:
         return self._exp_meta
