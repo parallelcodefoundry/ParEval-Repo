@@ -1,58 +1,36 @@
-Here is the translation of the README.md file to the OpenMP-offload execution model:
+Here is the translated README.md file for the OpenMP-offload execution model:
 
 ```markdown
 # microXOR: XOR stencil micro-benchmark
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written in C++ for CPU and GPU execution using OpenMP-offload.
+This version of microXOR is written in C++ and uses OpenMP with GPU offloading for parallelization on multiple devices (GPUs).
 
 ## Prerequisites
 
-A compiler supporting OpenMP 4.5 or later (e.g., GCC 9.x or Clang 10.x) must be installed.
-The offload-targets must also be installed on the system, which includes the device-specific headers and libraries for CPUs and GPUs.
+- A CPU and one or more NVIDIA GPUs
+- CUDA toolkit and OpenMPI installed
+- A compiler that supports OpenMP, such as GCC 5.1+ or Clang 3.7+
 
-## Building microXOR
+## Build
 
-To build microXOR, simply run:
+To build microXOR, use `cmake` to generate the Makefiles, then run `make`. You may need to set some environment variables depending on your system configuration.
+
+```
+cmake .
+make
+```
+
+## Run
+
+microXOR requires two command-line arguments: one for matrix size and one for block size. For example:
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make -j
+./microXOR 1024 32
 ```
 
-This will create an executable called `microXOR` that can be run using:
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the CPU.
 
-```bash
-./microXOR <N>
+Note that the code can be executed either on a single GPU or on multiple GPUs in parallel by adjusting the OpenMPI configuration.
 ```
-
-where `<N>` is the size of the grid.
-
-## Running microXOR
-
-To run microXOR, simply execute the `microXOR` binary with the size of the grid as an argument. The program will compute the XOR operation on a 2D grid of cells and print the result to standard output.
-
-## Validation
-
-The output of the program is validated by checking that each cell's value matches the expected value based on its neighbors.
-
-## Compilation flags
-
-To compile microXOR for CPU execution, use:
-
-```bash
-make -j CPUS=1
-```
-
-To compile microXOR for GPU execution using OpenMP-offload, use:
-
-```bash
-make -j GPUS=1
-```
-
-Note that the `CPUS` and `GPUS` variables can be adjusted to change the number of cores or GPUs used during compilation.
-```
-Note: The translation assumes that you have a working installation of OpenMP 4.5 or later, as well as device-specific headers and libraries for CPUs and GPUs. Additionally, this is just an example translation and may need modifications based on your specific environment and requirements.

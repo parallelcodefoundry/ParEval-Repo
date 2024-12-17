@@ -1,17 +1,90 @@
-# We define a variable for our SM_VERSION (compute capability)
-SM_VERSION ?= 80
+#===============================================================================
+# User Options
+#===============================================================================
 
-# We specify the path to the NVIDIA libraries
-CUDA_LIB_PATH ?= /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+COMPILER    ?= clang
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+TABLE       ?= no
+SM_VERSION  ?= 80
+NVHPC_PATH  ?= /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
 
-# We specify the compiler and CXX flags
-CXX = clang
-CXXFLAGS = -std=c++11 -fopenmp
+#===============================================================================
+# Program name & source code list
+#===============================================================================
 
-# We compile each file separately using the NVCC compiler (which supports offloading to NVIDIA GPUs)
-.cu.o:
-    $(NVCC) $(CXXFLAGS) -D__CUDA_ARCH__=$(SM_VERSION) -ccbin=$(CXX) -I. $< -o $@
+program = SimpleMOC-kernel
 
-# We link all object files together
-%.exe: %.cu.o
-    $(NVCC) $(LDFLAGS) $^ -L$(CUDA_LIB_PATH) -lcudart -lnvtoolkit $(LIBS) -o $@
+source = \
+main.c \
+kernel.c \
+init.c \
+io.c
+
+obj = $(source:.c=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Regular compiler
+ifeq ($(COMPILER),clang)
+  CC = clang
+endif
+
+# Standard Flags
+override CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda=10.2 -I/usr/local/cuda/include -L$(NVHPC_PATH) -lnvhpcomp -std=c++11
+
+# Linker Flags
+LDFLAGS = $(CFLAGS)
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -G
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+	CFLAGS += -O3 --use_fast_math
+endif
+
+# Exponential Table Build
+ifeq ($(TABLE), yes)
+	CFLAGS += -DTABLE
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) SimpleMOC-kernel_header.h
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) SimpleMOC-kernel_header.h
+
+run:
+	./$(program)
+
+
+# NVPTX compilation target
+NVPTX_TARGET = nvptx64-nvidia-cuda=10.2
+
+#===============================================================================
+# Compilation for NVIDIA GPU
+#===============================================================================
+
+nvidia: $(obj)
+	$(CC) -fopenmp-targets=$(NVPTX_TARGET) $(CFLAGS) $(obj) -o SimpleMOC-kernel -lcuda -lnvrtc

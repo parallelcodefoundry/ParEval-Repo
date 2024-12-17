@@ -1,37 +1,34 @@
-CXX = clang++
-CXXFLAGS = -std=c++11 -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp-compile -D__NVCC_DIAG_PRAGMA_SUPPORT__
-SM_VERSION ?= 80
-TARGET_ARCH ?= nvcc
+# Makefile for OpenMP microXOR offload
 
-ifeq ($(shell uname), Darwin)
-    CXXFLAGS += -I /usr/local/cuda/include
+SM_VERSION ?= $(CXX_COMPILER)
+CXX_COMPILER ?= g++
+OFFLOAD_ARCH ?= sm_80
+SRC = src
+INC = include
+OBJ = obj
+OFFLOADFLAGS ?= -fopenmp-targets=nvptx64-nvidia-cuda --cuda-gpu-arch=$(OFFLOAD_ARCH) -std=c++17
+ifneq ($(DEBUG), yes)
+    OFFLOADFLAGS += -O3
 else
-    # Linux or other platforms
+    OFFLOADFLAGS += -g -G
 endif
+LDFLAGS ?= -fopenmp
 
-# Add OpenMP include path
-CXXFLAGS += -I/usr/include/openmp
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
 
-# Set up the offload compiler and flags for different targets
-OPENMPIR = $(shell ompccgetdevicecount)
+$(EXE): $(OBJS)
+    $(CXX_COMPILER) $(OFFLOADFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-ifeq ($(OPENMPIR), 1)
-    CXXFLAGS += -fopenmp-targets=ptx64-nvidia-cuda -fopenmp-compile
-endif
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+    $(CXX_COMPILER) $(OFFLOADFLAGS) -c $< -o $@
 
-CXXFLAGS += -O3 -g -D __CUDA_HOST_API__ -DMICROXOR_KERNEL -mcu=$(SM_VERSION) -arch sm_$(SM_VERSION)
+obj:
+    mkdir -p $(OBJ)
 
-ifneq ($(shell which nvcc),)
-    CXX = nvcc
-else
-    # Use OpenMP-offload with a different compiler (e.g., clang++)
-endif
-
-all: microxor
-
-microxor: $(wildcard *.cpp $(wildcard *.hpp))
-        $(CXX) -o $@ $^ $(CXXFLAGS)
+clean:
+    rm -f $(OBJS) $(EXE)
 
 .PHONY: clean
-clean:
-        rm -f *.o microxor

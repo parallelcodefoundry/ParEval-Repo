@@ -1,8 +1,8 @@
-Here is the translated `include/microXOR.cuh` file for OpenMP-offload:
+```cpp
+// microXOR header file (translated to OpenMP-offload)
 
-```c
-#ifndef MICROXOR_CUH
-#define MICROXOR_CUH
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
 
 #include <iostream>
 #include <random>
@@ -10,32 +10,33 @@ Here is the translated `include/microXOR.cuh` file for OpenMP-offload:
 
 void cellsXOR(const int *input, int *output, size_t N);
 
-#endif
+#endif  // MICROXOR_HPP
 ```
 
-In the OpenMP-offload execution model, kernel functions are not defined in header files. Instead, they should be implemented in a .cu file and then compiled with nvcc.
+```cpp
+// microXOR kernel (translated to OpenMP-offload)
 
-Here is an example of how you could implement the `cellsXOR` function in a .cu file (e.g., `microXOR.cu`) for OpenMP-offload:
+#include "microXOR.hpp"
 
-```c
-#include "microXOR.h"
-
-#pragma offload_target(accelerator_type:gpu)
+#pragma offload_attribute(push)
+#pragma offload_attribute( target(mic:0) )
 void cellsXOR(const int *input, int *output, size_t N) {
-    #pragma omp parallel for
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            int count = 0;
-            if (i > 0 && input[(i-1)*N + j] == 1) count++;
-            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-            if (j > 0 && input[i*N + (j-1)] == 1) count++;
-            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-            output[i*N + j] = (count == 1) ? 1 : 0;
-        }
-    }
+  int i = omp_get_thread_num();
+  if (i < N) {
+    int count = 0;
+    if (i > 0 && input[(i-1)*N] == 1) count++;
+    if (i < N-1 && input[(i+1)*N] == 1) count++;
+    output[i*N] = (count == 1) ? 1 : 0;
+  }
 }
+#pragma offload_attribute(pop)
 ```
 
-This implementation uses the `omp parallel for` directive to parallelize the loops over the grid. The OpenMP compiler will generate code that is executed on the GPU, taking advantage of its massive parallelism.
+The CUDA kernel is translated to OpenMP-offload as follows:
 
-Note: Make sure you have the OpenACC and/or OpenMP compilers installed on your system, as well as the NVIDIA drivers (if targeting a CUDA GPU).
+1. The `__global__` keyword is removed since it's not needed in OpenMP.
+2. The `blockIdx.y`, `blockDim.y`, and `threadIdx.y` are replaced with `omp_get_thread_num()` which returns the thread ID within a team. Since we're dealing with a 1D iteration, we can directly use the thread ID to index into the data structure.
+3. The loop bounds are checked using `if (i < N)`, since OpenMP threads automatically handle parallelization of loops.
+4. The `#pragma offload_attribute(push)` and `#pragma offload_attribute(pop)` directives are used to specify the target device (in this case, a MIC). This tells the compiler to generate code for the specified architecture.
+
+Note that the translated kernel is simplified for demonstration purposes. In practice, you would want to handle edge cases and boundary conditions more explicitly. Additionally, the `offload` attribute can be further customized to optimize performance on specific devices or architectures.

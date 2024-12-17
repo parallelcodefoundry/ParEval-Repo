@@ -1,58 +1,128 @@
-// Define the OpenMP offload directive for the device (GPU)
-#pragma offload target(mic:0) \
-  in(A : float[10][10]) out(B : float[10][10])
+================================================================================
+SimpleMOC-kernel
+================================================================================
 
-// Function to perform matrix multiplication on the GPU
-void matmul(float *A, float *B) {
-    // Allocate memory on the GPU for the result matrix C
-    float *C;
-    cudaMallocHost((void **)&C, sizeof(float)*10*10);
-    
-    // Copy input matrices A and B to the GPU
-    cudaMemset(A, 0, sizeof(float)*10*10);
-    cudaMemcpy(B, A, sizeof(float)*10*10, cudaMemcpyDeviceToDevice);
+SimpleMOC-kernel represents the core computational of a larger application
+(SimpleMOC). This app was written in order to abstract away much of the
+complexity of the full application in order to facilitate easier porting of
+the code and enable more transparent analysis techniques on high performance
+architectures.
 
-    // Perform matrix multiplication on the GPU
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 10; j++) {
-            C[i * 10 + j] = A[i * 10 + j] * B[i * 10 + j];
-        }
-    }
+The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
+attentuation of neutron fluxes across an individual geometrical segment.
+This kernel composes approximately 92% of the walltime of the full application,
+and is therefore useful for analyzing optimization methods and performance
+implications for exascale supercomputer architectures.
 
-    // Copy result matrix C back to the host
-    cudaMemcpy(C, A, sizeof(float)*10*10, cudaMemcpyDeviceToHost);
+More information can be found in the following publication:
 
-    // Free memory allocated on the GPU
-    cudaFree(A);
-    cudaFree(B);
-}
+http://dx.doi.org/10.1016/j.cpc.2016.01.007
 
-// Main function
-int main() {
-    // Allocate input matrices A and B on the host
-    float *A, *B;
-    cudaMallocHost((void **)&A, sizeof(float)*10*10);
-    cudaMallocHost((void **)&B, sizeof(float)*10*10);
+================================================================================
+Architectural Support
+================================================================================
 
-    // Initialize input matrices A and B with random values
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 10; j++) {
-            A[i * 10 + j] = rand() / RAND_MAX;
-            B[i * 10 + j] = rand() / RAND_MAX;
-        }
-    }
+SimpleMOC-kernel is a OpenMP-offload code and supports execution on multi-core CPUs with offloading to GPUs.
 
-    // Offload execution of matmul function to the GPU
-    #pragma offload launch(mic:0) \
-      in(A : float[10][10]) out(B : float[10][10])
+================================================================================
+Quick Start Guide
+================================================================================
 
-    // Print result matrix C
-    for (int i = 0; i < 10; i++) {
-        for (int j = 0; j < 10; j++) {
-            printf("%f ", A[i * 10 + j]);
-        }
-        printf("\n");
-    }
+Download----------------------------------------------------------------------
 
-    return 0;
+	For the most up-to-date version of SimpleMOC-kernel, we recommend that you
+	download from our git repository. This can be accomplished via
+	cloning the repository from the command line, or by downloading a zip
+	from our github page.
+
+	Git Repository Clone:
+		
+		Use the following command to clone SimpleMOC-kernel to your machine:
+
+		>$ git clone https://github.com/ANL-CESAR/SimpleMOC-kernel.git
+
+		Once cloned, you can update the code to the newest version
+		using the following command (when in the SimpleMOC-kernel directory):
+
+		>$ git pull
+
+Compilation-------------------------------------------------------------------
+
+	To compile SimpleMOC-kernel with default settings, use the following command:
+
+	>$ make
+
+Running SimpleMOC-kernel-------------------------------------------------------
+
+	To run SimpleMOC-kernel with default settings, use the following command:
+
+	>$ ./SimpleMOC-kernel
+
+	For non-default settings, SimpleMOC-kernel supports the following
+	command line options:
+
+	Usage: ./SimpleMOC-kernel <options>
+	Options include:
+	  -t <threads>          Number of threads to run
+	  -s <segments>         Number of segments to process
+	  -e <energy groups>    Number of energy groups
+	  -p <segs per thread>  Number of segments per OpenMP thread
+
+================================================================================
+Advanced Compilation, Debugging, Optimization, and Profiling
+================================================================================
+
+There are a number of switches that can be set at the top of the Makefile, along
+with more advanced compilation features.
+
+Here is a sample of the control panel at the top of the makefile:
+
+COMPILER    = gcc -fopenmp-offload
+OPTIMIZE    = yes
+DEBUG       = no
+PROFILE     = no
+
+Explanation of Flags:
+
+COMPILER <gcc> - This selects your compiler (GNU GCC is supported).
+
+OPTIMIZE - Adds compiler optimization flag "-O3".
+
+DEBUG - Adds the compiler flag "-g".
+
+PROFILE - Adds the compiler flag "-pg".
+
+================================================================================
+SimpleMOC-kernel Strawman Reactor Defintion
+================================================================================
+
+For the purposes of simplicity this mini-app uses a conservative "strawman"
+reactor model to represent a good target problem for full core reactor
+simualations to be run on exascale class supercomputers. Arbitrary
+user-defined geometries are not supported.
+
+================================================================================
+Citing SimpleMOC-kernel
+================================================================================
+
+Papers citing SimpleMOC-kernel should in general refer to:
+
+John R. Tramm, Geoffrey Gunow, Tim He, Kord S. Smith, Benoit Forget, 
+Andrew R. Siegel, (2016) "A task-based parallelism and vectorized approach
+to 3D Method of Characteristics (MOC) reactor simulation for high performance
+computing architectures", Computer Physics Communications, Volume 202, 
+Pages 141���150, (https://doi.org/10.1016/j.cpc.2016.01.007).
+
+The bibtext entry for this paper is given below:
+
+@article{Tramm2016,
+title = "A task-based parallelism and vectorized approach to 3D Method of Characteristics (MOC) reactor simulation for high performance computing architectures",
+journal = "Computer Physics Communications",
+volume = "202",
+pages = "141 - 150",
+year = "2016",
+issn = "0010-4655",
+doi = "https://doi.org/10.1016/j.cpc.2016.01.007",
+url = "http://www.sciencedirect.com/science/article/pii/S0010465516000266",
+author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Benoit Forget and Andrew R. Siegel",
 }

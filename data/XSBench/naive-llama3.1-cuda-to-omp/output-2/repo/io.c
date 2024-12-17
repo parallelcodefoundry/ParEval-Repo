@@ -1,116 +1,120 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
+#include <omp.h>
 
 // Prints program logo
 void logo(int version)
 {
-    border_print();
-    printf(
-        "                   __   __ ___________                 _                        \n"
-        "                   \\ \\ / //  ___| ___ \\               | |                       \n"
-        "                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
-        "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
-        "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
-        "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
-    );
-    border_print();
-    center_print("Developed at Argonne National Laboratory", 79);
-    char v[100];
-    sprintf(v, "Version: %d", version);
-    center_print(v, 79);
-    border_print();
+    #pragma omp offload target(mic)
+    {
+        border_print();
+        printf(
+            "                   __   __ ___________                 _                        \n"
+            "                   \\ \\ / //  ___| ___ \\               | |                       \n"
+            "                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
+            "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
+            "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
+            "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n");
+        border_print();
+        center_print("Developed at Argonne National Laboratory", 79);
+        char v[100];
+        sprintf(v, "Version: %d", version);
+        center_print(v, 79);
+        border_print();
+    }
 }
 
 // Prints Section titles in center of 80 char terminal
 void center_print(const char *s, int width)
 {
-    int length = strlen(s);
-    int i;
-    for (i=0; i<=(width-length)/2; i++) {
-        fputs(" ", stdout);
+    #pragma omp offload target(mic)
+    {
+        int length = strlen(s);
+        int i;
+        for (i=0; i<=(width-length)/2; i++) {
+            printf(" ");
+        }
+        printf("%s\n",s);
     }
-    fputs(s, stdout);
-    fputs("\n", stdout);
 }
 
 int print_results( Inputs in, int mype, double runtime, int nprocs,
                    unsigned long long vhash )
 {
-    // Calculate Lookups per sec
-    int lookups = 0;
-    if (in.simulation_method == HISTORY_BASED)
-        lookups = in.lookups * in.particles;
-    else if (in.simulation_method == EVENT_BASED)
-        lookups = in.lookups;
-    int lookups_per_sec = (int) ((double) lookups / runtime);
-
-    // If running in MPI, reduce timing statistics and calculate average
-#ifdef MPI
-    int total_lookups = 0;
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_INT,
-               MPI_SUM, 0, MPI_COMM_WORLD);
-#endif
-
-    int is_invalid_result = 1;
-
-    // Print output
-    if (mype == 0)
+    #pragma omp offload target(mic)
     {
-        border_print();
-        center_print("RESULTS", 79);
-        border_print();
+        // Calculate Lookups per sec
+        int lookups = 0;
+        if (in.simulation_method == HISTORY_BASED) {
+            lookups = in.lookups * in.particles;
+        } else if (in.simulation_method == EVENT_BASED) {
+            lookups = in.lookups;
+        }
+        int lookups_per_sec = (int) ((double) lookups / runtime);
 
-        // Print the results
-        printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-#ifdef MPI
-        printf("MPI ranks:   %d\n", nprocs);
-#endif
-#ifdef MPI
-        printf("Total Lookups/s:            ");
-        fancy_int(total_lookups);
-        printf("Avg Lookups/s per MPI rank: ");
-        fancy_int(total_lookups / nprocs);
-#else
-        printf("Runtime:     %.3lf seconds\n", runtime);
-        printf("Lookups:     "); fancy_int(lookups);
-        printf("Lookups/s:   ");
-        fancy_int(lookups_per_sec);
-#endif
-    }
+        // If running in MPI, reduce timing statistics and calculate average
+        #ifdef MPI
+        int total_lookups = 0;
+        omp_set_num_threads(nprocs);
+        omp_set_nested(1);
+        #pragma omp parallel for reduction(+:total_lookups)
+        for (int i=0; i<in.lookups; i++) {
+            if (omp_get_thread_num() == 0) printf("MPI ranks:   %d\n", nprocs);
+            total_lookups += lookups_per_sec;
+        }
+        #endif
 
-    unsigned long long large = 0;
-    unsigned long long small = 0;
-    if (in.simulation_method == EVENT_BASED)
-    {
-        small = 945990;
-        large = 952131;
-    }
-    else if (in.simulation_method == HISTORY_BASED)
-    {
-        small = 941535;
-        large = 954318;
-    }
-    if (strcasecmp(in.HM, "large") == 0)
-    {
-        if (vhash == large)
-            is_invalid_result = 0;
-    }
-    else if (strcasecmp(in.HM, "small") == 0)
-    {
-        if (vhash == small)
-            is_invalid_result = 0;
-    }
+        int is_invalid_result = 1;
 
-    if(mype == 0 )
-    {
-        if (is_invalid_result)
-            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", vhash);
-        else
-            printf("Verification checksum: %llu (Valid)\n", vhash);
-        border_print();
-    }
+        // Print output
+        if (mype == 0)
+        {
+            border_print();
+            center_print("RESULTS", 79);
+            border_print();
 
-    return is_invalid_result;
+            printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
+            #ifdef MPI
+            printf("MPI ranks:   %d\n", nprocs);
+            #endif
+            #ifdef MPI
+            printf("Total Lookups/s:            ");
+            fancy_int(total_lookups);
+            printf("Avg Lookups/s per MPI rank: ");
+            fancy_int(total_lookups / nprocs);
+            #else
+            printf("Runtime:     %.3lf seconds\n", runtime);
+            printf("Lookups:     "); fancy_int(lookups);
+            printf("Lookups/s:   ");
+            fancy_int(lookups_per_sec);
+            #endif
+        }
+
+        unsigned long long large = 0;
+        unsigned long long small = 0;
+        if (in.simulation_method == EVENT_BASED) {
+            small = 945990;
+            large = 952131;
+        } else if (in.simulation_method == HISTORY_BASED) {
+            small = 941535;
+            large = 954318;
+        }
+        if (strcasecmp(in.HM, "large") == 0) {
+            if (vhash == large)
+                is_invalid_result = 0;
+        } else if (strcasecmp(in.HM, "small") == 0) {
+            if (vhash == small)
+                is_invalid_result = 0;
+        }
+
+        if(mype == 0 )
+        {
+            if (is_invalid_result)
+                printf("Verification checksum: %llu (WARNING - INVALID CHECKSUM!)\n", vhash);
+            else
+                printf("Verification checksum: %llu (Valid)\n", vhash);
+            border_print();
+        }
+    }
 }
 
 void print_CLI_error(void)
@@ -123,7 +127,7 @@ void print_CLI_error(void)
     printf("  -G <grid type>           Grid search type (unionized, nuclide, hash). Defaults to unionized.\n");
     printf("  -p <particles>           Number of particle histories\n");
     printf("  -l <lookups>             History Based: Number of Cross-section (XS) lookups per particle. Event Based: Total number of XS lookups.\n");
-    printf("  -h <hash bins>           Number of hash bins (only relevant when used with \"-G hash\")\n");
+    printf("  -h <hash bins>           Number of hash bins used (if using hash lookup type)\n");
     printf("  -b <binary mode>         Read or write all data structures to file. If reading, this will skip initialization phase. (read, write)\n");
     printf("  -k <kernel ID>           Specifies which kernel to run. 0 is baseline, 1, 2, etc are optimized variants. (0 is default.)\n");
     printf("  -n <num iterations>      Specifies how many kernel iterations to run. (1 is default.)\n");
@@ -134,7 +138,7 @@ void print_CLI_error(void)
     exit(4);
 }
 
-Inputs read_CLI(int argc, char * argv[])
+Inputs read_CLI( int argc, char * argv[] )
 {
     Inputs input;
 
@@ -184,7 +188,7 @@ Inputs read_CLI(int argc, char * argv[])
     int default_particles = 1;
 
     // Collect Raw Input
-    for (int i = 1; i < argc; i++)
+    for (int i=1; i<argc; i++)
     {
         char * arg = argv[i];
 
@@ -208,26 +212,22 @@ Inputs read_CLI(int argc, char * argv[])
             else
                 print_CLI_error();
 
-            if (strcmp(sim_type, "history") == 0)
+            if (strcasecmp(sim_type, "history") == 0)
                 input.simulation_method = HISTORY_BASED;
-            else if (strcmp(sim_type, "event") == 0)
-        {
+            else if (strcasecmp(sim_type, "event") == 0) {
                 input.simulation_method = EVENT_BASED;
                 // Also resets default # of lookups
-                if (default_lookups && default_particles)
-                {
+                if (default_lookups && default_particles) {
                     input.lookups = input.lookups * input.particles;
                     input.particles = 0;
                 }
-            }
-            else
+            } else
                 print_CLI_error();
         }
         // lookups (-l)
         else if (strcmp(arg, "-l") == 0)
         {
-            if (++i < argc)
-            {
+            if (++i < argc) {
                 input.lookups = atoi(argv[i]);
                 default_lookups = 0;
             }
@@ -245,8 +245,7 @@ Inputs read_CLI(int argc, char * argv[])
         // particles (-p)
         else if (strcmp(arg, "-p") == 0)
         {
-            if (++i < argc)
-            {
+            if (++i < argc) {
                 input.particles = atoi(argv[i]);
                 default_particles = 0;
             }
@@ -270,11 +269,11 @@ Inputs read_CLI(int argc, char * argv[])
             else
                 print_CLI_error();
 
-            if (strcmp(grid_type, "unionized") == 0)
+            if (strcasecmp(grid_type, "unionized") == 0)
                 input.grid_type = UNIONIZED;
-            else if (strcmp(grid_type, "nuclide") == 0)
+            else if (strcasecmp(grid_type, "nuclide") == 0)
                 input.grid_type = NUCLIDE;
-            else if (strcmp(grid_type, "hash") == 0)
+            else if (strcasecmp(grid_type, "hash") == 0)
                 input.grid_type = HASH;
             else
                 print_CLI_error();
@@ -288,9 +287,9 @@ Inputs read_CLI(int argc, char * argv[])
             else
                 print_CLI_error();
 
-            if (strcmp(binary_mode, "read") == 0)
+            if (strcasecmp(binary_mode, "read") == 0)
                 input.binary_mode = READ;
-            else if (strcmp(binary_mode, "write") == 0)
+            else if (strcasecmp(binary_mode, "write") == 0)
                 input.binary_mode = WRITE;
             else
                 print_CLI_error();
@@ -298,8 +297,7 @@ Inputs read_CLI(int argc, char * argv[])
         // kernel optimization selection (-k)
         else if (strcmp(arg, "-k") == 0)
         {
-            if (++i < argc)
-            {
+            if (++i < argc) {
                 input.kernel_id = atoi(argv[i]);
             }
             else
@@ -308,8 +306,7 @@ Inputs read_CLI(int argc, char * argv[])
         // number of kernel iterations (-n)
         else if (strcmp(arg, "-n") == 0)
         {
-            if (++i < argc)
-            {
+            if (++i < argc) {
                 input.num_iterations = atoi(argv[i]);
             }
             else
@@ -318,7 +315,7 @@ Inputs read_CLI(int argc, char * argv[])
         else if (strcmp(arg, "--csv") == 0)
         {
             if (++i < argc) {
-                input.filename = (char *)malloc(strlen(argv[i]) + 1);
+                input.filename = malloc(strlen(argv[i]) + 1);
                 strcpy(input.filename, argv[i]);
             }
             else
@@ -326,8 +323,7 @@ Inputs read_CLI(int argc, char * argv[])
         }
         else if (strcmp(arg, "-w") == 0)
         {
-            if (++i < argc)
-            {
+            if (++i < argc) {
                 input.num_warmups = atoi(argv[i]);
             }
             else
@@ -365,9 +361,9 @@ Inputs read_CLI(int argc, char * argv[])
 
     // Validate HM size
     if (strcasecmp(input.HM, "small") != 0 &&
-        strcasecmp(input.HM, "large") != 0 &&
-        strcasecmp(input.HM, "XL") != 0 &&
-        strcasecmp(input.HM, "XXL") != 0)
+            strcasecmp(input.HM, "large") != 0 &&
+            strcasecmp(input.HM, "XL") != 0 &&
+            strcasecmp(input.HM, "XXL") != 0)
         print_CLI_error();
 
     // Set HM size specific parameters
@@ -383,131 +379,56 @@ Inputs read_CLI(int argc, char * argv[])
     return input;
 }
 
-void binary_write(Inputs in, SimulationData SD)
+void binary_write( Inputs in, SimulationData SD )
 {
-#ifdef OPENMP_OFFLOAD
-#pragma offload target(mic:0) in(in) out(SD)
-#endif
-    const char * fname = "XS_data.dat";
-    printf("Writing all data structures to binary file %s...\n", fname);
-    FILE * fp = fopen(fname, "w");
+    #pragma offload target(mic) where (mype==0)
+    {
+        printf("Writing all data structures to binary file %s...\n", fname);
+        FILE * fp = fopen(fname, "w");
 
-    // Write SimulationData Object. Include pointers, even though we won't be using them.
-    fwrite(&SD, sizeof(SimulationData), 1, fp);
+        // Write SimulationData Object. Include pointers, even though we won't be using them.
+        fwrite(&SD, sizeof(SimulationData), 1, fp);
 
-    // Write heap arrays in SimulationData Object
-    fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
-    fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
-    fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
-    fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+        // Write heap arrays in SimulationData Object
+        fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+        fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
+        fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
+        fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+        fwrite(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
 
-    fclose(fp);
+        fclose(fp);
+    }
 }
 
-SimulationData binary_read(Inputs in)
+SimulationData binary_read( Inputs in )
 {
-#ifdef OPENMP_OFFLOAD
-#pragma offload target(mic:0) in(in)
-#endif
-    SimulationData SD;
-
-    const char * fname = "XS_data.dat";
-    printf("Reading all data structures from binary file %s...\n", fname);
-
-    FILE * fp = fopen(fname, "r");
-    assert(fp != NULL);
-
-    // Read SimulationData Object. Include pointers, even though we won't be using them.
-    fread(&SD, sizeof(SimulationData), 1, fp);
-
-    // Allocate space for arrays on heap
-    SD.num_nucs = (int *) malloc(SD.length_num_nucs * sizeof(int));
-    SD.concs = (double *) malloc(SD.length_concs * sizeof(double));
-    SD.mats = (int *) malloc(SD.length_mats * sizeof(int));
-    SD.nuclide_grid = (NuclideGridPoint *) malloc(SD.length_nuclide_grid * sizeof(NuclideGridPoint));
-
-    // Read heap arrays into SimulationData Object
-    fread(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
-    fread(SD.concs,          sizeof(double), SD.length_concs, fp);
-    fread(SD.mats,           sizeof(int), SD.length_mats, fp);
-    fread(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
-
-    fclose(fp);
-
-    return SD;
-}
-
-void print_inputs(Inputs in, int nprocs, int version)
-{
-#ifdef OPENMP_OFFLOAD
-#pragma offload target(mic:0) in(in) out(stdout)
-#endif
-    // Calculate Estimate of Memory Usage
-    int mem_tot = estimate_mem_usage( in );
-    logo(version);
-    center_print("INPUT SUMMARY", 79);
-    border_print();
-    printf("Programming Model:            CUDA\n");
-    cudaDeviceProp prop;
-    int device;
-    cudaGetDevice(&device);
-    cudaGetDeviceProperties ( &prop, device );
-    printf("CUDA Device:                  %s\n", prop.name);
-    if (in.simulation_method == EVENT_BASED)
-        printf("Simulation Method:            Event Based\n");
-    else
-        printf("Simulation Method:            History Based\n");
-    if (in.grid_type == NUCLIDE)
-        printf("Grid Type:                    Nuclide Grid\n");
-    else if (in.grid_type == UNIONIZED)
-        printf("Grid Type:                    Unionized Grid\n");
-    else
-        printf("Grid Type:                    Hash\n");
-
-    printf("Materials:                    %d\n", 12);
-    printf("H-M Benchmark Size:           %s\n", in.HM);
-    printf("Total Nuclides:               %ld\n", in.n_isotopes);
-    printf("Gridpoints (per Nuclide):     ");
-    fancy_int(in.n_gridpoints);
-    if (in.grid_type == HASH)
+    #pragma offload target(mic) where (mype==0)
     {
-        printf("Hash Bins:                    ");
-        fancy_int(in.hash_bins);
-    }
-    if (in.grid_type == UNIONIZED)
-    {
-        printf("Unionized Energy Gridpoints:  ");
-        fancy_int(in.n_isotopes*in.n_gridpoints);
-    }
-    if (in.simulation_method == HISTORY_BASED)
-    {
-        printf("Particle Histories:           "); fancy_int(in.particles);
-        printf("XS Lookups per Particle:      "); fancy_int(in.lookups);
-    }
-    printf("Total XS Lookups:             "); fancy_int(in.lookups);
-    printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-#ifdef MPI
-    printf("MPI Ranks:                    %d\n", nprocs);
-    printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
-#else
-    printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
-#endif
-    printf("Binary File Mode:             ");
-    if (in.binary_mode == NONE)
-        printf("Off\n");
-    else if (in.binary_mode == READ)
-        printf("Read\n");
-    else
-        printf("Write\n");
-    border_print();
-}
+        SimulationData SD;
 
-void border_print(void)
-{
-#ifdef OPENMP_OFFLOAD
-#pragma offload target(mic:0) in(stdout) out(stdout)
-#endif
-    printf(
-        "==================================================================="
-        "=============\n");
+        const char * fname = "XS_data.dat";
+        printf("Reading all data structures from binary file %s...\n", fname);
+
+        FILE * fp = fopen(fname, "r");
+        assert(fp != NULL);
+
+        // Read SimulationData Object. Include pointers, even though we won't be using them.
+        fread(&SD, sizeof(SimulationData), 1, fp);
+
+        // Allocate space for arrays on heap
+        SD.num_nucs = (int *) malloc(SD.length_num_nucs * sizeof(int));
+        SD.concs = (double *) malloc(SD.length_concs * sizeof(double));
+        SD.mats = (int *) malloc(SD.length_mats * sizeof(int));
+        SD.nuclide_grid = (NuclideGridPoint *) malloc(SD.length_nuclide_grid * sizeof(NuclideGridPoint));
+
+        // Read heap arrays into SimulationData Object
+        fread(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+        fread(SD.concs,          sizeof(double), SD.length_concs, fp);
+        fread(SD.mats,           sizeof(int), SD.length_mats, fp);
+        fread(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+
+        fclose(fp);
+
+        return SD;
+    }
 }

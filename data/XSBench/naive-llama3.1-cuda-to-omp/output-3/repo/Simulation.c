@@ -1,6 +1,16 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 
 // BASELINE FUNCTIONS
+////////////////////////////////////////////////////////////////////////////////////
+// All "baseline" code is at the top of this file. The baseline code is a simple
+// port of the original CPU OpenMP code to CUDA with few significant changes or
+// optimizations made. Following these functions are a number of optimized variants,
+// which each deploy a different combination of optimizations strategies. By
+// default, XSBench will only run the baseline implementation. Optimized variants
+// must be specifically selected using the "-k <optimized variant ID>" command
+// line argument.
+////////////////////////////////////////////////////////////////////////////////////
+
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
@@ -8,42 +18,49 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
     SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
     profile->host_to_device_time = get_time() - start;
 
-    if( mype == 0)	printf("Running baseline event-based simulation...\n");
+    ////////////////////////////////////////////////////////////////////////////////
+    // Configure & Launch Simulation Kernel
+    ////////////////////////////////////////////////////////////////////////////////
+    if (mype == 0) printf("Running baseline event-based simulation...\n");
 
     int nthreads = 256;
-    int nblocks = ceil( (double) in.lookups / (double) nthreads);
+    int nblocks = ceil((double) in.lookups / (double) nthreads);
 
     #pragma omp offload target(mype)
     {
-        for (int i = 0; i < in.num_iterations + in.num_warmups; i++) {
-            if (i == in.num_warmups) {
-                #pragma omp offload target(mype) device(nvidia)
-                {
-                    gpuErrchk( cudaDeviceSynchronize() );
-                }
-            }
-
-            // Configure & Launch Simulation Kernel
-            #pragma omp parallel for num_threads(nthreads) schedule(static)
-            for (int i = 0; i < in.lookups; i++) {
-                xs_lookup_kernel_baseline<<<nblocks, nthreads>>>( in, GSD );
-            }
+        #pragma omp teams
+        {
+            #pragma omp flush(GSD)
+            xs_lookup_kernel_baseline<<<nblocks, nthreads>>>(in, GSD);
         }
+        #pragma omp flush(GSD)
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
     }
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
-
+    ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
-    if( mype == 0)	printf("Reducing verification results...\n");
+    ////////////////////////////////////////////////////////////////////////////////
+
+    if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
     #pragma omp offload target(mype)
     {
-        unsigned long verification_scalar = thrust::reduce(thrust::device, GSD.verification, GSD.verification + in.lookups, 0);
+        #pragma omp teams
+        {
+            #pragma omp flush(GSD)
+            gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost));
+        }
+        #pragma omp flush(GSD)
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
     }
-    profile->kernel_time = get_time() - start;
+    profile->device_to_host_time = get_time() - start;
 
-    // Release device memory
+    unsigned long verification_scalar = 0;
+    for (int i = 0; i < in.lookups; i++)
+        verification_scalar += SD.verification[i];
+
     release_device_memory(GSD);
 
     return verification_scalar;
@@ -52,42 +69,42 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 // In this kernel, we perform a single lookup with each thread. Threads within a warp
 // do not really have any relation to each other, and divergence due to high nuclide count fuel
 // material lookups are costly. This kernel constitutes baseline performance.
-__global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
+__global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
 {
     // The lookup ID. Used to set the seed, and to store the verification value
-    const int i = blockIdx.x *blockDim.x + threadIdx.x;
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if( i >= in.lookups )
+    if (i >= in.lookups)
         return;
 
     // Set the initial seed value
     uint64_t seed = STARTING_SEED;
 
     // Forward seed to lookup index (we need 2 samples per lookup)
-    seed = fast_forward_LCG(seed, 2*i);
+    seed = fast_forward_LCG(seed, 2 * i);
 
     // Randomly pick an energy and material for the particle
     double p_energy = LCG_random_double(&seed);
-    int mat         = pick_mat(&seed);
+    int mat = pick_mat(&seed);
 
     double macro_xs_vector[5] = {0};
 
     // Perform macroscopic Cross Section Lookup
     calculate_macro_xs(
-            p_energy,        // Sampled neutron energy (in lethargy)
-            mat,             // Sampled material type index neutron is in
-            in.n_isotopes,   // Total number of isotopes in simulation
-            in.n_gridpoints, // Number of gridpoints per isotope in simulation
-            GSD.num_nucs,     // 1-D array with number of nuclides per material
-            GSD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
-            GSD.unionized_energy_array, // 1-D Unionized energy array
-            GSD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
-            GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
-            GSD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
-            macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
-            in.grid_type,    // Lookup type (nuclide, hash, or unionized)
-            in.hash_bins,    // Number of hash bins used (if using hash lookup type)
-            GSD.max_num_nucs  // Maximum number of nuclides present in any material
+        p_energy,        // Sampled neutron energy (in lethargy)
+        mat,             // Sampled material type index neutron is in
+        in.n_isotopes,   // Total number of isotopes in simulation
+        in.n_gridpoints, // Number of gridpoints per isotope in simulation
+        GSD.num_nucs,     // 1-D array with number of nuclides per material
+        GSD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
+        GSD.unionized_energy_array, // 1-D Unionized energy array
+        GSD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+        GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+        GSD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+        macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
+        in.grid_type,    // Lookup type (nuclide, hash, or unionized)
+        in.hash_bins,    // Number of hash bins used (if using hash lookup type)
+        GSD.max_num_nucs  // Maximum number of nuclides present in any material
     );
 
     // For verification, and to prevent the compiler from optimizing
@@ -98,13 +115,13 @@ __global__ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD )
     // with a thrust reduction kernel after the main simulation kernel.
     double max = -1.0;
     int max_idx = 0;
-    for(int j = 0; j < 5; j++ )
+    for (int j = 0; j < 5; j++)
     {
-        if( macro_xs_vector[j] > max )
+        if (macro_xs_vector[j] > max)
         {
             max = macro_xs_vector[j];
             max_idx = j;
         }
     }
-    GSD.verification[i] = max_idx+1;
+    GSD.verification[i] = max_idx + 1;
 }

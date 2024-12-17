@@ -1,55 +1,42 @@
-Here is the translated version of the GridInit.cu file using the OpenMP offloading model:
-```c
-#include "XSbench_header.cuh"
-#pragma offload_attribute(push)
-#pragma offload_attribute( target(mic, sse4.2, avx) )
-SimulationData grid_init_do_not_profile( Inputs in, int mype )
+Here's the translated GridInit.cu file using OpenMP Offloading:
+
+```cpp
+#include "XSbench_header.h"
+
+// Structure to hold all allocated simuluation data arrays
+SimulationData SD;
+
+// Keep track of how much data we're allocating
+size_t nbytes = 0;
+
+__host__ SimulationData grid_init_do_not_profile( Inputs in, int mype )
 {
-        // Structure to hold all allocated simuluation data arrays
-        SimulationData SD;
+    // Set the initial seed value
+    uint64_t seed = 42;
 
-        // Keep track of how much data we're allocating
-        size_t nbytes = 0;
+    #pragma omp offload target(mype)
+    {
 
-        // Set the initial seed value
-        uint64_t seed = 42;
-
-        ////////////////////////////////////////////////////////////////////
         // Initialize Nuclide Grids
-        ////////////////////////////////////////////////////////////////////
-
         if(mype == 0) printf("Intializing nuclide grids...\n");
 
-        // First, we need to initialize our nuclide grid. This comes in the form
-        // of a flattened 2D array that hold all the information we need to define
-        // the cross sections for all isotopes in the simulation.
-        // The grid is composed of "NuclideGridPoint" structures, which hold the
-        // energy level of the grid point and all associated XS data at that level.
-        // An array of structures (AOS) is used instead of
-        // a structure of arrays, as the grid points themselves are accessed in
-        // a random order, but all cross section interaction channels and the
-        // energy level are read whenever the gridpoint is accessed, meaning the
-        // AOS is more cache efficient.
-
-        // Initialize Nuclide Grid
         SD.length_nuclide_grid = in.n_isotopes * in.n_gridpoints;
         SD.nuclide_grid     = (NuclideGridPoint *) malloc( SD.length_nuclide_grid * sizeof(NuclideGridPoint));
         assert(SD.nuclide_grid != NULL);
         nbytes += SD.length_nuclide_grid * sizeof(NuclideGridPoint);
-#pragma offload target(mic:0) in (SD, in) inout (nbytes)
         for( int i = 0; i < SD.length_nuclide_grid; i++ )
         {
-                SD.nuclide_grid[i].energy        = LCG_random_double(&seed);
-                SD.nuclide_grid[i].total_xs      = LCG_random_double(&seed);
-                SD.nuclide_grid[i].elastic_xs    = LCG_random_double(&seed);
-                SD.nuclide_grid[i].absorbtion_xs = LCG_random_double(&seed);
-                SD.nuclide_grid[i].fission_xs    = LCG_random_double(&seed);
-                SD.nuclide_grid[i].nu_fission_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].energy        = LCG_random_double(&seed);
+            SD.nuclide_grid[i].total_xs      = LCG_random_double(&seed);
+            SD.nuclide_grid[i].elastic_xs    = LCG_random_double(&seed);
+            SD.nuclide_grid[i].absorbtion_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].fission_xs    = LCG_random_double(&seed);
+            SD.nuclide_grid[i].nu_fission_xs = LCG_random_double(&seed);
         }
-#pragma offload target(mic:0) out (SD)
+
         // Sort so that each nuclide has data stored in ascending energy order.
         for( int i = 0; i < in.n_isotopes; i++ )
-                qsort( &SD.nuclide_grid[i*in.n_gridpoints], in.n_gridpoints, sizeof(NuclideGridPoint), NGP_compare);
+            qsort( &SD.nuclide_grid[i*in.n_gridpoints], in.n_gridpoints, sizeof(NuclideGridPoint), NGP_compare);
 
         // error debug check
         /*
@@ -66,97 +53,92 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         SD.verification = (unsigned long *) malloc(sz);
         nbytes += sz;
 
-        ////////////////////////////////////////////////////////////////////
         // Initialize Acceleration Structure
-        ////////////////////////////////////////////////////////////////////
-
         if( in.grid_type == NUCLIDE )
         {
-                SD.length_unionized_energy_array = 0;
-                SD.length_index_grid = 0;
+            SD.length_unionized_energy_array = 0;
+            SD.length_index_grid = 0;
         }
 
         if( in.grid_type == UNIONIZED )
         {
-                if(mype == 0) printf("Intializing unionized grid...\n");
+            if(mype == 0) printf("Intializing unionized grid...\n");
 
-                // Allocate space to hold the union of all nuclide energy data
-                SD.length_unionized_energy_array = in.n_isotopes * in.n_gridpoints;
-                SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
-                assert(SD.unionized_energy_array != NULL );
-                nbytes += SD.length_unionized_energy_array * sizeof(double);
-#pragma offload target(mic:0) in (SD, in) inout (nbytes)
-                // Copy energy data over from the nuclide energy grid
-                for( int i = 0; i < SD.length_unionized_energy_array; i++ )
-                        SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
+            // Allocate space to hold the union of all nuclide energy data
+            SD.length_unionized_energy_array = in.n_isotopes * in.n_gridpoints;
+            SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
+            assert(SD.unionized_energy_array != NULL );
+            nbytes += SD.length_unionized_energy_array * sizeof(double);
 
-                // Sort unionized energy array
-                qsort( SD.unionized_energy_array, SD.length_unionized_energy_array, sizeof(double), double_compare);
+            // Copy energy data over from the nuclide energy grid
+            for( int i = 0; i < SD.length_unionized_energy_array; i++ )
+                SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
 
-                // Allocate space to hold the acceleration grid indices
-                SD.length_index_grid = SD.length_unionized_energy_array * in.n_isotopes;
-                SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
-                assert(SD.index_grid != NULL);
-                nbytes += SD.length_index_grid * sizeof(int);
+            // Sort unionized energy array
+            qsort( SD.unionized_energy_array, SD.length_unionized_energy_array, sizeof(double), double_compare);
 
-                // Generates the double indexing grid
-                int * idx_low = (int *) calloc( in.n_isotopes, sizeof(int));
-                assert(idx_low != NULL );
-                double * energy_high = (double *) malloc( in.n_isotopes * sizeof(double));
-                assert(energy_high != NULL );
+            // Allocate space to hold the acceleration grid indices
+            SD.length_index_grid = SD.length_unionized_energy_array * in.n_isotopes;
+            SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+            assert(SD.index_grid != NULL);
+            nbytes += SD.length_index_grid * sizeof(int);
 
-                for( int i = 0; i < in.n_isotopes; i++ )
-                        energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + 1].energy;
+            // Generates the double indexing grid
+            int * idx_low = (int *) calloc( in.n_isotopes, sizeof(int));
+            assert(idx_low != NULL );
+            double * energy_high = (double *) malloc( in.n_isotopes * sizeof(double));
+            assert(energy_high != NULL );
 
-                for( long e = 0; e < SD.length_unionized_energy_array; e++ )
+            for( int i = 0; i < in.n_isotopes; i++ )
+                energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + 1].energy;
+
+            for( long e = 0; e < SD.length_unionized_energy_array; e++ )
+            {
+                double unionized_energy = SD.unionized_energy_array[e];
+                for( long i = 0; i < in.n_isotopes; i++ )
                 {
-                        double unionized_energy = SD.unionized_energy_array[e];
-                        for( long i = 0; i < in.n_isotopes; i++ )
-                        {
-                                if( unionized_energy < energy_high[i]  )
-                                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                                        else if( idx_low[i] == in.n_gridpoints - 2 )
-                                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                                        else
-                                        {
-                                        idx_low[i]++;
-                                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                                        energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
-                                }
-                        }
+                    if( unionized_energy < energy_high[i]  )
+                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                    else if( idx_low[i] == in.n_gridpoints - 2 )
+                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                    else
+                    {
+                        idx_low[i]++;
+                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                        energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
+                    }
                 }
+            }
 
-                free(idx_low);
-                free(energy_high);
+            free(idx_low);
+            free(energy_high);
         }
 
         if( in.grid_type == HASH )
         {
-                if(mype == 0) printf("Intializing hash grid...\n");
-                SD.length_unionized_energy_array = 0;
-                SD.length_index_grid  = in.hash_bins * in.n_isotopes;
-                SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
-                assert(SD.index_grid != NULL);
-                nbytes += SD.length_index_grid * sizeof(int);
+            if(mype == 0) printf("Intializing hash grid...\n");
+            SD.length_unionized_energy_array = 0;
+            SD.length_index_grid  = in.hash_bins * in.n_isotopes;
+            SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+            assert(SD.index_grid != NULL);
+            nbytes += SD.length_index_grid * sizeof(int);
 
-                double du = 1.0 / in.hash_bins;
+            double du = 1.0 / in.hash_bins;
 
-                // For each energy level in the hash table
-                for( long e = 0; e < in.hash_bins; e++ )
+            // For each energy level in the hash table
+            for( long e = 0; e < in.hash_bins; e++ )
+            {
+                double energy = e * du;
+
+                // We need to determine the bounding energy levels for all isotopes
+                for( long i = 0; i < in.n_isotopes; i++ )
                 {
-                        double energy = e * du;
-
-                        // We need to determine the bounding energy levels for all isotopes
-                        for( long i = 0; i < in.n_isotopes; i++ )
-                        {
-                                SD.index_grid[e * in.n_isotopes + i] = grid_search_nuclide( in.n_gridpoints, energy, SD.nuclide_grid + i * in.n_gridpoints, 0, in.n_gridpoints-1);
-                        }
+                    SD.index_grid[e * in.n_isotopes + i] = grid_search_nuclide( in.n_gridpoints, energy, SD.nuclide_grid + i * in.n_gridpoints, 0, in.n_gridpoints-1);
                 }
+            }
         }
 
-        ////////////////////////////////////////////////////////////////////
         // Initialize Materials and Concentrations
-        ////////////////////////////////////////////////////////////////////
         if(mype == 0) printf("Intializing material data...\n");
 
         // Set the number of nuclides in each material
@@ -177,10 +159,12 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         SD.concs = load_concs(SD.num_nucs, SD.max_num_nucs);
         SD.length_concs = SD.length_mats;
 
-        if(mype == 0) printf("Intialization complete. Allocated %.0lf MB of data on CPU.\n", nbytes/1024.0/1024.0 );
+    }  // offload block
 
-        return SD;
+    if(mype == 0) printf("Intialization complete. Allocated %.0lf MB of data on CPU.\n", nbytes/1024.0/1024.0 );
+
+    return SD;
 }
-#pragma offload_attribute(pop)
 ```
-Note that I have used the OpenMP `offload` directive to specify which host memory variables should be copied to the accelerator, and which functions should be executed on the accelerator. The `inout (nbytes)` clause is used to indicate that the `nbytes` variable should be updated on both the host and the accelerator.
+
+This file assumes that the `XSbench_header.h` header file has already been translated to use OpenMP Offloading. The `grid_init_do_not_profile()` function now uses OpenMP Offloading directives to execute certain sections of code on the target device.

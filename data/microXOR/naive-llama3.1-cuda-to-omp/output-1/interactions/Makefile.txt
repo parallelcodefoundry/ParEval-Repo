@@ -1,49 +1,40 @@
-Here is the Makefile translated to the openmp-offload execution model:
+Here is the translated Makefile:
+```makefile
+# Makefile for OpenMP microXOR
 
-```
-# Use compiler flags to enable OpenMP and offloading
-CXX = $(CXX_COMPILER)
-CXXFLAGS = -fopenmp -march=$(SM_VERSION) -cuda
+CXX ?= clang++
+SM_VERSION ?= 80
+CXXFLAGS ?= -fopenmp -std=c++17 -march=nvptx64-nvidia-cuda=${SM_VERSION}
+ifeq ($(DEBUG), yes)
+	CXXFLAGS += -g -G
+else
+	CXXFLAGS += -O3
+endif
+LDFLAGS ?= -lcudart
 
-# Directories and files
-SRCDIR = src
-BUILDDIR = build
-BINDIR = bin
+CPPFILES = src/microXOR.cpp src/main.cpp
+HDRS = include/microXOR.hpp
 
-# Source and header files
-SOURCES = $(wildcard $(SRCDIR)/microXOR.cpp) $(wildcard $(SRCDIR)/microXOR.h)
-OBJECTS = $(patsubst $(SRCDIR)/%.cpp, $(BUILDDIR)/%.o, $(SOURCES:.h=.cpp))
+OBJS = $(CPPFILES:src/%.cpp=obj/%.o)
 
-# Build target
-TARGET = $(BINDIR)/microXOR
+EXE = microXOR.exe
 
-# Rules
-$(BUILDDIR)/%.o: $(SRCDIR)/%.cpp
-	@mkdir -p $(BUILDDIR)
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+
+obj/%.o: src/%.cpp $(HDRS) | obj
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+obj:
+	mkdir -p $(OBJ)
 
-# Clean up
 clean:
-	rm -rf $(BUILDDIR) $(BINDIR)/microXOR
+	rm -f $(OBJS) $(EXE)
 
-# Target to build the executable for a specific SM version
-build-%:
-	$(MAKE) CXX_COMPILER=$(shell which clang++) SM_VERSION=$* TARGET=$(TARGET)
+.PHONY: clean
 
-# Default target
-default: build-80
-
-.PHONY: clean default
+# Define the offload directive
+%.offload.cpp: %.cpp
+	sed -e 's/^/openmp target nvptx64-nvidia-cuda=${SM_VERSION}:\n/' $< > $@
 ```
-
-This Makefile is similar to the original one, but it uses compiler flags to enable OpenMP and offloading. The `CXX` variable is used to specify the C++ compiler (in this case, clang++), and the `CXXFLAGS` variable is used to pass additional flags to the compiler.
-
-The rules for building the object files and the target executable are similar to those in the original Makefile. However, the OpenMP offloading target is specified using the `build-%` rule, which takes a SM version as an argument.
-
-To build the code for a specific SM version (e.g., 80), you can use the following command:
-```
-make SM_VERSION=80 CXX_COMPILER=$(shell which clang++)
-```
+Note that I assumed you want to use clang++ as the CXX_COMPILER, and that you will compile this code using `make SM_VERSION=80 CXX_COMPILER=clang++` to build the code for a system with an NVIDIA GPU with compute capability 80 compiled with clang++. Also note that I used `.cpp` and `.hpp` filenames instead of `.cu` and `.cuh`, as per your request.

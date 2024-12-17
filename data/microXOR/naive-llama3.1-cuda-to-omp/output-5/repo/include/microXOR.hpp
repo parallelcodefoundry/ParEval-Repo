@@ -1,5 +1,7 @@
-#ifndef MICROXOR_CUH
-#define MICROXOR_CUH
+// microXOR header file (translated to OpenMP-offload)
+
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
 
 #include <iostream>
 #include <random>
@@ -7,4 +9,4 @@
 
 void cellsXOR(const int *input, int *output, size_t N);
 
-#endif
+#endif  // MICROXOR_HPP

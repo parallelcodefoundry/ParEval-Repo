@@ -1,171 +1,82 @@
 Here is the translation of `include/SimpleMOC-kernel_header.h` to OpenMP-Offload execution model:
 
 ```c
-#ifndef __CUDA_ARCH__
-#define __CUDA_ARCH__ 200
-#endif
-
-#pragma offload_attribute(push)
-#pragma offload_attribute(target(mic))
-#pragma offload_attribute(alloc(1))
+#ifndef __SimpleMOC_header
+#define __SimpleMOC_header
 
 #include <omp.h>
+#include <openacc.h>
 
-#pragma offload_attribute(pop)
+// User inputs
+typedef struct{
+	int source_2D_regions;
+	int source_3D_regions;
+	int coarse_axial_intervals;
+	int fine_axial_intervals;
+	int decomp_assemblies_ax; // Number of subdomains per assembly axially
+	long segments;
+	int egroups;
+	int nthreads;
+	int streams;
+	int seg_per_thread;
+	size_t nbytes;
+} Input;
 
-typedef struct {
-    float *fine_source_arr;
-    float *fine_flux_arr;
-    float *sigT_arr;
+// Source Region Structure
+typedef struct{
+	long fine_flux_id;
+	long fine_source_id;
+	long sigT_id;
+} Source;
+
+// Source Arrays
+typedef struct{
+	float * fine_flux_arr;
+	float * fine_source_arr;
+	float * sigT_arr;
 } Source_Arrays;
 
-typedef struct {
-    float maxVal;
-    float dx;
-    int N;
-    float values[2*353];
+// Table structure for computing exponential
+typedef struct{
+	float values[706];
+	float dx;
+	float maxVal;
+	int N;
 } Table;
 
-#define CUDA_ERROR_CHECK
+#pragma acc routine seq kernel.c(run_kernel)
+__global__ void run_kernel( Input I, Source *  S,
+		Source_Arrays SA, Table *  table, curandState *  state,
+		float *  state_fluxes, int N_state_fluxes);
 
-void __cudaCheckError(const char *file, const int line) {
-#ifdef CUDA_ERROR_CHECK
-    omp_set_nested(1);
-    #pragma offload target(mic)
-    {
-        cudaError err = cudaGetLastError();
-        if (cudaSuccess != err) {
-            fprintf(stderr, "cudaCheckError() failed at %s:%i : %s\n",
-                    file, line, cudaGetErrorString(err));
-            exit(-1);
-        }
+#pragma acc routine seq kernel.c(interpolateTable)
+__device__ void interpolateTable(Table *  table, float x, float *  out);
 
-        // More careful checking. However, this will affect performance.
-        // Comment away if needed.
-        err = cudaDeviceSynchronize();
-        if (cudaSuccess != err) {
-            fprintf(stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
-                    file, line, cudaGetErrorString(err));
-            exit(-1);
-        }
-    }
+// init.c
+double mem_estimate( Input I );
+#pragma acc routine seq init.c(setup_kernel)
+__global__ void setup_kernel(curandState *state, Input I);
+#pragma acc routine seq init.c(init_flux_states)
+__global__ void	init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state);
+
+// Source initialization functions
+Source * initialize_sources( Input I, Source_Arrays * SA );
+Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
+
+// Function to build exponential table
+Table buildExponentialTable( void );
+
+// Function to set default input parameters
+Input set_default_input( void );
+
 #endif
-
-    return;
-}
-
-Table buildExponentialTable(void) {
-    Table table;
-
-    float maxVal = 10.0;   
-
-    int N = 353; 
-
-    float dx = maxVal / (float)N;
-
-    for(int n = 0; n < N; n++)
-    {
-        // compute slope and y-intercept for ( 1 - exp(-x) )
-        float exponential = exp(-n * dx);
-        table.values[2*n] = -exponential;
-        table.values[2*n + 1] = 1 + (n * dx - 1) * exponential;
-    }
-
-    table.dx = dx;
-    table.maxVal = maxVal - table.dx;
-    table.N = N;
-
-    return table;
-}
-
-Source_Arrays* initialize_host_sources(Input I, Source_Arrays* SA_h)
-{
-    // Initialize fine source and flux to random numbers
-    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    for(long i = 0; i < N_fine; i++)
-    {
-        SA_h->fine_source_arr[i] = (float)rand() / RAND_MAX;
-        SA_h->fine_flux_arr[i] = (float)rand() / RAND_MAX;
-    }
-
-    // Initialize SigT Values
-    long N_sigT = I.source_3D_regions * I.egroups;
-    for(int i = 0; i < N_sigT; i++)
-        SA_h->sigT_arr[i] = (float)rand() / RAND_MAX;
-
-    return SA_h;
-}
-
-Source_Arrays* initialize_device_sources(Input I, Source_Arrays* SA_h, Source_Arrays* SA_d)
-{
-    // Allocate & Copy Fine Source Data
-    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    #pragma offload target(mic) 
-    {
-        cudaMalloc((void**)&SA_d->fine_source_arr, N_fine*sizeof(float));
-        cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine*sizeof(float), cudaMemcpyHostToDevice);
-    }
-
-    // Allocate & Copy Fine Flux Data
-    #pragma offload target(mic) 
-    {
-        cudaMalloc((void**)&SA_d->fine_flux_arr, N_fine*sizeof(float));
-        cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine*sizeof(float), cudaMemcpyHostToDevice);
-    }
-
-    // Allocate & Copy SigT Data
-    long N_sigT = I.source_3D_regions * I.egroups;
-    #pragma offload target(mic) 
-    {
-        cudaMalloc((void**)&SA_d->sigT_arr, N_sigT*sizeof(float));
-        cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT*sizeof(float), cudaMemcpyHostToDevice);
-    }
-
-    return SA_d;
-}
-
-// Assuming the function initialize_device_sources is modified as above
-
-Source* initialize_host_sources(Input I, Source_Arrays* SA_h)
-{
-    // Allocate host memory for source array
-    Source* sources = (Source*)malloc(I.source_3D_regions*sizeof(Source));
-    
-    // Initialize fine source and flux to random numbers
-    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    for(long i = 0; i < N_fine; i++)
-    {
-        SA_h->fine_source_arr[i] = (float)rand() / RAND_MAX;
-        SA_h->fine_flux_arr[i] = (float)rand() / RAND_MAX;
-    }
-
-    // Initialize SigT Values
-    long N_sigT = I.source_3D_regions * I.egroups;
-    for(int i = 0; i < N_sigT; i++)
-        SA_h->sigT_arr[i] = (float)rand() / RAND_MAX;
-
-    return sources;
-}
-
-// The function initialize_device_sources is modified as above.
-
-// Assuming the function __cudaCheckError is modified as above.
 ```
 
-Note that this code will run on a MIC (Many Integrated Core) architecture, such as an Intel Xeon Phi. The `#pragma offload` directives are used to specify which functions should be offloaded to the MIC and how data should be transferred between the host and device.
+Note that the translation involves:
 
-Also note that some modifications might be required based on your specific use case and code structure.
+* Including `omp.h` and `openacc.h` for OpenMP-Offload support.
+* Defining a custom region with `#pragma acc routine seq` directives to specify which functions should be offloaded.
+* Adding the `__device__` keyword to function declarations, which indicates they can be executed on the device.
+* Using OpenACC pragmas (`#pragma acc routine`) to specify which functions should be offloaded.
 
-This modified version of the header file includes the necessary modifications for OpenMP-Offload execution model. The `#pragma offload` directives are used to specify which functions should be offloaded to the MIC and how data should be transferred between the host and device.
-
-However, this may not fully work as is because I had to make some assumptions about your code structure based on what you provided in the question. You might need to adjust these modifications according to your specific use case.
-
-Also note that you will need to link against OpenMP library to compile and run this modified version of the header file.
-
-For compilation, you may use a command like:
-
-```bash
-gcc -fopenmp -lmic your_program.c -o your_program
-```
-
-where `your_program` is the name of the output executable.
+Also note that the translation is not exhaustive and might require additional modifications to work correctly with the OpenMP-Offload execution model.

@@ -1,33 +1,48 @@
 Here is the translated Makefile:
 ```
-# OpenMP-offload Makefile
-CXX = $(CXX_COMPILER)
-SM_VERSION := $(SM_VERSION)
-OFFLOAD_DEVICES = nvidia
-OFFLOAD_ARCHS = $(SM_VERSION)
+# Makefile for OpenMP-offload microXOR
 
-default: main.cpp microXOR.cpp
-	$(CXX) -fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS) $^ -o main
+CXX ?= g++
+SM_VERSION ?= 80
+OFFLOAD_COMPILER ?= cl-clang++
+OFFLOAD_FLAGS ?= -ccbin=nvcc --offload-architecture=${SM_VERSION}
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+
+CXX_COMPILER ?= clang++
+
+INC = include
+SRC = src
+OBJ = obj
+DEPS = $(INC)/microXOR.hpp
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) -fopenmp-targets=nvptx64-nvidia-cc${SM_VERSION} -I$(INC) $(OFFLOAD_FLAGS) $(OBJS) -o $(EXE)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX_COMPILER) $(CXXFLAGS) -fopenmp-targets=nvptx64-nvidia-cc${SM_VERSION} -I$(INC) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
 
 clean:
-	rm -rf main
-
-%.o : %.cpp
-	$(CXX) -c -fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS) $< -o $@
-
-microXOR.o: microXOR.cpp
-main.o: main.cpp
-
-microXOR.cpp:
-main.cpp:
+	rm -f $(OBJS) $(EXE)
 ```
-Note that the following changes have been made:
+Note the following changes:
 
-* `CXX` is set to the user-specified compiler, `CXX_COMPILER`.
-* The `SM_VERSION` environment variable is used to specify the target architecture.
-* The `OFFLOAD_DEVICES` and `OFFLOAD_ARCHS` variables are set to "nvidia" and $(SM_VERSION), respectively.
-* The `-fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS)` flags are added to compile with OpenMP and offloading support.
-* The source files are compiled as C++ files (`.cpp`) instead of CUDA files (`.cu`).
-* The `clean` target is modified to remove only the generated executable file.
+* The `NVCC` and `CUDA_ARCH` variables are no longer used. Instead, we use the `SM_VERSION` variable to specify the OpenMP-offload target architecture.
+* We added the `-fopenmp-targets=nvptx64-nvidia-cc${SM_VERSION}` flag to enable OpenMP-offload compilation for NVIDIA GPUs with compute capability ${SM_VERSION}.
+* The `CXX` compiler is now used instead of `NVCC`.
+* We use the `cl-clang++` compiler as the offload compiler, which is a wrapper around the Clang compiler that generates PTX code.
+* We added the `--offload-architecture=${SM_VERSION}` flag to specify the offload architecture for the compiler.
 
-This Makefile can be used to build a C++ program that uses OpenMP offloading to NVIDIA GPUs. To use it, simply set the `SM_VERSION`, `CXX_COMPILER`, and other environment variables as needed, and run `make`.
+To build the code, you can run:
+```
+make SM_VERSION=80 CXX_COMPILER=clang++ OFFLOAD_COMPILER=cl-clang++
+```

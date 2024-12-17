@@ -1,26 +1,11 @@
-#===============================================================================
 # User Options
-#===============================================================================
+COMPILER ?= clang
+CUDA_ARCH ?= 80
+OPTIMIZE ?= yes
+DEBUG    ?= no
+PROFILE  ?= no
 
-COMPILER    ?= nvidia
-OPTIMIZE    ?= yes
-DEBUG       ?= no
-PROFILE     ?= no
-SM_VERSION  ?= 80
-
-CXX         = clang++
-LD          = clang++
-
-# OpenMP flags
-OPENMPFLAGS = -fopenmp -std=c++14
-
-# Offload flag
-OFFLOAD     = -fopenacc
-
-#===============================================================================
 # Program name & source code list
-#===============================================================================
-
 program = XSBench
 
 source = \
@@ -33,16 +18,15 @@ Materials.cu
 
 obj = $(source:.cu=.o)
 
-#===============================================================================
-# Sets Flags
-#===============================================================================
+# Sets Flags for OpenMP offload
+CFLAGS := -fopenmp -D__CUDA_ARCH__=$(CUDA_ARCH) -std=c++14
 
-# Standard Flags
-CFLAGS := -O3
-
-# OpenMP Compiler Flags
-OMP_CXXFLAGS = $(OPENMPFLAGS) -arch=sm_$(SM_VERSION)
-OMP_LDFLAGS  = $(OFFLOAD)
+# Sets Flags for compiler choice (clang or other)
+ifeq ($(COMPILER),clang)
+  CC = clang++
+else ifeq ($(COMPILER),gcc)
+  CC = g++
+endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -59,15 +43,12 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-#===============================================================================
-# Targets to Build
-#===============================================================================
-
+# Target to Build
 $(program): $(obj) XSbench_header.cuh Makefile
-	$(CXX) $(OMP_CXXFLAGS) $(CFLAGS) $(obj) -o $@ $(OMP_LDFLAGS)
+	$(CC) $(CFLAGS) $(obj) -o $@ -fopenacc
 
 %.o: %.cu XSbench_header.cuh Makefile
-	$(CXX) $(OMP_CXXFLAGS) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
@@ -81,25 +62,5 @@ run:
 
 io.cu:
 #include "XSbench_header.cuh"
-
-// Prints program logo
-void logo(int version)
-{
-	border_print();
-	printf(
-	"                   __   __ ___________                 _                        \n"
-	"                   \\ \\ / //  ___| ___ \\               | |                       \n"
-	"                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
-	"                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
-	"                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
-	"                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
-	       );
-	border_print();
-	center_print("Developed at Argonne National Laboratory", 79);
-	char v[100];
-	sprintf(v, "Version: %d", version);
-	center_print(v, 79);
-	border_print();
-}
 
 // ...

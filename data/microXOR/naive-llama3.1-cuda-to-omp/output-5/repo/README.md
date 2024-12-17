@@ -4,8 +4,8 @@ This is microXOR, a stencil computation benchmark computing an XOR operation ove
 
 ## Prerequisites
 
-OpenMP and offloading capabilities must be installed. This code has been tested with GCC 9.3.0 and OpenMPI 4.1.0 on Linux.
+C++17 must be installed.
 
-## Compiling the Code
+## Build and Run
 
-To compile the code, use:
+To build microXOR for CPU execution using OpenMP offloading to the GPU, use `g++` (or your C++ compiler of choice) with the following command:

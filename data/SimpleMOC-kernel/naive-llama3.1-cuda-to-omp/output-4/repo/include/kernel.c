@@ -1,66 +1,91 @@
-#include <omp.h>
-#include <cuda_runtime_api.h>
+#include "SimpleMOC-kernel_header.h"
 
-#define CUDA_CHECK(error) \
-  do { \
-    cudaError_t err = (error); \
-    if (err != cudaSuccess) { \
-      printf("CUDA error: %s\n", cudaGetErrorString(err)); \
-      exit(1); \
-    } \
-  } while (0)
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState *state,
+                float *state_fluxes, int N_state_fluxes) {
+    #pragma omp offload target(cuda)
+    __global__ void kernel() {
+        int blockId = blockIdx.y * gridDim.x + blockIdx.x;
+        if (blockId >= I.segments / I.seg_per_thread)
+            return;
 
-#define HANDLE_ERROR(err) \
-  do { \
-    if ((err) != cudaSuccess) { \
-      fprintf(stderr, "CUDA error: %s\n", cudaGetErrorString((err))); \
-      exit(EXIT_FAILURE); \
-    } \
-  } while (0)
+        // Assign RNG state
+        curandState *localState = &state[blockId % I.streams];
 
-#pragma offload target(mic, map_arg_kernel)
-int main() {
-  // initialize device
-  int dev = omp_get_max_threads();
-  CUDA_CHECK(cudaSetDevice(dev));
+        blockId *= I.seg_per_thread;
+        blockId--;
 
-  // allocate memory on the device
-  float *d_sources;
-  cudaMalloc((void **)&d_sources, sizeof(Source) * numSources);
+        int g = threadIdx.x; // Each energy group (g) is one thread in a block
 
-  // copy data from host to device
-  Source *sources = (Source *)malloc(sizeof(Source) * numSources);
-  for (int i = 0; i < numSources; ++i) {
-    sources[i].sigT_id = i;
-  }
-  CUDA_CHECK(cudaMemcpy(d_sources, sources, sizeof(Source) * numSources, cudaMemcpyHostToDevice));
+        float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral;
+        float tally;
 
-  // execute kernel
-  #pragma omp parallel
-  {
-    int tid = omp_get_thread_num();
-    int num_threads = omp_get_num_threads();
+        extern __shared__ int shm[];
+        int *state_flux_id = &shm[0];
+        int *QSR_id = &shm[I.seg_per_thread];
+        int *FAI_id = &shm[I.seg_per_thread * 2];
 
-    // allocate memory for each thread
-    float *d_sources_thread;
-    cudaMalloc((void **)&d_sources_thread, sizeof(Source) * numSources);
+        if (threadIdx.x == 0) {
+            for (int i = 0; i < I.seg_per_thread; i++) {
+                state_flux_id[i] = curand(localState) % N_state_fluxes;
+                QSR_id[i] = curand(localState) % I.source_3D_regions;
+                FAI_id[i] = curand(localState) % I.fine_axial_intervals;
+            }
+        }
 
-    // copy data from device to thread-local memory
-    CUDA_CHECK(cudaMemcpy(d_sources_thread, d_sources, sizeof(Source) * numSources, cudaMemcpyDeviceToDevice));
+#pragma omp offload target(cuda) is_device_ptr(S, SA)
+        __syncthreads();
 
-    // execute kernel function
-    kernel_function(d_sources_thread, numSources);
-  }
+        for (int i = 0; i < I.seg_per_thread; i++) {
+            blockId++;
 
-  // synchronize threads
-  #pragma omp barrier
+            float *state_flux = &state_fluxes[state_flux_id[i]];
 
-  // deallocate memory on the device
-  cudaFree(d_sources);
+#pragma omp offload target(cuda) is_device_ptr(table)
+            __syncthreads();
 
-  return 0;
-}
+            // Attenuate Segment
+            // ...
 
-void kernel_function(float *d_sources, int numSources) {
-  // perform computations here
+            // Load neighboring sources
+            if (FAI_id[i] == 0) {
+                // ...
+            } else if (FAI_id[i] == I.fine_axial_intervals - 1) {
+                // ...
+            } else {
+                // ...
+            }
+
+            sigT = __ldg(&SA.sigT_arr[S[QSR_id[i]].sigT_id + g]);
+
+            tau = sigT * ds;
+            sigT2 = sigT * sigT;
+
+            #ifdef TABLE
+            interpolateTable(table, tau, &expVal);
+            #else
+            expVal = 1.f - expf(-tau); // EXP function is fater than table lookup
+            #endif
+
+            reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
+
+            flux_integral = (q0 * tau + (sigT * __ldg(&state_flux[g]) - q0)
+                             * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2
+                            * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal)
+                            / (3.f * sigT2 * sigT2);
+
+            tally = weight * flux_integral;
+
+            // SHOULD BE ATOMIC HERE!
+            atomicAdd(&FSR_flux[g], (float)tally);
+
+            t1 = q0 * expVal / sigT;
+            t2 = q1 * mu * (tau - expVal) / sigT2;
+            t3 = q2 * mu2 * reuse;
+            t4 = state_flux[g] * (1.f - expVal);
+            state_flux[g] = t1 + t2 + t3 + t4;
+        }
+    }
+
+#pragma omp target teams distribute parallel for
+    kernel<<<I.streams / 100 + 1, 100>>>(I, S, SA, table, state, state_fluxes, N_state_fluxes);
 }

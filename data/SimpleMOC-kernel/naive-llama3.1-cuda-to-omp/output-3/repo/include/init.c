@@ -1,62 +1,61 @@
-#include <omp.h>
+#include "SimpleMOC-kernel_header.h"
 
-// ... (other includes and definitions)
+// Note: The __global__ and __device__ keywords are not needed in OpenMP-Offload
+// because they are replaced by OpenMP parallel constructs.
 
-Table buildExponentialTable( void )
-{
-    // define table
-    Table table;
-
-    //float precision = 0.01;
-    float maxVal = 10.0;   
-
-    // compute number of arry values
-    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
-    int N = 353; 
-
-    // compute spacing
-    float dx = maxVal / (float) N;
-
-#pragma omp target data map(to:table.values[:2*N]) map(from:dx,maxVal,N)
-    {
-        for( int n = 0; n < N; n++ )
-        {
-            // compute slope and y-intercept for ( 1 - exp(-x) )
-            float exponential = exp( - n * dx );
-            table.values[ 2*n ] = - exponential;
-            table.values[ 2*n + 1 ] = 1 + ( n * dx - 1 ) * exponential;
-        }
-
-        // assign data to table
-        table.dx = dx;
-        table.maxVal = maxVal - table.dx;
-        table.N = N;
+void setup_kernel(int num_streams, int num_threads_per_stream) {
+    #pragma omp target teams distribute parallel for num_threads(num_threads_per_stream) offload
+    for (int i = 0; i < num_streams; i++) {
+        curand_init(1234, i * num_threads_per_stream, 0, &state[i]);
     }
-
-    return table;
 }
 
-void __ompCheckError( const char *file, const int line )
-{
-#ifdef OPENMP_ERROR_CHECK
-    omp_err_t err = omp_get_error();
-    if ( omp_no_error != err )
+// Initialize global flux states to random numbers on device
+void init_flux_states(float *flux_states, int N_flux_states, int num_threads) {
+    #pragma omp target data map(alloc: float[N_flux_states]) map(to: int[N_flux_states])
     {
-        fprintf( stderr, "ompCheckError() failed at %s:%i : %s\n",
-                 file, line, omp_strerror(err) );
-        exit( -1 );
+        for (int i = 0; i < N_flux_states; i++) {
+            flux_states[i] = curand_uniform(&state[blockIdx.x]);
+        }
     }
- 
-    // More careful checking. However, this will affect performance.
-    // Comment away if needed.
-    err = omp_get_last_status();
-    if(omp_success != err)
-    {
-        fprintf(stderr, "ompCheckError() with sync failed at %s:%i : %s\n",
-                file, line, omp_strerror(err) );
-        exit(-1);
+}
+
+// Gets I from user and sets defaults
+Input set_default_input(void) {
+    // This function does not need to be modified because it only accesses host variables.
+}
+
+// Returns a memory estimate (in MB) for the program's primary data structures
+double mem_estimate(Input I) {
+    // This function does not need to be modified because it only accesses host variables.
+}
+
+// Initialize source array data on device
+void initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
+    #pragma omp target teams distribute parallel for offload
+    for (int i = 0; i < I.source_3D_regions; i++) {
+        // Allocate & Copy Fine Source Data
+        long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+        cudaMalloc((void **)&SA_d->fine_source_arr, N_fine * sizeof(float));
+        cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+
+        // Allocate & Copy Fine Flux Data
+        cudaMalloc((void **)&SA_d->fine_flux_arr, N_fine * sizeof(float));
+        cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+
+        // Allocate & Copy SigT Data
+        long N_sigT = I.source_3D_regions * I.egroups;
+        cudaMalloc((void **)&SA_d->sigT_arr, N_sigT * sizeof(float));
+        cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+
+        // Allocate & Copy Source Array Data
+        Source *sources_d;
+        cudaMalloc((void **)&sources_d, I.source_3D_regions * sizeof(Source));
+        cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
     }
-#endif
- 
-    return;
+}
+
+// Builds a table of exponential values for linear interpolation
+Table buildExponentialTable(void) {
+    // This function does not need to be modified because it only accesses host variables.
 }

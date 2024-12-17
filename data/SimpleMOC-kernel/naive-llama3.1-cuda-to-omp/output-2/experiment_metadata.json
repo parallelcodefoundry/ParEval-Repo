@@ -5,5 +5,5 @@
     "source_model": "cuda",
     "dest_model": "openmp-offload",
     "output_number": 2,
-    "path": "../../../data/SimpleMOC-kernel/naive-llama-3.1-cuda-to-omp/output-2/repo"
+    "path": "../../../data/SimpleMOC-kernel/naive-llama3.1-cuda-to-omp/output-2/repo"
 }

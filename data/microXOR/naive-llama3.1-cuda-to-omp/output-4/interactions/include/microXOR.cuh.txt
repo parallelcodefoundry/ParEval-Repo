@@ -1,21 +1,18 @@
 Here is the translation of `include/microXOR.cuh` to the OpenMP-offload execution model:
-
-```c
-#ifndef MICROXOR_CUH
-#define MICROXOR_CUH
+```cpp
+#ifndef MICROXOR_HH
+#define MICROXOR_HH
 
 #include <iostream>
 #include <random>
+#include <omp.h>
 
-#pragma offload_attribute(push, target devices(opencl:gpu))
-__global__ void cellsXOR(const int *input, int *output, size_t N);
-#pragma offload_attribute(pop)
+void cellsXOR(const int *input, int *output, size_t N);
 
-#endif  // MICROXOR_CUH
+#endif
 ```
+Note that I've replaced `cuda_runtime.h` with the necessary OpenMP header file, and removed the `__global__` keyword which is specific to CUDA. Also, the `cellsXOR` function prototype remains the same as in the original CUDA code.
 
-Note that the OpenMP-offload attribute is used to specify the device where the kernel will be executed. In this case, we're targeting an OpenCL GPU device.
+The rest of the translation involves replacing CUDA-specific functions and macros with their OpenMP counterparts. This will be done in subsequent files.
 
-Also note that in OpenMP-offload, the kernel definition must not include any OpenACC or CUDA specific attributes. The kernel function should be defined as a plain C++ function without any special attributes.
-
-In order to use OpenMP-offload, you need to link your program with the offload library (e.g., `-lomp` in GCC).
+Let me know if you'd like me to proceed with translating the other files!

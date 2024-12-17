@@ -1,70 +1,75 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
-        // =====================================================================
-        // Initialization & Command Line Read-In
-        // =====================================================================
-        int version = 20;
-        int mype = 0;
-        double omp_start, omp_end;
-        int nprocs = 1;
-        unsigned long long verification;
+    // =====================================================================
+    // Initialization & Command Line Read-In
+    // =====================================================================
+    int version = 20;
+    int mype = 0;
+    double omp_start, omp_end;
+    int nprocs = 1;
 
-        // Process CLI Fields -- store in "Inputs" structure
-        Inputs in = read_CLI(argc, argv);
-
-        // Print-out of Input Summary
-        if (mype == 0)
-                print_inputs(in, nprocs, version);
-
-        // =====================================================================
-        // Prepare Nuclide Energy Grids, Unionized Energy Grid, & Material Data
-        // This is not reflective of a real Monte Carlo simulation workload,
-        // therefore, do not profile this region!
-        // =====================================================================
-
-        SimulationData SD;
-
-        // If read from file mode is selected, skip initialization and load
-        // all simulation data structures from file instead
-        if (in.binary_mode == READ)
-                SD = binary_read(in);
-        else
-                SD = grid_init_do_not_profile(in, mype);
-
-        // If writing from file mode is selected, write all simulation data
-        // structures to file
-        if (in.binary_mode == WRITE && mype == 0)
-                binary_write(in, SD);
-
-	Profile profile;
-
-        // =====================================================================
-        // Cross Section (XS) Parallel Lookup Simulation
-        // This is the section that should be profiled, as it reflects a
-        // realistic continuous energy Monte Carlo macroscopic cross section
-        // lookup kernel.
-        // =====================================================================
-        if (mype == 0) {
-                printf("\n");
-                border_print();
-                center_print("SIMULATION", 79);
-                border_print();
-        }
-
-        // Start Simulation Timer
-        omp_start = get_time();
-
-        int num_threads;
-        int device_id;
-
-        #pragma omp parallel shared(in, SD)
+    #ifdef _OPENMP
+        int num_threads = 1;
+        #pragma omp parallel
         {
             num_threads = omp_get_num_threads();
-            device_id = omp_get_num_devices();
+            #pragma omp master
+            {
+                num_threads = 1; // since we're using a single thread for the kernel execution, this should be set to 1
+            }
+        }
+    #endif
 
-            if (in.simulation_method == EVENT_BASED) {
+    // Process CLI Fields -- store in "Inputs" structure
+    Inputs in = read_CLI(argc, argv);
+
+    // Print-out of Input Summary
+    if (mype == 0)
+            print_inputs(in, nprocs, version);
+
+    // =====================================================================
+    // Prepare Nuclide Energy Grids, Unionized Energy Grid, & Material Data
+    // This is not reflective of a real Monte Carlo simulation workload,
+    // therefore, do not profile this region!
+    // =====================================================================
+
+    SimulationData SD;
+
+    // If read from file mode is selected, skip initialization and load
+    // all simulation data structures from file instead
+    if (in.binary_mode == READ)
+            SD = binary_read(in);
+    else
+            SD = grid_init_do_not_profile(in, mype);
+
+    // If writing from file mode is selected, write all simulation data
+    // structures to file
+    if (in.binary_mode == WRITE && mype == 0)
+            binary_write(in, SD);
+
+    Profile profile;
+
+    // =====================================================================
+    // Cross Section (XS) Parallel Lookup Simulation
+    // This is the section that should be profiled, as it reflects a
+    // realistic continuous energy Monte Carlo macroscopic cross section
+    // lookup kernel.
+    // =====================================================================
+    if (mype == 0) {
+            printf("\n");
+            border_print();
+            center_print("SIMULATION", 79);
+            border_print();
+    }
+
+    // Start Simulation Timer
+    omp_start = get_time();
+
+    #pragma offload target(mic:MIC_0)
+    {
+        // Run simulation
+        if (in.simulation_method == EVENT_BASED) {
                 if (in.kernel_id == 0)
                         verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
                 else if (in.kernel_id == 1)
@@ -83,15 +88,21 @@ int main(int argc, char *argv[]) {
                         printf("Error: No kernel ID %d found!\n", in.kernel_id);
                         exit(1);
                 }
-            } else {
+        } else {
                 printf(
                         "History-based simulation not implemented in CUDA code. Instead,\nuse "
                         "the event-based method with \"-m event\" argument.\n");
                 exit(1);
-            }
-
         }
 
+        if (mype == 0) {
+                printf("\n");
+                printf("Simulation complete.\n");
+        }
+    }
+
+    #pragma offload target(mic:MIC_0)
+    {
         // End Simulation Timer
         omp_end = get_time();
 
@@ -105,7 +116,8 @@ int main(int argc, char *argv[]) {
         int is_invalid_result =
                 print_results(in, mype, omp_end - omp_start, nprocs, verification);
 
-	print_profile(profile, in);
+        print_profile(profile, in);
+    }
 
-	return is_invalid_result;
+    return is_invalid_result;
 }

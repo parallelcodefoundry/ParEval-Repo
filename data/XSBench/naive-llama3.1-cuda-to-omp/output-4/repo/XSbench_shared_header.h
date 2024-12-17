@@ -1,28 +1,7 @@
 #ifndef XSBENCH_SHARED_HEADER_H
 #define XSBENCH_SHARED_HEADER_H
 
-#include <omp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <assert.h>
-#include "omp_offload.h"
-
-// Grid types
-#define UNIONIZED 0
-#define NUCLIDE 1
-#define HASH 2
-
-// Simulation types
-#define HISTORY_BASED 1
-#define EVENT_BASED 2
-
-// Binary Mode Type
-#define NONE 0
-#define READ 1
-#define WRITE 2
-
-#define STARTING_SEED 1070
+// Header for shared utilities across XSBench versions
 
 typedef struct{
         int nthreads;

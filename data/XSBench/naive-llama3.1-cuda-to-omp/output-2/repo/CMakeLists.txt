@@ -1,24 +1,28 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(
-    XSBench_OpenMP
+    XSBench_OPENMP
     VERSION 1.0
-    LANGUAGES CXX CUDA
+    LANGUAGES CXX
+    OFFLOAD_TARGETS nvidia, host
+    OMPTargets CUDA
 )
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable OpenMP for offloading
-set(CMAKE_C_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS "-fopenmp")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-# Include necessary compiler flags and libraries
-include_directories(/usr/include/offload)
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
+
+set_source_files_properties(${SOURCE} PROPERTIES LANGUAGE C)
+set_property(TARGET ${TARGET} PROPERTY OMPCudaDeviceFlags -arch=sm_80)
 
 add_executable(XSBench ${SOURCE})
 
-target_link_libraries(XSBench pthread openmp offline-capable cuda)
-
 install(TARGETS XSBench DESTINATION bin)
+
+target_link_libraries( XSBench OPENMP::OFFLOAD )

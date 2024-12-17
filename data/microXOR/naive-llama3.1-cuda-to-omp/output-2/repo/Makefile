@@ -1,20 +1,33 @@
-# OpenMP-offload Makefile
-CXX = $(CXX_COMPILER)
-SM_VERSION := $(SM_VERSION)
-OFFLOAD_DEVICES = nvidia
-OFFLOAD_ARCHS = $(SM_VERSION)
+# Makefile for OpenMP-offload microXOR
 
-default: main.cpp microXOR.cpp
-	$(CXX) -fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS) $^ -o main
+CXX ?= g++
+SM_VERSION ?= 80
+OFFLOAD_COMPILER ?= cl-clang++
+OFFLOAD_FLAGS ?= -ccbin=nvcc --offload-architecture=${SM_VERSION}
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+
+CXX_COMPILER ?= clang++
+
+INC = include
+SRC = src
+OBJ = obj
+DEPS = $(INC)/microXOR.hpp
+CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
+
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) -fopenmp-targets=nvptx64-nvidia-cc${SM_VERSION} -I$(INC) $(OFFLOAD_FLAGS) $(OBJS) -o $(EXE)
+
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX_COMPILER) $(CXXFLAGS) -fopenmp-targets=nvptx64-nvidia-cc${SM_VERSION} -I$(INC) -c $< -o $@
+
+obj:
+	mkdir -p $(OBJ)
 
 clean:
-	rm -rf main
-
-%.o : %.cpp
-	$(CXX) -c -fopenmp -foffload=$(OFFLOAD_DEVICES),arch=$(OFFLOAD_ARCHS) $< -o $@
-
-microXOR.o: microXOR.cpp
-main.o: main.cpp
-
-microXOR.cpp:
-main.cpp:
+	rm -f $(OBJS) $(EXE)

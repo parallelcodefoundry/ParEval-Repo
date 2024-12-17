@@ -1,38 +1,24 @@
-```c
-// microXOR header file
+Here's the translation of `include/microXOR.cuh` to the OpenMP Offload execution model:
 
-#ifndef MICROXOR_CUH
-#define MICROXOR_CUH
+```cpp
+#ifndef MICROXOR_H
+#define MICROXOR_H
 
 #include <iostream>
 #include <random>
 #include <omp.h>
 
-void cellsXOR(const int *input, int *output, size_t N) {
-  #pragma omp declare target
-  {
-    #pragma omp parallel for
-    for (size_t i = 0; i < N*N; i++) {
-      int count = 0;
-      if (i > 0 && input[(int)((i-1)/N)*N + (int)(i%N)] == 1) count++;
-      if (i < N*N - 1 && input[(int)((i+1)/N)*N + (int)((i+1)%N)] == 1) count++;
-      if (i > N && input[(int)((i-1)/N)*N + (int)((i-1)%N)] == 1) count++;
-      if (i < N*N - N && input[(int)((i+N-1)/N)*N + (int)((i+N-1)%N)] == 1) count++;
-      output[i] = (count == 1) ? 1 : 0;
-    }
-  }
-}
-
+#ifdef __OFFLOAD
+  #define DEVICE omp_target_device_num(0)
+#else
+  #define DEVICE 0
 #endif
+
+__attribute__((offload(DEVICE, none))) void cellsXOR(int *input, int *output, size_t N);
+
+#endif  // MICROXOR_H
 ```
 
-Note that the `#pragma omp declare target` directive is used to specify the device where the parallel region should be executed. The `cellsXOR` function is now a host function, and it launches a parallel loop on the specified target (device). Each iteration of the loop corresponds to a thread, which computes the value of the corresponding output element.
+Note that in the OpenMP Offload model, kernels are not defined with `__global__` but rather as a function decorated with `offload(none)` to indicate that it is an offloaded kernel. This means no threads will be spawned on host, and execution will happen solely on-device.
 
-The use of OpenMP directives for parallelization in this example follows the general structure:
-
-*   The `#pragma omp declare target` directive is used to specify the device where the parallel region should be executed.
-*   The `#pragma omp parallel for` directive is used to launch a parallel loop, with each iteration corresponding to a thread. This directive is typically used in conjunction with OpenMP's `target` clause.
-
-Also note that this translation is based on the assumption that you want to run your code on an offloading architecture (e.g., GPU), where the OpenMP directives are used to specify the parallel execution environment and the data transfers between host and device. If you're working on a multi-core CPU, you might need to use different compilation flags or directives.
-
-To compile this code with OpenMP support for offloading, you can add the following flag: `-fopenmp -std=c++11`.
+The `.cuh` file has been renamed to `.h` for consistency with the OpenMP Offload naming conventions.

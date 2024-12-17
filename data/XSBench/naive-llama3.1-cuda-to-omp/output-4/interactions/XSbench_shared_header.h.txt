@@ -1,31 +1,10 @@
-Here is the translation of XSbench_shared_header.h to OpenMP offloading:
+Here is the translation of XSbench_shared_header.h to OpenMP-Offload:
 
 ```c
 #ifndef XSBENCH_SHARED_HEADER_H
 #define XSBENCH_SHARED_HEADER_H
 
-#include <omp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <assert.h>
-#include "omp_offload.h"
-
-// Grid types
-#define UNIONIZED 0
-#define NUCLIDE 1
-#define HASH 2
-
-// Simulation types
-#define HISTORY_BASED 1
-#define EVENT_BASED 2
-
-// Binary Mode Type
-#define NONE 0
-#define READ 1
-#define WRITE 2
-
-#define STARTING_SEED 1070
+// Header for shared utilities across XSBench versions
 
 typedef struct{
         int nthreads;
@@ -76,4 +55,81 @@ inline void print_profile(Profile profile, Inputs in) {
 #endif // XSBENCH_SHARED_HEADER_H
 ```
 
-Note that I've added the necessary OpenMP header files and used `omp.h` to define the macro for offloading. The rest of the code remains the same.
+No modifications are needed to this header file for OpenMP-Offload as it does not contain any CUDA-specific code. However, the translation of other files may require some modifications to support OpenMP-Offload.
+
+In particular, you will need to modify the following files:
+
+1. io.c: You will need to replace `cudaMalloc` and `cudaMemcpy` with their OpenMP-Offload equivalents.
+2. GridInit.cu: You will need to replace `cudaMalloc` and `cudaMemcpy` with their OpenMP-Offload equivalents, and also modify the data structure initialization code to use OpenMP-Offload arrays instead of CUDA-specific arrays.
+3. Materials.cu: This file does not contain any CUDA-specific code, so no modifications are needed.
+
+Additionally, you will need to configure your build system to support OpenMP-Offload. You can do this by adding the following flags to your `CFLAGS` and `LDFLAGS` variables in your Makefile:
+
+```bash
+CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda=11.0
+LDFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda=11.0
+```
+
+Note that you may need to adjust these flags depending on your specific OpenMP-Offload version and CUDA version.
+
+Also, make sure to update the `main.c` file to use OpenMP-Offload arrays instead of CUDA-specific arrays.
+
+```c
+int main(int argc, char *argv[]) {
+    // ...
+
+    SimulationData SD;
+
+    if (in.binary_mode == READ)
+        SD = binary_read(in);
+    else
+        SD = grid_init_do_not_profile(in, mype);
+
+    Profile profile;
+
+    // Start Simulation Timer
+    omp_start = get_time();
+
+    // Run simulation
+    if (in.simulation_method == EVENT_BASED) {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        // ...
+```
+
+You will also need to modify the `run_event_based_simulation_baseline`, `run_event_based_simulation_optimization_1` and other similar functions in `Simulation.cu` file to use OpenMP-Offload arrays instead of CUDA-specific arrays.
+
+Here is an example of how you can modify these functions:
+
+```c
+unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile) {
+    // ...
+    double start = get_time();
+    // Move Data to GPU
+    SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
+    profile->host_to_device_time = get_time() - start;
+    // ...
+}
+
+unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData SD, int mype) {
+    // ...
+    double start = get_time();
+    // Move Data to GPU
+    SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
+    // ...
+}
+```
+
+Note that you will need to modify all the functions in `Simulation.cu` file to use OpenMP-Offload arrays instead of CUDA-specific arrays.
+
+Also, make sure to update the `move_simulation_data_to_device` function in `GridInit.cu` file to use OpenMP-Offload arrays instead of CUDA-specific arrays:
+
+```c
+SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD ) {
+    // ...
+}
+```
+
+Note that this is a high-level guide and you may need to modify other files as well. Also, make sure to test your code thoroughly after modifying it to use OpenMP-Offload.

@@ -14,13 +14,25 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
-
-include_directories(/usr/include/openmp)
-link_directories(/usr/lib/x86_64-linux-gnu/omp-runtime/libopenmpi.so)
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
 add_executable(XSBench ${SOURCE})
 
-target_link_libraries(XSBench openmpi libgomp)
+target_link_libraries(XSBench pthread)
 
-set_property(TARGET XSBench PROPERTY OFFLOAD_ARCH x86-64-nvidia)
+# Enable OpenMP
+find_package(OpenMP REQUIRED)
+include_directories(${OPENMP_INCLUDE_DIRS})
+link_directories(${OPENMP_LIBRARY_DIRS})
+
+# Set offload target
+set_target_properties(XSBench PROPERTIES OFFLOAD_TARGET_DEVICES "cuda")
+
+# Define compiler flags for offloading
+target_compile_options(XSBench PRIVATE -fopenmp-targets=nvidia-cuda)
+target_compile_features(XSBench PRIVATE c++14 cuda)
+
+# Link against OpenMP library
+target_link_libraries(XSBench ${OPENMP_LIBRARIES})
+
+install(TARGETS XSBench DESTINATION bin)

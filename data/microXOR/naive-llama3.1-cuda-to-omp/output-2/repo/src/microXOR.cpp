@@ -1,15 +1,28 @@
-// microXOR kernel using OpenMP and offloading to GPU
+// microXOR kernel in OpenMP offloading model
 
 #include <omp.h>
-#include "microXOR.cuh"
-#include <cuda_runtime.h>
+#include "microXOR.hpp"
 
-#pragma omp declare target (gpu)
+/* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.
+   Note that we only consider neighbors and not input_{i,j} when computing output_{i,j}.
+   input and output are NxN grids of ints in row-major.
+   Use OpenMP offloading for execution. The kernel is launched on an NxN grid of threads.
+   Example:
 
-void cellsXOR(const int *input, int *output, size_t N) {
+   input: [[0, 1, 1, 0],
+           [1, 0, 0, 0],
+           [0, 0, 0, 0],
+           [0, 1, 0, 0]
+   output: [[0, 0, 1, 1],
+            [1, 0, 0, 1],
+            [0, 0, 1, 0],
+            [1, 0, 1, 0]]
+*/
+void cellsXOR(int *input, int *output, size_t N) {
+  #pragma omp offload target(mic)
   #pragma omp parallel for
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
       int count = 0;
       if (i > 0 && input[(i-1)*N + j] == 1) count++;
       if (i < N-1 && input[(i+1)*N + j] == 1) count++;
@@ -18,12 +31,6 @@ void cellsXOR(const int *input, int *output, size_t N) {
       output[i*N + j] = (count == 1) ? 1 : 0;
     }
   }
-}
 
-// Launch the kernel on the GPU
-void launch_kernel(const int *input, int *output, size_t N) {
-  #pragma omp target map(to: input[0:N*N], output[0:N*N])
-  {
-    cellsXOR(input, output, N);
-  }
+  #pragma omp target exit(data)
 }
