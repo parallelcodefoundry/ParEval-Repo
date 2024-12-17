@@ -1,26 +1,34 @@
 """Naively translates a repository file-by-file from one execution model to
-   another execution model using an Ollama model
+   another execution model using an locally-hosted vLLM model
 """
 # std imports
 import os
 import sys
 
 # tpl imports
-from ollama import chat
-from ollama import ChatResponse
+from openai import OpenAI
 
 # local imports
 sys.path.append(os.path.dirname(__file__))
 from naive_translator import NaiveTranslator
 from repo import Repo
 
-class NaiveOllamaTranslator(NaiveTranslator):
+class NaiveVLLMTranslator(NaiveTranslator):
 
     def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str, output_id: int, app_name: str, llm_name: str, dst_config: os.PathLike):
         super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name, llm_name, dst_config)
-        self._model = None
+        self._model = OpenAI(
+            base_url="http://localhost:8000/v1",
+            api_key="token-abc123"
+        )
 
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
+        if self._llm_name == 'llama3.3':
+            self._llm_name = 'meta-llama/Llama-3.3-70B-Instruct'
+        elif self._llm_name == 'llama3.2':
+            self._llm_name = 'meta-llama/Llama-3.2-3B-Instruct'
+        elif self._llm_name == 'llama3.1':
+            self._llm_name = 'meta-llama/Llama-3.1-8B-Instruct'
         completion = chat(model=self._llm_name,
                           messages=[{"role": "system", "content": system_prompt},
                                     {"role": "user", "content": prompt}],

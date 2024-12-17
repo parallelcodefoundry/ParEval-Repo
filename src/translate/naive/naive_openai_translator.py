@@ -28,10 +28,8 @@ class NaiveOpenAITranslator(NaiveTranslator):
             model = "gpt-4o"
         completion = self._model.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "system", "content": system_prompt},
+                      {"role": "user", "content": prompt}],
             max_tokens=4096,
             temperature=0.2,
             top_p=0.96,
