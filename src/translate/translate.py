@@ -16,7 +16,8 @@ from repo import Repo
 from translator import Translator
 from naive.naive_openai_translator import NaiveOpenAITranslator
 from naive.naive_gemini_translator import NaiveGeminiTranslator
-from naive.naive_llama_translator import NaiveLlamaTranslator
+from naive.naive_ollama_translator import NaiveOllamaTranslator
+from naive.naive_vllm_translator import NaiveVLLMTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -44,7 +45,7 @@ def get_translator_cls(method: str, naive_llm: str):
         if naive_llm == "gemini":
             return NaiveGeminiTranslator
         if "llama" in naive_llm:
-            return NaiveLlamaTranslator
+            return NaiveVLLMTranslator
         else:
             return NaiveOpenAITranslator
     else:
