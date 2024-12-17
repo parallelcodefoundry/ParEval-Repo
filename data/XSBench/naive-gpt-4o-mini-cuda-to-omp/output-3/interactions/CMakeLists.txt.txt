@@ -17,24 +17,20 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
-
-# Specify OpenMP as the parallelization model
-find_package(OpenMP REQUIRED)
-
-if(OpenMP_CXX_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-endif()
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
 add_executable(XSBench ${SOURCE})
+
+# Enable OpenMP support
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(XSBench PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 install(TARGETS XSBench DESTINATION bin)
 ```
 
 ### Changes Made:
-1. The project name has been changed to `XSBench_OpenMP` to reflect the new execution model.
-2. The CUDA language specification has been removed since we are transitioning to OpenMP.
-3. The `find_package(OpenMP REQUIRED)` line has been added to locate the OpenMP package.
-4. The OpenMP flags are appended to the `CMAKE_CXX_FLAGS` if OpenMP is found. 
-
-This configuration will allow you to compile the project using OpenMP for parallel execution.
+1. Changed the project name to `XSBench_OpenMP` to reflect the new execution model.
+2. Removed CUDA-specific settings and replaced them with OpenMP settings.
+3. Added a check for OpenMP support and linked the OpenMP library to the executable.

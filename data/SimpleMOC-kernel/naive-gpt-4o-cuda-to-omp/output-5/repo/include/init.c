@@ -1,27 +1,14 @@
 #include "SimpleMOC-kernel_header.h"
 #include <omp.h>
-
-// Initialize random number generator states
-void setup_kernel(curandState *state, Input I) {
-    #pragma omp target teams distribute parallel for
-    for (int threadId = 0; threadId < I.streams; ++threadId) {
-        // OpenMP doesn't have a direct equivalent to curand_init, so we use a simple seed
-        unsigned int seed = 1234 + threadId;
-        state[threadId] = seed; // Store the seed directly as state
-    }
-}
+#include <stdlib.h>
 
 // Initialize global flux states to random numbers on device
-void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state) {
-    #pragma omp target teams distribute parallel for collapse(2)
-    for (int blockId = 0; blockId < N_flux_states; ++blockId) {
-        for (int g = 0; g < I.egroups; ++g) {
-            // Assign RNG state
-            unsigned int localState = state[blockId % I.streams];
-
-            // Generate a random number using a simple linear congruential generator
-            localState = (1103515245 * localState + 12345) & 0x7fffffff;
-            flux_states[blockId * I.egroups + g] = (float)localState / 0x7fffffff;
+void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int seed) {
+    #pragma omp target teams distribute parallel for
+    for (int blockId = 0; blockId < N_flux_states; blockId++) {
+        unsigned int localState = seed + blockId;
+        for (int i = 0; i < I.egroups; i++) {
+            flux_states[blockId * I.egroups + i] = rand_r(&localState) / (float)RAND_MAX;
         }
     }
 }
@@ -101,7 +88,6 @@ Source *initialize_sources(Input I, Source_Arrays *SA) {
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    #pragma omp target enter data map(to: SA_d[:1])
     #pragma omp target enter data map(alloc: SA_d->fine_source_arr[0:N_fine])
     #pragma omp target update to(SA_d->fine_source_arr[0:N_fine])
 
@@ -130,7 +116,7 @@ Table buildExponentialTable(void) {
     //float precision = 0.01;
     float maxVal = 10.0;
 
-    // compute number of array values
+    // compute number of arry values
     //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
     int N = 353;
 
@@ -151,26 +137,4 @@ Table buildExponentialTable(void) {
     table.N = N;
 
     return table;
-}
-
-void __cudaCheckError(const char *file, const int line) {
-#ifdef CUDA_ERROR_CHECK
-    cudaError err = cudaGetLastError();
-    if (cudaSuccess != err) {
-        fprintf(stderr, "cudaCheckError() failed at %s:%i : %s\n",
-                file, line, cudaGetErrorString(err));
-        exit(-1);
-    }
-
-    // More careful checking. However, this will affect performance.
-    // Comment away if needed.
-    err = cudaDeviceSynchronize();
-    if (cudaSuccess != err) {
-        fprintf(stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
-                file, line, cudaGetErrorString(err));
-        exit(-1);
-    }
-#endif
-
-    return;
 }

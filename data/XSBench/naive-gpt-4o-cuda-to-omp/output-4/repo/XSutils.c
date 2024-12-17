@@ -1,12 +1,11 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <omp.h>
 
-int double_compare(const void *a, const void *b) {
-    double A = *((double *)a);
-    double B = *((double *)b);
+int double_compare(const void * a, const void * b) {
+    double A = *((double *) a);
+    double B = *((double *) b);
 
     if (A > B)
         return 1;
@@ -16,9 +15,9 @@ int double_compare(const void *a, const void *b) {
         return 0;
 }
 
-int NGP_compare(const void *a, const void *b) {
-    NuclideGridPoint A = *((NuclideGridPoint *)a);
-    NuclideGridPoint B = *((NuclideGridPoint *)b);
+int NGP_compare(const void * a, const void * b) {
+    NuclideGridPoint A = *((NuclideGridPoint *) a);
+    NuclideGridPoint B = *((NuclideGridPoint *) b);
 
     if (A.energy > B.energy)
         return 1;
@@ -40,7 +39,7 @@ double rn_v(void) {
     unsigned long m = 2147483647;
     n1 = (a * (seed)) % m;
     seed = n1;
-    ret = (double)n1 / m;
+    ret = (double) n1 / m;
     return ret;
 }
 
@@ -58,7 +57,7 @@ size_t estimate_mem_usage(Inputs in) {
     else
         memtotal = all_nuclide_grids + size_hash_grid;
 
-    memtotal = ceil(memtotal / (1024.0 * 1024.0));
+    memtotal = (size_t) ceil(memtotal / (1024.0 * 1024.0));
     return memtotal;
 }
 

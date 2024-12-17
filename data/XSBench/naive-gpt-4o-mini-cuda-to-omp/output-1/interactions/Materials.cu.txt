@@ -1,8 +1,10 @@
-Here is the translated `Materials.cu` file to the OpenMP Offload execution model:
+Here is the translated `Materials.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
+#include <stdlib.h>
+#include <string.h>
 
 // num_nucs represents the number of nuclides that each material contains
 int * load_num_nucs(long n_isotopes)
@@ -41,7 +43,7 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
         if (num_nucs[m] > *max_num_nucs)
             *max_num_nucs = num_nucs[m];
     }
-    int * mats = (int *)malloc(num_mats * (*max_num_nucs) * sizeof(int));
+    int * mats = (int *) malloc(num_mats * (*max_num_nucs) * sizeof(int));
 
     // Small H-M has 34 fuel nuclides
     int mats0_Sml[] = { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
@@ -54,7 +56,7 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
     for (int i = 0; i < 321 - 34; i++)
         mats0_Lrg[34 + i] = 68 + i; // H-M large adds nuclides to fuel only
 
-    // These are the non-fuel materials	
+    // These are the non-fuel materials
     int mats1[] = { 63, 64, 65, 66, 67 }; // cladding
     int mats2[] = { 24, 41, 4, 5 }; // cold borated water
     int mats3[] = { 24, 41, 4, 5 }; // hot borated water
@@ -100,9 +102,9 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
 double * load_concs(int * num_nucs, int max_num_nucs)
 {
     uint64_t seed = STARTING_SEED * STARTING_SEED;
-    double * concs = (double *)malloc(12 * max_num_nucs * sizeof(double));
+    double * concs = (double *) malloc(12 * max_num_nucs * sizeof(double));
 
-    #pragma omp target teams distribute parallel for collapse(2)
+    #pragma omp target teams distribute parallel for
     for (int i = 0; i < 12; i++)
         for (int j = 0; j < num_nucs[i]; j++)
             concs[i * max_num_nucs + j] = LCG_random_double(&seed);
@@ -111,9 +113,9 @@ double * load_concs(int * num_nucs, int max_num_nucs)
 }
 ```
 
-### Key Changes Made:
-1. **OpenMP Directives**: Added `#pragma omp target teams distribute parallel for collapse(2)` to parallelize the loop for loading concentrations.
-2. **Memory Management**: The memory allocation and copying remain the same, as they are not specific to the execution model.
-3. **Kernel Launches**: Removed CUDA kernel launches and replaced them with OpenMP parallel constructs.
+### Key Changes:
+1. **OpenMP Directives**: Added `#pragma omp target teams distribute parallel for` to parallelize the `load_concs` function for offloading to the target device.
+2. **Memory Management**: The code assumes that memory allocation and deallocation is handled similarly to CUDA, but you may need to adjust memory management based on your specific OpenMP Offload implementation.
+3. **Function Signatures**: Changed the file extension and included the appropriate header files for C.
 
-This code is now structured to work with OpenMP Offload, which allows for offloading computations to a target device (like a GPU) while using OpenMP's parallelization capabilities.
+Make sure to adjust the rest of the codebase accordingly to ensure compatibility with the OpenMP Offload model.

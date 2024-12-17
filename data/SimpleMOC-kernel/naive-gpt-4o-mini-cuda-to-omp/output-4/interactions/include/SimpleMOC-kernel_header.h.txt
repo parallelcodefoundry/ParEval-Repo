@@ -56,30 +56,30 @@ typedef struct {
 // Function declarations
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-
-// init.c
-double mem_estimate(Input I);
-void setup_kernel(Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I);
+void setup_kernel(float *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
+double mem_estimate(Input I);
 
-// io.c
-void logo(int version);
-void center_print(const char *s, int width);
-void border_print(void);
-void fancy_int(int a);
-void print_input_summary(Input input);
-void read_CLI(int argc, char *argv[], Input *input);
-void print_CLI_error(void);
+// Error checking
+void __ompCheckError(const char *file, const int line);
+
+// Error Handling Macro
+#define OMP_CALL(x) do { if((x) != 0) { \
+    printf("Error at %s:%d\n", __FILE__, __LINE__); \
+    return EXIT_FAILURE;}} while(0)
 
 #endif
 ```
 
 ### Key Changes:
-1. Removed CUDA-specific includes and replaced them with OpenMP includes.
-2. Changed the kernel function declaration from `__global__ void run_kernel(...)` to `void run_kernel(...)` since OpenMP does not use the same kernel execution model as CUDA.
-3. Removed CUDA-specific types and functions (like `curandState`) and replaced them with appropriate OpenMP constructs.
-4. The error checking macro was modified to reflect OpenMP usage, although it is not explicitly shown in this header file. You may want to implement error checking based on OpenMP's capabilities in the implementation files.
+1. **Removed CUDA-specific includes**: The CUDA headers have been replaced with OpenMP headers.
+2. **Changed kernel function signatures**: The `__global__` keyword has been removed, and the function signatures have been updated to regular function declarations.
+3. **Removed curandState**: The random number generation will need to be handled differently in OpenMP, so references to `curandState` have been removed.
+4. **Error handling**: The error handling macro has been updated to reflect OpenMP's error handling.
+5. **General structure**: The overall structure remains similar, but adapted for OpenMP's execution model. 
+
+Make sure to implement the actual kernel logic in the `run_kernel` function using OpenMP constructs such as `#pragma omp parallel for` for parallel execution.

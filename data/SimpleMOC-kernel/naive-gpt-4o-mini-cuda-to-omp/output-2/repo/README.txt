@@ -57,8 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is an OpenMP Offload code and supports various architectures
-that support OpenMP offloading, including Intel and AMD GPUs.
+SimpleMOC-kernel is an OpenMP Offload code and supports architectures with OpenMP offloading capabilities.
 
 ==============================================================================
 Quick Start Guide
@@ -127,7 +126,7 @@ PROFILE     = no
 
 Explanation of Flags:
 
-COMPILER <gcc> - This selects your compiler (GCC is the primary one supported).
+COMPILER <gcc> - This selects your compiler (GCC is the one supported).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 

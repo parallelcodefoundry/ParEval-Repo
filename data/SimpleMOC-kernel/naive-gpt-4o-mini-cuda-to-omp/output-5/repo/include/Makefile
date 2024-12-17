@@ -28,7 +28,7 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx-nvidia-cuda -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -I/usr/local/cuda/include
 
 # Linker Flags
 LDFLAGS = -lm -lcurand
@@ -58,10 +58,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) SimpleMOC-kernel_header.h
-	$(CXX) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CXX) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

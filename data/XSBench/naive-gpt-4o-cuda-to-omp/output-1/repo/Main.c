@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {

@@ -27,14 +27,11 @@ obj = $(source:.c=.o)
 # Sets Flags
 #===============================================================================
 
-# Compiler
-CC = $(COMPILER)
-
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_$(SM_VERSION) -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcudart -lcurand
+LDFLAGS = -lm -fopenmp -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcurand
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -48,7 +45,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3
+	CFLAGS += -O3 -ffast-math
 endif
 
 # Exponential Table Build
@@ -61,10 +58,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) SimpleMOC-kernel_header.h
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

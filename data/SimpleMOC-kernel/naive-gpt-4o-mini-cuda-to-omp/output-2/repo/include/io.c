@@ -87,7 +87,7 @@ void print_input_summary(Input I)
         cudaGetDeviceProperties(&prop, device);
         printf("%-25s%s\n", "CUDA Device: ", prop.name); 
     }
-    
+
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);

@@ -1,7 +1,7 @@
 #include "SimpleMOC-kernel_header.h"
 #include <omp.h>
 
-// Initialize the random number generator states
+// Initialize random number generator states
 void setup_kernel(curandState *state, Input I) {
     #pragma omp target teams distribute parallel for
     for (int threadId = 0; threadId < I.streams; ++threadId) {
@@ -14,7 +14,6 @@ void init_flux_states(float *flux_states, int N_flux_states, Input I, curandStat
     #pragma omp target teams distribute parallel for
     for (int blockId = 0; blockId < N_flux_states; ++blockId) {
         curandState localState = state[blockId % I.streams];
-
         for (int i = 0; i < I.egroups; ++i) {
             flux_states[blockId * I.egroups + i] = curand_uniform(&localState);
         }
@@ -121,11 +120,9 @@ Table buildExponentialTable(void) {
     // define table
     Table table;
 
-    //float precision = 0.01;
     float maxVal = 10.0;
 
     // compute number of array values
-    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
     int N = 353;
 
     // compute spacing
@@ -148,7 +145,23 @@ Table buildExponentialTable(void) {
 }
 
 void __cudaCheckError(const char *file, const int line) {
-    // OpenMP offload error checking can be done using OpenMP's error handling mechanisms
-    // Here we just print a message as a placeholder
-    fprintf(stderr, "Check for errors in OpenMP offload at %s:%i\n", file, line);
+#ifdef CUDA_ERROR_CHECK
+    cudaError err = cudaGetLastError();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "cudaCheckError() failed at %s:%i : %s\n",
+                file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+
+    // More careful checking. However, this will affect performance.
+    // Comment away if needed.
+    err = cudaDeviceSynchronize();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
+                file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+#endif
+
+    return;
 }

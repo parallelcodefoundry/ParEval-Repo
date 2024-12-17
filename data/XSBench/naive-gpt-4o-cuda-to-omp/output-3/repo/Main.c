@@ -1,5 +1,4 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -78,7 +77,7 @@ int main(int argc, char *argv[]) {
         }
     } else {
         printf(
-            "History-based simulation not implemented in OpenMP-offload code. Instead,\nuse "
+            "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
             "the event-based method with \"-m event\" argument.\n");
         exit(1);
     }

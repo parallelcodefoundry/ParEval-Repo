@@ -49,4 +49,21 @@ inline void print_profile(Profile profile, Inputs in) {
   }
 }
 
+// Memory management functions for OpenMP offload
+void* omp_malloc(size_t size) {
+    void* ptr;
+    #pragma omp target enter data map(alloc: ptr) if(target)
+    {
+        ptr = malloc(size);
+    }
+    return ptr;
+}
+
+void omp_free(void* ptr) {
+    #pragma omp target exit data map(delete: ptr) if(target)
+    {
+        free(ptr);
+    }
+}
+
 #endif // XSBENCH_SHARED_HEADER_H

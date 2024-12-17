@@ -58,7 +58,7 @@ Architectural Support
 ==============================================================================
 
 SimpleMOC-kernel is an OpenMP offload code and supports various architectures
-that can utilize OpenMP for parallel execution, including CPUs and GPUs.
+with OpenMP offload capabilities.
 
 ==============================================================================
 Quick Start Guide
@@ -102,7 +102,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -t <threads>          Number of threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per OpenMP thread
+	  -p <segs per thread>  Number of segments per OpenMP task
 	
 
 	If no options are specified, then a default set of parameters will
@@ -127,7 +127,7 @@ PROFILE     = no
 
 Explanation of Flags:
 
-COMPILER <gcc> - This selects your compiler (GCC is one of the supported compilers).
+COMPILER <gcc> - This selects your compiler (GCC is the primary supported).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
@@ -169,3 +169,5 @@ doi = "https://doi.org/10.1016/j.cpc.2016.01.007",
 url = "http://www.sciencedirect.com/science/article/pii/S0010465516000266",
 author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Benoit Forget and Andrew R. Siegel",
 }
+
+===============================================================================

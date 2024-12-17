@@ -1,4 +1,4 @@
-Here is the translated `src/main.cu` file using the OpenMP Offload execution model:
+Here is the translated `src/main.cpp` file using the OpenMP offload execution model:
 
 ```cpp
 // microXOR driver
@@ -6,25 +6,11 @@ Here is the translated `src/main.cu` file using the OpenMP Offload execution mod
 #include <iostream>
 #include <random>
 #include <omp.h>
+#include "microXOR.hpp"
 
 void cleanup(int *input, int *output) {
   delete[] input;
   delete[] output;
-}
-
-void cellsXOR(const int *input, int *output, size_t N, size_t blockEdge) {
-  #pragma omp target teams distribute parallel for collapse(2) \
-    map(to: input[0:N*N]) map(from: output[0:N*N])
-  for (size_t i = 0; i < N; i++) {
-    for (size_t j = 0; j < N; j++) {
-      int count = 0;
-      if (i > 0 && input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-      output[i*N + j] = (count == 1) ? 1 : 0;
-    }
-  }
 }
 
 int main(int argc, char **argv) {
@@ -58,7 +44,20 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  cellsXOR(input, output, N, blockEdge);
+  #pragma omp target data map(to: input[0:N*N]) map(from: output[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for collapse(2) thread_limit(blockEdge*blockEdge)
+    for (size_t i = 0; i < N; i++) {
+      for (size_t j = 0; j < N; j++) {
+        int count = 0;
+        if (i > 0 && input[(i-1)*N + j] == 1) count++;
+        if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+        if (j > 0 && input[i*N + (j-1)] == 1) count++;
+        if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+        output[i*N + j] = (count == 1) ? 1 : 0;
+      }
+    }
+  }
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {
@@ -90,7 +89,9 @@ int main(int argc, char **argv) {
 ```
 
 ### Key Changes:
-- Removed CUDA-specific memory management (`cudaMalloc`, `cudaMemcpy`) and replaced it with OpenMP Offload directives.
-- The `cellsXOR` function is now a regular function with an OpenMP target directive to offload computation to the GPU.
-- Used `#pragma omp target teams distribute parallel for collapse(2)` to parallelize the nested loops over the 2D grid.
-- Removed the CUDA-specific cleanup function for device memory, as OpenMP handles memory mapping automatically.
+1. **Header File Inclusion**: Changed from `microXOR.cuh` to `microXOR.hpp` assuming the header file will be translated to C++ as well.
+2. **Memory Management**: Removed explicit device memory management (`cudaMalloc`, `cudaMemcpy`, `cudaFree`) and used OpenMP's `target data` directive to manage data transfer between host and device.
+3. **Kernel Launch**: Replaced the CUDA kernel launch with OpenMP's `target teams distribute parallel for` construct, using `collapse(2)` to handle the 2D grid and `thread_limit` to control the number of threads per block.
+4. **Validation**: The validation logic remains unchanged as it operates on the host.
+
+This translation assumes that the OpenMP offloading infrastructure is properly set up and that the target device supports OpenMP offloading.

@@ -1,4 +1,4 @@
-Here is the translated `XSbench_shared_header.h` file for the OpenMP Offload execution model:
+Here is the translated `XSbench_shared_header.h` file for the OpenMP offload execution model. The changes primarily involve replacing CUDA-specific constructs with OpenMP constructs, particularly for memory management and kernel execution.
 
 ```c
 #ifndef XSBENCH_SHARED_HEADER_H
@@ -52,12 +52,28 @@ inline void print_profile(Profile profile, Inputs in) {
   }
 }
 
+// Memory management functions for OpenMP offload
+void* omp_malloc(size_t size) {
+    void* ptr;
+    #pragma omp target enter data map(alloc: ptr) if(target)
+    {
+        ptr = malloc(size);
+    }
+    return ptr;
+}
+
+void omp_free(void* ptr) {
+    #pragma omp target exit data map(delete: ptr) if(target)
+    {
+        free(ptr);
+    }
+}
+
 #endif // XSBENCH_SHARED_HEADER_H
 ```
 
-### Changes Made:
-1. The structure definitions remain the same since they are not specific to CUDA or OpenMP.
-2. The function `print_profile` is unchanged as it deals with file I/O and printing, which is not dependent on the execution model.
-3. The overall structure and logic of the header file are preserved, as they are compatible with both CUDA and OpenMP Offload. 
+### Key Changes:
+1. **Memory Management**: Added `omp_malloc` and `omp_free` functions to handle memory allocation and deallocation for OpenMP offload. These functions use OpenMP target directives to manage memory on the device.
+2. **Kernel Execution**: The kernel execution will be handled in the corresponding `.c` files where the OpenMP offload pragmas will be added to the relevant functions. This header file does not directly handle kernel execution, so no changes were made in that regard here. 
 
-This header file can be used in an OpenMP Offload context without modification to the core logic. The actual offloading of computations would occur in the implementation files where the kernels are defined.
+Make sure to adjust the corresponding `.c` files to use these memory management functions and to include OpenMP directives for offloading computations to the target device.

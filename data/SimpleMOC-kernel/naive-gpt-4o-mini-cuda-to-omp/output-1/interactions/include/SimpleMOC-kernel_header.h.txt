@@ -56,8 +56,8 @@ typedef struct {
 // Function declarations
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-void setup_kernel(Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I);
+void setup_kernel(float *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
@@ -65,20 +65,19 @@ Input set_default_input(void);
 double mem_estimate(Input I);
 
 // Error handling
-void check_omp_error(int err, const char *file, const int line);
+void __ompCheckError(const char *file, const int line);
 
-// Macros for error checking
-#define OMP_CALL(x) do { int err = (x); if (err != 0) { check_omp_error(err, __FILE__, __LINE__); }} while(0)
+#define OmpCheckError() __ompCheckError(__FILE__, __LINE__)
 
 #endif
 ```
 
-### Changes Made:
-1. Removed CUDA-specific includes and replaced them with OpenMP includes.
-2. Changed the kernel function declaration from `__global__ void run_kernel(...)` to `void run_kernel(...)` to indicate it will be run on the host and offloaded to the device.
-3. Removed the `curandState` and CUDA-specific random number generation functions, as they will need to be replaced with OpenMP-compatible alternatives.
-4. Added a function declaration for `setup_kernel` and `init_flux_states` without the `__global__` qualifier.
-5. Added error handling macros and functions suitable for OpenMP.
-6. Adjusted the structure to remove CUDA-specific types and functions, focusing on OpenMP constructs. 
+### Key Changes:
+1. **Header Guards**: Kept the same.
+2. **Removed CUDA Includes**: Removed CUDA-specific headers and replaced them with OpenMP headers.
+3. **Function Signatures**: Changed the kernel function signature to a regular function signature since OpenMP does not use `__global__`.
+4. **Random Number Generation**: Removed `curandState` and related functions, as OpenMP does not have a direct equivalent. You may need to implement a different random number generation strategy suitable for OpenMP.
+5. **Error Handling**: Adjusted the error handling macro to reflect OpenMP error checking.
+6. **Removed CUDA-specific Types**: Removed types and functions specific to CUDA, such as `cudaMalloc`, `cudaMemcpy`, etc. 
 
-This header file is now ready for use in an OpenMP Offload context.
+Make sure to implement the actual logic for the `run_kernel` function and other functions in the corresponding `.c` files, adapting them to use OpenMP constructs (like `#pragma omp target` for offloading).

@@ -1,3 +1,5 @@
+Here is the translated Makefile for the openmp-offload execution model:
+
 ```Makefile
 #===============================================================================
 # User Options
@@ -29,10 +31,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcurand
+LDFLAGS = -lm -fopenmp -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcurand
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -74,4 +76,4 @@ run:
 	./$(program)
 ```
 
-This Makefile is adapted for OpenMP offloading using the `clang` compiler targeting NVIDIA GPUs. It assumes that the user will provide the appropriate flags and paths for their specific environment, as indicated in the problem statement. The `-fopenmp` and `-fopenmp-targets=nvptx64` flags are used to enable OpenMP offloading to NVIDIA GPUs, and the `-Xopenmp-target -march=sm_$(SM_VERSION)` flag specifies the GPU architecture.
+This Makefile is configured to use `clang` as the compiler with OpenMP offloading to NVIDIA GPUs. The `-fopenmp` and `-fopenmp-targets=nvptx64-nvidia-cuda` flags enable OpenMP offloading, and `-Xopenmp-target -march=sm_$(SM_VERSION)` specifies the target GPU architecture. The `LDFLAGS` include the path to the NVIDIA libraries needed for linking.

@@ -11,7 +11,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Support](#OpenMP-Support)
+	* [MPI Support](#MPI-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)

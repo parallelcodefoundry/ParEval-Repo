@@ -37,7 +37,7 @@ LDFLAGS = -lm
 # LLVM Compiler
 ifeq ($(COMPILER),llvm)
   CC = clang
-  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH) -std=c11
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xclang -target-cpu=sm_$(CUDA_ARCH) -std=c11
 endif
 
 # Debug Flags

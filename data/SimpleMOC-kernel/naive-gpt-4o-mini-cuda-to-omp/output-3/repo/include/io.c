@@ -81,12 +81,15 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    // Get OpenMP device properties
+    // Get device properties
     #pragma omp target
     {
-        // Assuming OpenMP offload can access device properties
-        // Note: This is a placeholder as OpenMP does not have direct device property access like CUDA
-        printf("%-25s%s\n", "OpenMP Device: ", "OpenMP Device"); 
+        cudaDeviceProp prop;
+        int device;
+        cudaGetDevice(&device);
+        cudaGetDeviceProperties(&prop, device);
+        #pragma omp target update to(prop)
+        printf("%-25s%s\n", "CUDA Device: ", prop.name); 
     }
 
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
@@ -98,7 +101,7 @@ void print_input_summary(Input I)
     printf("%-25s", "Segments:"); fancy_int(I.segments);
     printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
-    printf("%-25s%d\n", "Segments per OpenMP block:", I.seg_per_thread);
+    printf("%-25s%d\n", "Segments per CUDA block:", I.seg_per_thread);
     #ifdef TABLE
     printf("%-25s%s\n", "Exponential Table:","ON");
     #else
@@ -149,11 +152,16 @@ void read_CLI( int argc, char * argv[], Input * input )
             else
                 print_CLI_error();
         }
-        // OpenMP Device Number (-d)
+        // CUDA Device Number (-d)
         else if( strcmp(arg, "-d") == 0 )
         {
-            // OpenMP does not have a direct device selection like CUDA
-            // Placeholder for device selection if needed
+            if( ++i < argc )
+            {
+                int device_id = atoi(argv[i]);
+                cudaSetDevice(device_id);
+            }
+            else
+                print_CLI_error();
         }
         else
             print_CLI_error();
@@ -168,8 +176,8 @@ void print_CLI_error(void)
     printf("  -t <threads>          Number of OpenMP threads to run\n");
     printf("  -s <segments>         Number of segments to process\n");
     printf("  -e <energy groups>    Number of energy groups\n");
-    printf("  -p <segs per thread>  Number of segments per OpenMP Block\n");
-    printf("  -d <OpenMP device ID> OpenMP device ID number\n");
+    printf("  -p <segs per thread>  Number of segments per CUDA Block\n");
+    printf("  -d <CUDA device ID>   CUDA GPU device ID number\n");
     printf("See readme for full description of default run values\n");
     exit(1);
 }

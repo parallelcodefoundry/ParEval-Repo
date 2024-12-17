@@ -1,5 +1,10 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 #include <omp.h>
+#include <sys/time.h>
+#include <string.h>
 
 int double_compare(const void * a, const void * b)
 {
@@ -65,5 +70,9 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-    return omp_get_wtime();
+    struct timeval timecheck;
+    gettimeofday(&timecheck, NULL);
+    long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+    double time = (double) ms / 1000.0;
+    return time;
 }

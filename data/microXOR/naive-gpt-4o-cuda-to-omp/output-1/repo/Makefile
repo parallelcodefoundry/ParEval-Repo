@@ -1,4 +1,4 @@
-# Makefile for OpenMP-offload microXOR
+# Makefile for OpenMP Offload microXOR
 
 CXX ?= clang++
 SM_VERSION ?= 80
@@ -11,7 +11,6 @@ ifneq ($(DEBUG), yes)
 else
 	CXXFLAGS += -g
 endif
-LDFLAGS ?= -fopenmp
 
 CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
 DEPS = $(INC)/microXOR.hpp
@@ -19,7 +18,7 @@ OBJS = $(CPPFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
 EXE = microXOR.exe
 
 $(EXE): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
 
 $(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
 	$(CXX) $(CXXFLAGS) -c $< -o $@

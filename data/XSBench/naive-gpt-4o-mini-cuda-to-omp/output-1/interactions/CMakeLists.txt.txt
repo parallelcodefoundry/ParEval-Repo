@@ -17,23 +17,21 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
+
+add_executable(XSBench ${SOURCE})
 
 # Enable OpenMP support
 find_package(OpenMP REQUIRED)
 if(OpenMP_CXX_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    target_link_libraries(XSBench PUBLIC OpenMP::OpenMP_CXX)
 endif()
-
-add_executable(XSBench ${SOURCE})
 
 install(TARGETS XSBench DESTINATION bin)
 ```
 
-### Key Changes:
-1. **Project Name**: Changed from `XSBench_CUDA` to `XSBench_OpenMP` to reflect the new execution model.
-2. **CUDA Language Removal**: Removed the CUDA language specification since we are transitioning to OpenMP.
-3. **OpenMP Support**: Added a section to find and enable OpenMP support, which is necessary for offloading to the target device.
-4. **CMake Flags**: Retained the existing compilation flags while ensuring OpenMP flags are included if OpenMP is found. 
-
-This CMake configuration is now set up to compile the project using OpenMP for offloading to compatible devices.
+### Changes Made:
+1. The project name has been changed to `XSBench_OpenMP` to reflect the new execution model.
+2. The CUDA specific settings have been removed.
+3. OpenMP support is enabled using `find_package(OpenMP REQUIRED)` and linked to the target if found.
+4. The source files are now referenced with a `.c` extension instead of `.cu`.

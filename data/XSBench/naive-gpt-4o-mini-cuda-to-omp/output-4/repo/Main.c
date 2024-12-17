@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification, profile)
+    #pragma omp target
     {
         if (in.simulation_method == EVENT_BASED) {
             if (in.kernel_id == 0)
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
             }
         } else {
             printf(
-                "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
+                "History-based simulation not implemented in OpenMP code. Instead,\nuse "
                 "the event-based method with \"-m event\" argument.\n");
             exit(1);
         }

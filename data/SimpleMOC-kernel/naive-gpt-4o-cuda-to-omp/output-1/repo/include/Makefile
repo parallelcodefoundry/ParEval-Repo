@@ -31,10 +31,10 @@ obj = $(source:.c=.o)
 CC = $(COMPILER)
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION)
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcurand
+LDFLAGS = -lm -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lomptarget
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -48,7 +48,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3 -ffast-math
+	CFLAGS += -O3
 endif
 
 # Exponential Table Build

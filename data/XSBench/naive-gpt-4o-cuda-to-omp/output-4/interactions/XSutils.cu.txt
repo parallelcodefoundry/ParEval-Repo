@@ -1,15 +1,14 @@
-To translate the `XSutils.cu` file from the CUDA execution model to the OpenMP-offload execution model, we need to replace CUDA-specific constructs with OpenMP constructs. The functions in `XSutils.cu` do not directly involve GPU-specific operations, so the translation will primarily involve ensuring that the code is compatible with OpenMP and can be offloaded if needed. Here's the translated file:
+Here's the translated `XSutils.cu` file to the OpenMP offload execution model. The CUDA-specific parts have been removed, and the code is adapted to use OpenMP for parallel execution where applicable:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <omp.h>
 
-int double_compare(const void *a, const void *b) {
-    double A = *((double *)a);
-    double B = *((double *)b);
+int double_compare(const void * a, const void * b) {
+    double A = *((double *) a);
+    double B = *((double *) b);
 
     if (A > B)
         return 1;
@@ -19,9 +18,9 @@ int double_compare(const void *a, const void *b) {
         return 0;
 }
 
-int NGP_compare(const void *a, const void *b) {
-    NuclideGridPoint A = *((NuclideGridPoint *)a);
-    NuclideGridPoint B = *((NuclideGridPoint *)b);
+int NGP_compare(const void * a, const void * b) {
+    NuclideGridPoint A = *((NuclideGridPoint *) a);
+    NuclideGridPoint B = *((NuclideGridPoint *) b);
 
     if (A.energy > B.energy)
         return 1;
@@ -43,7 +42,7 @@ double rn_v(void) {
     unsigned long m = 2147483647;
     n1 = (a * (seed)) % m;
     seed = n1;
-    ret = (double)n1 / m;
+    ret = (double) n1 / m;
     return ret;
 }
 
@@ -61,7 +60,7 @@ size_t estimate_mem_usage(Inputs in) {
     else
         memtotal = all_nuclide_grids + size_hash_grid;
 
-    memtotal = ceil(memtotal / (1024.0 * 1024.0));
+    memtotal = (size_t) ceil(memtotal / (1024.0 * 1024.0));
     return memtotal;
 }
 
@@ -71,8 +70,7 @@ double get_time(void) {
 ```
 
 ### Key Changes:
-- **OpenMP Time Function**: Replaced the CUDA-specific time function with `omp_get_wtime()`, which is the standard way to get wall-clock time in OpenMP.
-- **Removed CUDA Headers**: Removed CUDA-specific headers and replaced them with standard C/C++ headers.
-- **General Compatibility**: Ensured that the code is compatible with OpenMP, although the functions in this file do not directly involve GPU-specific operations.
-
-This translation assumes that the rest of the codebase has been appropriately adapted to use OpenMP for offloading and that the necessary OpenMP pragmas are added where needed in other parts of the code.
+- Removed CUDA-specific includes and error checking macros.
+- Used OpenMP's `omp_get_wtime()` for timing instead of CUDA or other platform-specific timing functions.
+- Removed any CUDA-specific memory management or device synchronization, as OpenMP offload handles this differently.
+- The RNG function and comparison functions remain unchanged as they are not specific to CUDA.

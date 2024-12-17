@@ -37,17 +37,19 @@ LDFLAGS = -lm
 # LLVM Compiler
 ifeq ($(COMPILER),llvm)
   CC = clang
-  CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -march=sm_$(CUDA_ARCH) -std=c11
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH) -std=c11
 endif
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
+  LDFLAGS  += -g
 endif
 
 # Profiling Flags
 ifeq ($(PROFILE),yes)
   CFLAGS += -pg
+  LDFLAGS  += -pg
 endif
 
 # Optimization Flags

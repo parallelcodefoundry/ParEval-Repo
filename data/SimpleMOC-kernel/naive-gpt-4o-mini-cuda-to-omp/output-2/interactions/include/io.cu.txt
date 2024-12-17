@@ -1,4 +1,4 @@
-Here is the translated `include/io.cu` file for the OpenMP Offload execution model:
+Here is the translated `io.c` file for the OpenMP Offload execution model:
 
 ```c
 #include "SimpleMOC-kernel_header.h"
@@ -90,7 +90,7 @@ void print_input_summary(Input I)
         cudaGetDeviceProperties(&prop, device);
         printf("%-25s%s\n", "CUDA Device: ", prop.name); 
     }
-    
+
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -183,6 +183,6 @@ void print_CLI_error(void)
 ```
 
 ### Key Changes:
-1. The `#include <omp.h>` directive is added to support OpenMP directives.
-2. The device property retrieval is wrapped in a `#pragma omp target` directive to ensure it runs on the target device.
-3. The overall structure and logic remain the same, but the CUDA-specific calls are removed or adjusted to fit the OpenMP Offload model.
+1. The `#include <omp.h>` directive is added to support OpenMP.
+2. The CUDA-specific device property retrieval is wrapped in an OpenMP target directive to ensure it runs on the device.
+3. The rest of the code structure remains largely unchanged, as it primarily deals with printing and input handling, which do not require significant modifications for the OpenMP Offload model.

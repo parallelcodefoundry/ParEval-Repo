@@ -1,9 +1,11 @@
-Here is the translated `src/main.cu` file to the OpenMP Offload execution model. The translation involves replacing CUDA-specific constructs with OpenMP directives and functions, while maintaining the same command-line interface and functionality.
+Here's the translated `src/main.cpp` file using the OpenMP offload execution model:
 
 ```cpp
 // microXOR driver
 
-#include "microXOR.cuh"
+#include "microXOR.hpp"
+#include <iostream>
+#include <random>
 #include <omp.h>
 
 void cleanup(int *input, int *output) {
@@ -87,10 +89,6 @@ int main(int argc, char **argv) {
 ```
 
 ### Key Changes:
-- Removed CUDA-specific memory management functions (`cudaMalloc`, `cudaMemcpy`, `cudaFree`) and replaced them with OpenMP target data mapping.
-- Used `#pragma omp target data` to map input and output arrays to the device.
-- Used `#pragma omp target teams distribute parallel for` to parallelize the computation across the device.
-- Used `collapse(2)` to handle the nested loops efficiently.
-- Used `thread_limit(blockEdge*blockEdge)` to specify the number of threads per team, analogous to CUDA's block size.
-
-This code should maintain the same functionality and command-line interface as the original CUDA version.
+- The CUDA-specific memory management (`cudaMalloc`, `cudaMemcpy`, etc.) has been replaced with OpenMP's `#pragma omp target data` to manage data transfers between host and device.
+- The kernel launch syntax has been replaced with OpenMP's `#pragma omp target teams distribute parallel for` to parallelize the computation across the GPU.
+- The `cleanup` function no longer needs to free device memory, as OpenMP handles data mapping automatically.

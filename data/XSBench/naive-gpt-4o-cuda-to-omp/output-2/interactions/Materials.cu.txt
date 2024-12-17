@@ -1,7 +1,12 @@
-Here is the translated `Materials.cu` file to the OpenMP Offload execution model:
+Here is the translated `Materials.cu` file to the OpenMP-offload execution model. The file is now named `Materials.c` and assumes that the necessary OpenMP headers and pragmas are used for offloading.
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+// Material data is hard coded into the functions in this file.
+// Note that there are 12 materials present in H-M (large or small)
+
+#include "XSbench_header.h"
+#include <stdlib.h>
+#include <string.h>
 #include <omp.h>
 
 // num_nucs represents the number of nuclides that each material contains
@@ -112,6 +117,9 @@ double * load_concs( int * num_nucs, int max_num_nucs )
 ```
 
 ### Key Changes:
-1. **OpenMP Offload Directives**: Added `#pragma omp target teams distribute parallel for` to offload the `load_concs` function to the GPU. This directive is used to parallelize the loop over the GPU.
-2. **Memory Mapping**: Used `map(tofrom:concs[0:12*max_num_nucs])` to specify that the `concs` array should be mapped to the device memory.
-3. **Removed CUDA-specific Code**: Removed any CUDA-specific code and replaced it with OpenMP offload constructs.
+1. **Header Inclusion**: Changed the header file to `XSbench_header.h` assuming a C environment.
+2. **OpenMP Offloading**: Added OpenMP pragmas to offload the `load_concs` function to the target device.
+3. **Memory Management**: Used standard C memory management functions (`malloc`, `memcpy`).
+4. **Random Number Generation**: Assumed `LCG_random_double` is available and compatible with OpenMP offloading.
+
+This code assumes that the OpenMP environment is set up correctly and that the necessary OpenMP flags are used during compilation to enable offloading to the target device.

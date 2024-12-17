@@ -5,7 +5,7 @@ SM_VERSION ?= 80
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target -march=sm_$(SM_VERSION) -I$(INC) -std=c++17
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION) -I$(INC) -std=c++17
 ifneq ($(DEBUG), yes)
 	CXXFLAGS += -O3
 else

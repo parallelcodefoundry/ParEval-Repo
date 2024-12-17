@@ -80,8 +80,7 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    int device_num = omp_get_default_device();
-    printf("%-25s%d\n", "OpenMP Device ID:", device_num);
+    printf("%-25s%s\n", "OpenMP Device: ", "Generic GPU"); 
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -92,11 +91,11 @@ void print_input_summary(Input I)
     printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
     printf("%-25s%d\n", "Segments per OpenMP block:", I.seg_per_thread);
-#ifdef TABLE
+    #ifdef TABLE
     printf("%-25s%s\n", "Exponential Table:", "ON");
-#else
+    #else
     printf("%-25s%s\n", "Exponential Table:", "OFF");
-#endif
+    #endif
     border_print();
 }
 
@@ -142,17 +141,6 @@ void read_CLI(int argc, char *argv[], Input *input)
             else
                 print_CLI_error();
         }
-        // OpenMP Device Number (-d)
-        else if (strcmp(arg, "-d") == 0)
-        {
-            if (++i < argc)
-            {
-                int device_id = atoi(argv[i]);
-                omp_set_default_device(device_id);
-            }
-            else
-                print_CLI_error();
-        }
         else
             print_CLI_error();
     }
@@ -167,7 +155,6 @@ void print_CLI_error(void)
     printf("  -s <segments>         Number of segments to process\n");
     printf("  -e <energy groups>    Number of energy groups\n");
     printf("  -p <segs per thread>  Number of segments per OpenMP Block\n");
-    printf("  -d <OpenMP device ID> OpenMP device ID number\n");
     printf("See readme for full description of default run values\n");
     exit(1);
 }

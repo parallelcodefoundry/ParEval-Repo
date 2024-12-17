@@ -14,7 +14,7 @@
 #define OMP_ERROR_CHECK
 
 // User inputs
-typedef struct{
+typedef struct {
     int source_2D_regions;
     int source_3D_regions;
     int coarse_axial_intervals;
@@ -29,21 +29,21 @@ typedef struct{
 } Input;
 
 // Source Region Structure
-typedef struct{
+typedef struct {
     long fine_flux_id;
     long fine_source_id;
     long sigT_id;
 } Source;
 
 // Source Arrays
-typedef struct{
-    float * fine_flux_arr;
-    float * fine_source_arr;
-    float * sigT_arr;
+typedef struct {
+    float *fine_flux_arr;
+    float *fine_source_arr;
+    float *sigT_arr;
 } Source_Arrays;
 
 // Table structure for computing exponential
-typedef struct{
+typedef struct {
     float values[706];
     float dx;
     float maxVal;
@@ -51,19 +51,20 @@ typedef struct{
 } Table;
 
 // Function prototypes
-void run_kernel(Input I, Source * S, Source_Arrays SA, Table * table, float * state_fluxes, int N_state_fluxes);
-void interpolateTable(Table * table, float x, float * out);
-void setup_kernel(Input I);
-void init_flux_states(float * flux_states, int N_flux_states, Input I);
-Source * initialize_sources(Input I, Source_Arrays * SA);
-Source * initialize_device_sources(Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h);
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
+void interpolateTable(Table *table, float x, float *out);
+void setup_kernel(float *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
+Source *initialize_sources(Input I, Source_Arrays *SA);
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
 double mem_estimate(Input I);
 
-// Error handling macros
-#define OMP_CALL(x) do { x; } while(0)
+// Error checking function
+void check_omp_error(const char *file, const int line);
 
-void __ompCheckError(const char *file, const int line);
+// Macro for error checking
+#define OMP_CALL(x) do { x; check_omp_error(__FILE__, __LINE__); } while(0)
 
 #endif

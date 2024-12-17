@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
 
 int double_compare(const void * a, const void * b)
@@ -59,7 +59,7 @@ size_t estimate_mem_usage( Inputs in )
     else
         memtotal = all_nuclide_grids + size_hash_grid;
 
-    memtotal = ceil(memtotal / (1024.0*1024.0));
+    memtotal = ceil(memtotal / (1024.0 * 1024.0));
     return memtotal;
 }
 

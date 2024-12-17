@@ -2,7 +2,7 @@
 // microXOR kernel using OpenMP Offloading
 
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
 /* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.
    Note that we only consider neighbors and not input_{i,j} when computing output_{i,j}.
@@ -34,8 +34,8 @@ void cellsXOR(const int *input, int *output, size_t N) {
 }
 ```
 
-### Explanation:
-- The CUDA kernel is replaced with a function that uses OpenMP directives to offload computation to a GPU.
-- The `#pragma omp target teams distribute parallel for collapse(2)` directive is used to parallelize the nested loops over `i` and `j`.
-- The `map` clauses are used to specify data movement between the host and the device. The `input` array is mapped to the device, and the `output` array is mapped from the device.
-- The `collapse(2)` clause is used to collapse the two loops into a single loop for parallel execution, which is similar to the 2D grid of threads in CUDA.
+### Key Changes:
+- The CUDA kernel function `__global__ void cellsXOR` is replaced with a standard C++ function `void cellsXOR`.
+- The CUDA-specific syntax for launching kernels is replaced with OpenMP directives. Specifically, `#pragma omp target teams distribute parallel for collapse(2)` is used to offload the computation to the GPU.
+- The `map` clauses are used to specify data movement between the host and the device.
+- The loop indices are changed to `size_t` to match the function signature and ensure compatibility with the `N` parameter type.

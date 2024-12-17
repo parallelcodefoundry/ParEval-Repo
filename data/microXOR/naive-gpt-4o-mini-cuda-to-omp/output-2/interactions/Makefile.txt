@@ -3,7 +3,7 @@ Here is the translated Makefile for the OpenMP Offload execution model:
 ```Makefile
 # Makefile for OpenMP Offload microXOR
 
-CXX ?= $(CXX_COMPILER)
+CXX ?= clang++
 SM_VERSION ?= 80
 SRC = src
 INC = include
@@ -36,8 +36,8 @@ clean:
 .PHONY: clean
 ```
 
-### Changes Made:
-1. Changed the compiler from `nvcc` to a generic C++ compiler (e.g., `clang++`) with OpenMP Offload support.
-2. Updated the file extensions from `.cu` to `.cpp` and `.cuh` to `.hpp` to reflect C++ conventions.
-3. Adjusted the compilation flags to include OpenMP Offload options.
-4. Removed CUDA-specific flags and replaced them with OpenMP Offload flags.
+### Notes:
+- The file extensions have been changed from `.cu` to `.cpp` and `.cuh` to `.hpp` to reflect the C++ codebase.
+- The compiler is set to `clang++` to support OpenMP Offload.
+- The OpenMP flags are included in `CXXFLAGS` to enable offloading to NVIDIA GPUs.
+- The `SM_VERSION` variable is included for specifying the compute capability, similar to the original `CUDA_ARCH`.

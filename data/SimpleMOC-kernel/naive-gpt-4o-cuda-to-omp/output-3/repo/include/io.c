@@ -80,10 +80,7 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    // OpenMP does not have a direct equivalent for querying device properties like CUDA
-    // Instead, we can print the number of OpenMP devices available
-    int num_devices = omp_get_num_devices();
-    printf("%-25s%d OpenMP devices available\n", "OpenMP Devices:", num_devices);
+    printf("%-25s%s\n", "OpenMP Device: ", "Generic OpenMP Device");
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -144,17 +141,6 @@ void read_CLI(int argc, char *argv[], Input *input)
             else
                 print_CLI_error();
         }
-        // OpenMP Device Number (-d)
-        else if (strcmp(arg, "-d") == 0)
-        {
-            if (++i < argc)
-            {
-                int device_id = atoi(argv[i]);
-                omp_set_default_device(device_id);
-            }
-            else
-                print_CLI_error();
-        }
         else
             print_CLI_error();
     }
@@ -169,7 +155,6 @@ void print_CLI_error(void)
     printf("  -s <segments>         Number of segments to process\n");
     printf("  -e <energy groups>    Number of energy groups\n");
     printf("  -p <segs per thread>  Number of segments per OpenMP Block\n");
-    printf("  -d <OpenMP device ID> OpenMP device ID number\n");
     printf("See readme for full description of default run values\n");
     exit(1);
 }

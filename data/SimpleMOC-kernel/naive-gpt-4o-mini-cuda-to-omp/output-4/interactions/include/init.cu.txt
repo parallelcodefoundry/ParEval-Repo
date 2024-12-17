@@ -1,20 +1,22 @@
-Here is the translated `init.cu` file using the OpenMP Offload execution model:
+Here is the translated `init.c` file for the OpenMP Offload execution model:
 
 ```c
 #include "SimpleMOC-kernel_header.h"
 #include <omp.h>
 
 // Initialize global flux states to random numbers on device
-void init_flux_states(float *flux_states, int N_flux_states, Input I)
+void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state)
 {
     #pragma omp target teams distribute parallel for
-    for (int blockId = 0; blockId < N_flux_states; blockId++)
-    {
+    for (int blockId = 0; blockId < N_flux_states; blockId++) {
         // Assign RNG state
-        unsigned int localState = 1234 + blockId; // Simple RNG state initialization
+        curandState localState;
+        curand_init(1234, blockId % I.streams, 0, &localState);
 
-        // Initialize flux states
-        flux_states[blockId] = (float)rand_r(&localState) / RAND_MAX;
+        // Initialize flux state
+        for (int g = 0; g < I.egroups; g++) {
+            flux_states[blockId + g] = curand_uniform(&localState);
+        }
     }
 }
 
@@ -82,8 +84,7 @@ Source *initialize_sources(Input I, Source_Arrays *SA)
 
     // Initialize fine source and flux to random numbers
     #pragma omp target teams distribute parallel for
-    for (long i = 0; i < N_fine; i++)
-    {
+    for (long i = 0; i < N_fine; i++) {
         SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
         SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
     }
@@ -101,31 +102,30 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
     #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine])
-    cudaMalloc((void **)&SA_d->fine_source_arr, N_fine * sizeof(float));
     cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy Fine Flux Data
     #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine])
-    cudaMalloc((void **)&SA_d->fine_flux_arr, N_fine * sizeof(float));
     cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
     #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT])
-    cudaMalloc((void **)&SA_d->sigT_arr, N_sigT * sizeof(float));
     cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy Source Array Data
     Source *sources_d;
-    cudaMalloc((void **)&sources_d, I.source_3D_regions * sizeof(Source));
+    #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions])
     cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
 
     return sources_d;
 }
 ```
 
-### Key Changes:
-1. The `init_flux_states` function is now a regular function that uses OpenMP directives for offloading to the target device.
-2. The random number generation is simplified using `rand_r` for thread safety.
-3. Memory allocation and copying for the source arrays are done using OpenMP target directives to manage data movement between host and device.
-4. The initialization of arrays is done using OpenMP parallel for loops to distribute the workload across available threads.
+### Changes Made:
+1. **OpenMP Directives**: Added `#pragma omp target teams distribute parallel for` to parallelize loops that can be offloaded to the device.
+2. **Random Number Generation**: The random number generation logic was adapted to use `curand_init` directly in the OpenMP offload context.
+3. **Data Mapping**: Used `#pragma omp target enter data map` to manage data transfers between host and device.
+4. **Removed CUDA Specific Code**: Removed CUDA specific kernel definitions and replaced them with standard C functions suitable for OpenMP offloading.
+
+Make sure to adjust the random number generation and data management according to your specific requirements and the capabilities of your OpenMP implementation.

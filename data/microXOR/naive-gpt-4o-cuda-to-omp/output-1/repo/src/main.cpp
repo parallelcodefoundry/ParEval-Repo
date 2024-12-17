@@ -3,25 +3,11 @@
 #include <iostream>
 #include <random>
 #include <omp.h>
+#include "microXOR.hpp"
 
 void cleanup(int *input, int *output) {
   delete[] input;
   delete[] output;
-}
-
-void cellsXOR(const int *input, int *output, size_t N, size_t blockEdge) {
-  #pragma omp target teams distribute parallel for collapse(2) \
-    map(to: input[0:N*N]) map(from: output[0:N*N])
-  for (size_t i = 0; i < N; i++) {
-    for (size_t j = 0; j < N; j++) {
-      int count = 0;
-      if (i > 0 && input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-      output[i*N + j] = (count == 1) ? 1 : 0;
-    }
-  }
 }
 
 int main(int argc, char **argv) {
@@ -55,7 +41,20 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-  cellsXOR(input, output, N, blockEdge);
+  #pragma omp target data map(to: input[0:N*N]) map(from: output[0:N*N])
+  {
+    #pragma omp target teams distribute parallel for collapse(2) thread_limit(blockEdge*blockEdge)
+    for (size_t i = 0; i < N; i++) {
+      for (size_t j = 0; j < N; j++) {
+        int count = 0;
+        if (i > 0 && input[(i-1)*N + j] == 1) count++;
+        if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+        if (j > 0 && input[i*N + (j-1)] == 1) count++;
+        if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+        output[i*N + j] = (count == 1) ? 1 : 0;
+      }
+    }
+  }
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {

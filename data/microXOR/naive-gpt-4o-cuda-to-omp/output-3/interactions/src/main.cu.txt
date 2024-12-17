@@ -1,12 +1,12 @@
-Here is the translated `src/main.cu` file using the OpenMP Offload execution model:
+Here's the translated `src/main.cpp` file using the OpenMP offload execution model:
 
 ```cpp
 // microXOR driver
 
+#include "microXOR.hpp"
 #include <iostream>
 #include <random>
 #include <omp.h>
-#include "microXOR.cuh"
 
 void cleanup(int *input, int *output) {
   delete[] input;
@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
 ```
 
 ### Key Changes:
-- The CUDA-specific memory management functions (`cudaMalloc`, `cudaMemcpy`, `cudaFree`) have been removed, as OpenMP Offload handles data transfer with `#pragma omp target data` and `map` clauses.
-- The kernel launch syntax has been replaced with OpenMP directives: `#pragma omp target teams distribute parallel for collapse(2) thread_limit(blockEdge*blockEdge)`.
-- The `cleanup` function has been adjusted to remove device memory cleanup since OpenMP Offload manages memory differently.
-- The `omp.h` header is included to support OpenMP directives.
+- The CUDA-specific memory management functions (`cudaMalloc`, `cudaMemcpy`, `cudaFree`) have been replaced with OpenMP target data mapping.
+- The kernel launch syntax has been replaced with OpenMP target directives, using `#pragma omp target teams distribute parallel for collapse(2)` to parallelize the nested loops.
+- The `thread_limit` clause is used to specify the number of threads per team, analogous to the CUDA block size.
+- Memory cleanup is simplified since OpenMP handles the data transfer implicitly with the `map` clauses.

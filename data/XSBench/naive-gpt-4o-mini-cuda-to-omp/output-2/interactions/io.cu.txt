@@ -1,8 +1,7 @@
-Here is the translated `io.cu` file to the OpenMP Offload execution model:
+Here is the translated `io.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
-#include <omp.h>
+```c
+#include "XSbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -124,14 +123,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     center_print("INPUT SUMMARY", 79);
     border_print();
     printf("Programming Model:            OpenMP Offload\n");
-    #pragma omp target
-    {
-        // Get device properties
-        #pragma omp target device(0)
-        {
-            printf("OpenMP Device:                  %s\n", "OpenMP Device"); // Placeholder for actual device name
-        }
-    }
+    printf("OpenMP Device:                %s\n", "OpenMP compatible device");
     if( in.simulation_method == EVENT_BASED )
         printf("Simulation Method:            Event Based\n");
     else
@@ -346,7 +338,9 @@ Inputs read_CLI( int argc, char * argv[] )
         else if( strcmp(arg, "-h") == 0 )
         {
             if( ++i < argc )
+            {
                 input.hash_bins = atoi(argv[i]);
+            }
             else
                 print_CLI_error();
         }
@@ -490,6 +484,32 @@ Inputs read_CLI( int argc, char * argv[] )
     // Return input struct
     return input;
 }
-```
 
-This translation maintains the functionality of the original `io.cu` file while adapting it to the OpenMP Offload execution model. The main changes involve the use of OpenMP directives to manage device-specific operations, such as printing device properties and managing memory.
+void binary_write( Inputs in, SimulationData SD )
+{
+    const char * fname = "XS_data.dat";
+    printf("Writing all data structures to binary file %s...\n", fname);
+    FILE * fp = fopen(fname, "w");
+
+    // Write SimulationData Object. Include pointers, even though we won't be using them.
+    fwrite(&SD, sizeof(SimulationData), 1, fp);
+
+    // Write heap arrays in SimulationData Object
+    fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+    fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
+    fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
+    fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+    fwrite(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+    fwrite(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
+
+    fclose(fp);
+}
+
+SimulationData binary_read( Inputs in )
+{
+    SimulationData SD;
+
+    const char * fname = "XS_data.dat";
+    printf("Reading all data structures from binary file %s...\n", fname);
+
+    FILE * fp = fopen(fname,

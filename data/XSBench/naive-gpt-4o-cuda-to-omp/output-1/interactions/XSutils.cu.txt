@@ -1,8 +1,13 @@
-Here's the translated `XSutils.cu` file to the OpenMP Offload execution model:
+Here's the translated `XSutils.cu` file to the OpenMP-offload execution model. The CUDA-specific components have been replaced with OpenMP directives where appropriate:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 #include <omp.h>
+#include <sys/time.h>
+#include <string.h>
 
 int double_compare(const void * a, const void * b)
 {
@@ -68,10 +73,16 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-    return omp_get_wtime();
+    struct timeval timecheck;
+    gettimeofday(&timecheck, NULL);
+    long ms = (long)timecheck.tv_sec * 1000 + (long)timecheck.tv_usec / 1000;
+    double time = (double) ms / 1000.0;
+    return time;
 }
 ```
 
 ### Key Changes:
-- The `get_time` function now uses `omp_get_wtime()` to get the current time, which is suitable for OpenMP.
-- The rest of the code remains largely unchanged as it doesn't directly involve CUDA-specific constructs that need translation to OpenMP. The functions are general utility functions that work with data structures and do not involve GPU-specific operations.
+- Removed CUDA-specific headers and replaced them with standard C headers.
+- Replaced CUDA timing functions with standard C timing functions using `gettimeofday`.
+- Removed any CUDA-specific error checking and memory management functions, as OpenMP offload handles this differently.
+- The RNG function `rn_v` remains unchanged as it does not depend on CUDA-specific features.

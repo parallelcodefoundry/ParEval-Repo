@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -8,7 +8,7 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
-    // Move Data to GPU
+    // Move Data to Device
     SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
     profile->host_to_device_time = get_time() - start;
 
@@ -17,9 +17,6 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
     ////////////////////////////////////////////////////////////////////////////////
     if (mype == 0) printf("Running baseline event-based simulation...\n");
 
-    int nthreads = 256;
-    int nblocks = ceil((double)in.lookups / (double)nthreads);
-
     int nwarmups = in.num_warmups;
     start = 0.0;
     for (int i = 0; i < in.num_iterations + nwarmups; i++) {
@@ -27,18 +24,12 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
             #pragma omp target update from(GSD.verification[0:in.lookups])
             start = get_time();
         }
-        #pragma omp target teams distribute parallel for \
-            map(to: GSD.num_nucs[0:GSD.length_num_nucs], \
-                GSD.concs[0:GSD.length_concs], \
-                GSD.mats[0:GSD.length_mats], \
-                GSD.unionized_energy_array[0:GSD.length_unionized_energy_array], \
-                GSD.index_grid[0:GSD.length_index_grid], \
-                GSD.nuclide_grid[0:GSD.length_nuclide_grid]) \
-            map(tofrom: GSD.verification[0:in.lookups])
+        #pragma omp target teams distribute parallel for is_device_ptr(GSD.num_nucs, GSD.concs, GSD.unionized_energy_array, GSD.index_grid, GSD.nuclide_grid, GSD.mats, GSD.verification)
         for (int i = 0; i < in.lookups; i++) {
             xs_lookup_kernel_baseline(in, GSD, i);
         }
     }
+    #pragma omp target update from(GSD.verification[0:in.lookups])
     profile->kernel_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -47,19 +38,18 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    #pragma omp target update from(GSD.verification[0:in.lookups])
-    profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
         verification_scalar += SD.verification[i];
+
+    profile->device_to_host_time = get_time() - start;
 
     release_device_memory(GSD);
 
     return verification_scalar;
 }
 
-// In this kernel, we perform a single lookup with each thread.
 void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 {
     if (i >= in.lookups)
@@ -87,7 +77,7 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
         GSD.concs,       // Flattened 2-D array with concentration of each nuclide in each material
         GSD.unionized_energy_array, // 1-D Unionized energy array
         GSD.index_grid,  // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
-        GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
+        GSD.nuclide_grid,// Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
         GSD.mats,        // Flattened 2-D array with nuclide indices defining composition of each type of material
         macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
         in.grid_type,    // Lookup type (nuclide, hash, or unionized)
@@ -98,7 +88,9 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
     // For verification, and to prevent the compiler from optimizing
     // all work out, we interrogate the returned macro_xs_vector array
     // to find its maximum value index, then increment the verification
-    // value by that index.
+    // value by that index. In this implementation, we have each thread
+    // write to its thread_id index in an array, which we will reduce
+    // with a thrust reduction kernel after the main simulation kernel.
     double max = -1.0;
     int max_idx = 0;
     for (int j = 0; j < 5; j++) {
@@ -112,10 +104,10 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 
 // Calculates the microscopic cross section for a given nuclide & energy
 void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
-                        long n_gridpoints,
-                        double * __restrict__ egrid, int * __restrict__ index_data,
-                        NuclideGridPoint * __restrict__ nuclide_grids,
-                        long idx, double * __restrict__ xs_vector, int grid_type, int hash_bins) {
+                        long n_gridpoints, double *egrid, int *index_data,
+                        NuclideGridPoint *nuclide_grids, long idx,
+                        double *xs_vector, int grid_type, int hash_bins)
+{
     // Variables
     double f;
     NuclideGridPoint *low, *high;
@@ -192,12 +184,11 @@ void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
 
 // Calculates macroscopic cross section based on a given material & energy
 void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
-                        long n_gridpoints, int * __restrict__ num_nucs,
-                        double * __restrict__ concs,
-                        double * __restrict__ egrid, int * __restrict__ index_data,
-                        NuclideGridPoint * __restrict__ nuclide_grids,
-                        int * __restrict__ mats,
-                        double * __restrict__ macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs) {
+                        long n_gridpoints, int *num_nucs,
+                        double *concs, double *egrid, int *index_data,
+                        NuclideGridPoint *nuclide_grids, int *mats,
+                        double *macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs)
+{
     int p_nuc; // the nuclide we are looking up
     long idx = -1;
     double conc; // the concentration of the nuclide in the material
@@ -239,7 +230,8 @@ void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
 
 // binary search for energy on unionized energy grid
 // returns lower index
-long grid_search(long n, double quarry, double * __restrict__ A) {
+long grid_search(long n, double quarry, double *A)
+{
     long lowerLimit = 0;
     long upperLimit = n - 1;
     long examinationPoint;
@@ -260,7 +252,8 @@ long grid_search(long n, double quarry, double * __restrict__ A) {
 }
 
 // binary search for energy on nuclide energy grid
-long grid_search_nuclide(long n, double quarry, NuclideGridPoint *A, long low, long high) {
+long grid_search_nuclide(long n, double quarry, NuclideGridPoint *A, long low, long high)
+{
     long lowerLimit = low;
     long upperLimit = high;
     long examinationPoint;
@@ -281,20 +274,9 @@ long grid_search_nuclide(long n, double quarry, NuclideGridPoint *A, long low, l
 }
 
 // picks a material based on a probabilistic distribution
-int pick_mat(uint64_t *seed) {
-    double dist[12];
-    dist[0] = 0.140;  // fuel
-    dist[1] = 0.052;  // cladding
-    dist[2] = 0.275;  // cold, borated water
-    dist[3] = 0.134;  // hot, borated water
-    dist[4] = 0.154;  // RPV
-    dist[5] = 0.064;  // Lower, radial reflector
-    dist[6] = 0.066;  // Upper reflector / top plate
-    dist[7] = 0.055;  // bottom plate
-    dist[8] = 0.008;  // bottom nozzle
-    dist[9] = 0.015;  // top nozzle
-    dist[10] = 0.025; // top of fuel assemblies
-    dist[11] = 0.013; // bottom of fuel assemblies
+int pick_mat(uint64_t *seed)
+{
+    double dist[12] = {0.140, 0.052, 0.275, 0.134, 0.154, 0.064, 0.066, 0.055, 0.008, 0.015, 0.025, 0.013};
 
     double roll = LCG_random_double(seed);
 
@@ -309,7 +291,8 @@ int pick_mat(uint64_t *seed) {
     return 0;
 }
 
-double LCG_random_double(uint64_t *seed) {
+double LCG_random_double(uint64_t *seed)
+{
     const uint64_t m = 9223372036854775808ULL; // 2^63
     const uint64_t a = 2806196910506780709ULL;
     const uint64_t c = 1ULL;
@@ -317,7 +300,8 @@ double LCG_random_double(uint64_t *seed) {
     return (double)(*seed) / (double)m;
 }
 
-uint64_t fast_forward_LCG(uint64_t seed, uint64_t n) {
+uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
+{
     const uint64_t m = 9223372036854775808ULL; // 2^63
     uint64_t a = 2806196910506780709ULL;
     uint64_t c = 1ULL;

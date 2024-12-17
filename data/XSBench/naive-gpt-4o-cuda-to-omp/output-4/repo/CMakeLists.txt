@@ -10,22 +10,18 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS "-Wall -Wextra")
+set(CMAKE_C_FLAGS_DEBUG "-g")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
 
 # Add OpenMP flags
 find_package(OpenMP REQUIRED)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
-
-# Change the language property to CXX for OpenMP offloading
-set_source_files_properties(${SOURCE} PROPERTIES LANGUAGE CXX)
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
 add_executable(XSBench ${SOURCE})
 
-# Link OpenMP
-target_link_libraries(XSBench PRIVATE OpenMP::OpenMP_CXX)
+target_link_libraries(XSBench PRIVATE OpenMP::OpenMP_C)
 
 install(TARGETS XSBench DESTINATION bin)

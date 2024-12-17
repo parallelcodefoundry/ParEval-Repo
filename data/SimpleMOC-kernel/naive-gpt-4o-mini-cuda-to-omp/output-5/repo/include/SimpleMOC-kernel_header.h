@@ -50,7 +50,7 @@ typedef struct {
     int N;
 } Table;
 
-// Function declarations
+// Function prototypes
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
 void setup_kernel(Input I);
@@ -62,6 +62,6 @@ Input set_default_input(void);
 double mem_estimate(Input I);
 
 // Error handling
-void __ompCheckError(const char *file, const int line);
+void check_error(const char *file, const int line);
 
 #endif

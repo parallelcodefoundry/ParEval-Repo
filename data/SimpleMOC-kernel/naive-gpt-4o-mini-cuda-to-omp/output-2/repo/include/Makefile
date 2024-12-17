@@ -28,10 +28,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
 
 # Linker Flags
-LDFLAGS = -lm -lcurand
+LDFLAGS = -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -58,10 +58,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) SimpleMOC-kernel_header.h
-	$(CXX) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CXX) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

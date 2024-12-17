@@ -7,14 +7,14 @@ This version of microXOR is written using OpenMP Offloading for GPU execution.
 
 ## Prerequisites
 
-A compiler with OpenMP 4.5 or later support and a compatible GPU is required.
+A compiler with OpenMP 4.5 or later support and a compatible GPU is required. Examples include GCC 9+ or Clang 9+.
 
 ## Build
 
-To build microXOR, use `make`, setting the appropriate compiler and flags for your system. For example, the following will build microXOR using the `clang` compiler:
+To build microXOR, use `make`. Ensure that your compiler supports OpenMP Offloading and is configured correctly for your GPU. You may need to set environment variables or modify the Makefile to specify the target architecture.
 
 ```
-make CC=clang
+make
 ```
 
 ## Run

@@ -17,9 +17,9 @@ void init_flux_states(float *flux_states, int N_flux_states, Input I, curandStat
         // Assign RNG state
         curandState localState = state[blockId % I.streams];
 
-        // Initialize the flux state
-        for (int g = 0; g < I.egroups; g++) {
-            flux_states[blockId + g] = curand_uniform(&localState);
+        // Initialize flux states
+        for (int i = 0; i < I.egroups; i++) {
+            flux_states[blockId + i] = curand_uniform(&localState);
         }
     }
 }
@@ -104,22 +104,26 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
 {
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine])
-    cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+    #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine]) 
+    #pragma omp target update to(SA_d->fine_source_arr[0:N_fine]) 
+    #pragma omp target exit data map(from: SA_d->fine_source_arr[0:N_fine]) 
 
     // Allocate & Copy Fine Flux Data
-    #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine])
-    cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+    #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine]) 
+    #pragma omp target update to(SA_d->fine_flux_arr[0:N_fine]) 
+    #pragma omp target exit data map(from: SA_d->fine_flux_arr[0:N_fine]) 
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
-    #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT])
-    cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+    #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT]) 
+    #pragma omp target update to(SA_d->sigT_arr[0:N_sigT]) 
+    #pragma omp target exit data map(from: SA_d->sigT_arr[0:N_sigT]) 
 
     // Allocate & Copy Source Array Data
     Source *sources_d;
-    #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions])
-    cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
+    #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions]) 
+    #pragma omp target update to(sources_d[0:I.source_3D_regions]) 
+    #pragma omp target exit data map(from: sources_d[0:I.source_3D_regions]) 
 
     return sources_d;
 }

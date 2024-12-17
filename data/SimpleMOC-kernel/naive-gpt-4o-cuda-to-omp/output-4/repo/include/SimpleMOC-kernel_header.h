@@ -1,6 +1,7 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -12,7 +13,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <omp.h>
+#include <assert.h>
 
 // User inputs
 typedef struct {
@@ -63,7 +64,6 @@ Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
-void check_error(const char *file, const int line);
 
 // io.c
 void logo(int version);

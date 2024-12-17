@@ -10,27 +10,28 @@
  * 		- A set of shared SIMD vectors, each thread id being its idx
  */
 
-void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned long long seed, float *state_fluxes, int N_state_fluxes) {
+void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes) {
     int num_segments = I.segments / I.seg_per_thread;
 
-    #pragma omp target teams distribute parallel for collapse(2) map(to: S[0:I.source_3D_regions], SA, table[0:1]) map(tofrom: state_fluxes[0:N_state_fluxes * I.egroups])
+    #pragma omp target teams distribute parallel for collapse(2) map(to: S[0:I.source_3D_regions], SA, table[0:1], state[0:I.streams], state_fluxes[0:N_state_fluxes * I.egroups]) map(from: SA.fine_flux_arr[0:I.source_3D_regions * I.fine_axial_intervals * I.egroups])
     for (int blockIdx_y = 0; blockIdx_y < num_segments; ++blockIdx_y) {
         for (int blockIdx_x = 0; blockIdx_x < num_segments; ++blockIdx_x) {
-            int blockId = blockIdx_y * num_segments + blockIdx_x;
+            int blockId = blockIdx_y * num_segments + blockIdx_x; // geometric segment
 
             if (blockId >= num_segments)
                 continue;
 
-            unsigned int localState = seed + blockId;
+            // Assign RNG state
+            unsigned int localState = state[blockId % I.streams];
 
             blockId *= I.seg_per_thread;
             blockId--;
 
-            #pragma omp parallel
-            {
-                int g = omp_get_thread_num(); // Each energy group (g) is one thread in a block
+            #pragma omp parallel for
+            for (int g = 0; g < I.egroups; ++g) { // Each energy group (g) is one thread in a block
 
                 // Thread Local (i.e., specific to E group) variables
+                // Similar to SIMD vectors in CPU code
                 float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
 
                 // Randomized variables (common across all threads within block)
@@ -41,9 +42,9 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned lon
                 #pragma omp single
                 {
                     for (int i = 0; i < I.seg_per_thread; i++) {
-                        state_flux_id[i] = localState % N_state_fluxes;
-                        QSR_id[i] = localState % I.source_3D_regions;
-                        FAI_id[i] = localState % I.fine_axial_intervals;
+                        state_flux_id[i] = rand_r(&localState) % N_state_fluxes;
+                        QSR_id[i] = rand_r(&localState) % I.source_3D_regions;
+                        FAI_id[i] = rand_r(&localState) % I.fine_axial_intervals;
                     }
                 }
 
@@ -60,7 +61,10 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned lon
                     // Attenuate Segment
                     //////////////////////////////////////////////////////////
 
-                    // Some placeholder constants
+                    // Some placeholder constants - In the full app some of these are
+                    // calculated based off position in geometry. This treatment
+                    // shaves off a few FLOPS, but is not significant compared to the
+                    // rest of the function.
                     float dz = 0.1f;
                     float zin = 0.3f;
                     float weight = 0.5f;
@@ -76,24 +80,32 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned lon
                     if (FAI_id[i] == 0) {
                         float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                         float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
+                        // cycle over energy groups
+                        // load neighboring sources
                         float y2 = f2[g];
                         float y3 = f3[g];
 
+                        // do linear "fitting"
                         float c0 = y2;
                         float c1 = (y3 - y2) / dz;
 
+                        // calculate q0, q1, q2
                         q0 = c0 + c1 * zin;
                         q1 = c1;
                         q2 = 0;
                     } else if (FAI_id[i] == I.fine_axial_intervals - 1) {
                         float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
                         float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
+                        // cycle over energy groups
+                        // load neighboring sources
                         float y1 = f1[g];
                         float y2 = f2[g];
 
+                        // do linear "fitting"
                         float c0 = y2;
                         float c1 = (y2 - y1) / dz;
 
+                        // calculate q0, q1, q2
                         q0 = c0 + c1 * zin;
                         q1 = c1;
                         q2 = 0;
@@ -101,43 +113,60 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned lon
                         float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
                         float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                         float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
+                        // cycle over energy groups
+                        // load neighboring sources
                         float y1 = f1[g];
                         float y2 = f2[g];
                         float y3 = f3[g];
 
+                        // do quadratic "fitting"
                         float c0 = y2;
                         float c1 = (y1 - y3) / (2.f * dz);
                         float c2 = (y1 - 2.f * y2 + y3) / (2.f * dz * dz);
 
+                        // calculate q0, q1, q2
                         q0 = c0 + c1 * zin + c2 * zin * zin;
                         q1 = c1 + 2.f * c2 * zin;
                         q2 = c2;
                     }
 
+                    // load total cross section
                     sigT = SA.sigT_arr[S[QSR_id[i]].sigT_id + g];
 
+                    // calculate common values for efficiency
                     tau = sigT * ds;
                     sigT2 = sigT * sigT;
 
                     #ifdef TABLE
                     interpolateTable(table, tau, &expVal);
                     #else
-                    expVal = 1.f - expf(-tau);
+                    expVal = 1.f - expf(-tau); // EXP function is faster than table lookup
                     #endif
 
+                    // Flux Integral
+
+                    // Re-used Term
                     reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
 
+                    // add contribution to new source flux
                     flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
 
+                    // Prepare tally
                     tally = weight * flux_integral;
 
+                    // Atomic update
                     #pragma omp atomic
                     FSR_flux[g] += tally;
 
+                    // Term 1
                     t1 = q0 * expVal / sigT;
+                    // Term 2
                     t2 = q1 * mu * (tau - expVal) / sigT2;
+                    // Term 3
                     t3 = q2 * mu2 * reuse;
+                    // Term 4
                     t4 = state_flux[g] * (1.f - expVal);
+                    // Total psi
                     state_flux[g] = t1 + t2 + t3 + t4;
                 }
             }
@@ -148,6 +177,7 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned lon
 /* Interpolates a formed exponential table to compute ( 1- exp(-x) )
  *  at the desired x value */
 void interpolateTable(Table *table, float x, float *out) {
+    // check to ensure value is in domain
     if (x > table->maxVal)
         *out = 1.0f;
     else {

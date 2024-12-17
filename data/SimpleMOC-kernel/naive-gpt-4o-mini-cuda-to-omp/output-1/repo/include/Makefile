@@ -28,10 +28,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx-nvidia-cuda -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm
+LDFLAGS = -lm -lcurand
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -45,7 +45,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3
+	CFLAGS += -O3 -ffast-math
 endif
 
 # Exponential Table Build
