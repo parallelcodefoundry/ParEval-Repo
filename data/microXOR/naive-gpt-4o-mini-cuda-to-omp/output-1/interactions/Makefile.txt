@@ -1,20 +1,20 @@
 Here is the translated Makefile for the OpenMP Offload execution model:
 
-```makefile
+```Makefile
 # Makefile for OpenMP Offload microXOR
 
-CXX ?= $(CXX_COMPILER)
+CXX ?= clang++
 SM_VERSION ?= 80
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx-none -I$(INC) -std=c++17
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(SM_VERSION) -I$(INC) -std=c++17
 ifneq ($(DEBUG), yes)
 	CXXFLAGS += -O3
 else
 	CXXFLAGS += -g
 endif
-LDFLAGS ?= -lomp
+LDFLAGS ?= -lcudart
 
 CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
 DEPS = $(INC)/microXOR.hpp
@@ -36,8 +36,8 @@ clean:
 .PHONY: clean
 ```
 
-### Changes Made:
-1. Changed the compiler from `nvcc` to a C++ compiler that supports OpenMP Offload (e.g., `clang++`).
-2. Updated the flags to include OpenMP Offload compilation flags.
-3. Changed file extensions from `.cu` to `.cpp` and `.cuh` to `.hpp` to reflect C++ conventions.
-4. Adjusted the linking flags to include OpenMP libraries.
+### Key Changes:
+1. Changed the compiler from `nvcc` to `clang++` to support OpenMP Offload.
+2. Updated the flags to include `-fopenmp` and `-fopenmp-targets=nvptx64-nvidia-cuda` for OpenMP Offload.
+3. Renamed `.cu` files to `.cpp` and `.cuh` to `.hpp` to reflect C++ conventions.
+4. Adjusted the architecture flag to use `-march=sm_$(SM_VERSION)` for specifying the target architecture.

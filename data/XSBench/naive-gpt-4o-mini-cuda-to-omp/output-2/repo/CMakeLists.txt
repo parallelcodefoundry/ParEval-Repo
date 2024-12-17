@@ -14,15 +14,14 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-set(SOURCE Main.cu io.cu Simulation.cu GridInit.cu XSutils.cu Materials.cu)
-
-# Enable OpenMP Offloading
-find_package(OpenMP REQUIRED)
-
-if(OpenMP_CXX_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -fopenmp-targets=nvptx-nvidia-cuda")
-endif()
+set(SOURCE Main.c io.c Simulation.c GridInit.c XSutils.c Materials.c)
 
 add_executable(XSBench ${SOURCE})
+
+# Enable OpenMP support
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(XSBench PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 install(TARGETS XSBench DESTINATION bin)

@@ -1,5 +1,4 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
@@ -8,7 +7,7 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
-    // Move Data to GPU
+    // Move Data to Device
     SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
     profile->host_to_device_time = get_time() - start;
 
@@ -18,29 +17,21 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
     if (mype == 0) printf("Running baseline event-based simulation...\n");
 
     int nthreads = 256;
-    int nblocks = ceil((double) in.lookups / (double) nthreads);
+    int nblocks = (in.lookups + nthreads - 1) / nthreads;
 
     int nwarmups = in.num_warmups;
     start = 0.0;
     for (int i = 0; i < in.num_iterations + nwarmups; i++) {
         if (i == nwarmups) {
-            #pragma omp target
-            {
-                // Synchronize device
-                #pragma omp taskwait
-            }
             start = get_time();
         }
-        #pragma omp target
-        {
-            xs_lookup_kernel_baseline<<<nblocks, nthreads>>>(in, GSD);
+
+        #pragma omp target teams distribute parallel for num_threads(nthreads)
+        for (int j = 0; j < in.lookups; j++) {
+            xs_lookup_kernel_baseline(in, GSD, j);
         }
     }
-    #pragma omp target
-    {
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
-    }
+
     profile->kernel_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -49,15 +40,13 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    #pragma omp target
-    {
-        gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost));
-    }
+    // Copy verification results back to host
+    #pragma omp target update from GSD.verification[0:in.lookups]
     profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
-        verification_scalar += SD.verification[i];
+        verification_scalar += GSD.verification[i];
 
     release_device_memory(GSD);
 
@@ -65,15 +54,9 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 }
 
 // In this kernel, we perform a single lookup with each thread.
-#pragma omp declare target
-void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
+void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 {
     // The lookup ID. Used to set the seed, and to store the verification value
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (i >= in.lookups)
-        return;
-
     // Set the initial seed value
     uint64_t seed = STARTING_SEED;
 
@@ -120,6 +103,5 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
     }
     GSD.verification[i] = max_idx + 1;
 }
-#pragma omp end declare target
 
 // Other functions remain unchanged...

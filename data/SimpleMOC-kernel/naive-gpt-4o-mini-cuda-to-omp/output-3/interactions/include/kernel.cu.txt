@@ -1,4 +1,4 @@
-Here is the translated `include/kernel.cu` file using the OpenMP Offload execution model:
+Here is the translated `kernel.c` file using the OpenMP offload execution model:
 
 ```c
 #include "SimpleMOC-kernel_header.h"
@@ -16,24 +16,26 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
                 float *state_fluxes, int N_state_fluxes)
 {
     #pragma omp target teams distribute parallel for
-    for (int blockId = 0; blockId < (I.segments / I.seg_per_thread); blockId++) {
+    for (int blockId = 0; blockId < I.segments / I.seg_per_thread; blockId++)
+    {
         // Assign RNG state
         curandState *localState = &state[blockId % I.streams];
 
         int g; // Each energy group (g) is one thread in a block
 
         // Thread Local (i.e., specific to E group) variables
-        // Similar to SIMD vectors in CPU code
         float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
 
-        // Randomized variables (common across all threads within block)
+        // Randomized variables (common across all thread within block)
         int state_flux_id[I.seg_per_thread];
         int QSR_id[I.seg_per_thread];
         int FAI_id[I.seg_per_thread];
 
-        // Initialize shared state
-        if (omp_get_thread_num() == 0) {
-            for (int i = 0; i < I.seg_per_thread; i++) {
+        // Initialize RNG states
+        if (omp_get_thread_num() == 0)
+        {
+            for (int i = 0; i < I.seg_per_thread; i++)
+            {
                 state_flux_id[i] = curand(localState) % N_state_fluxes;
                 QSR_id[i] = curand(localState) % I.source_3D_regions;
                 FAI_id[i] = curand(localState) % I.fine_axial_intervals;
@@ -42,14 +44,15 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
 
         #pragma omp barrier
 
-        for (int i = 0; i < I.seg_per_thread; i++) {
+        for (int i = 0; i < I.seg_per_thread; i++)
+        {
             blockId++;
 
             float *state_flux = &state_fluxes[state_flux_id[i]];
 
             // Attenuate Segment
             float dz = 0.1f;
-            float zin = 0.3f; 
+            float zin = 0.3f;
             float weight = 0.5f;
             float mu = 0.9f;
             float mu2 = 0.3f;
@@ -60,10 +63,12 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
             // load fine source region flux vector
             float *FSR_flux = &SA.fine_flux_arr[S[QSR_id[i]].fine_flux_id + FAI_id[i] * egroups];
 
-            if (FAI_id[i] == 0) {
+            if (FAI_id[i] == 0)
+            {
                 float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                 float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
                 // cycle over energy groups
+                // load neighboring sources
                 float y2 = f2[g];
                 float y3 = f3[g];
 
@@ -75,10 +80,13 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
                 q0 = c0 + c1 * zin;
                 q1 = c1;
                 q2 = 0;
-            } else if (FAI_id[i] == I.fine_axial_intervals - 1) {
+            }
+            else if (FAI_id[i] == I.fine_axial_intervals - 1)
+            {
                 float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
                 float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                 // cycle over energy groups
+                // load neighboring sources
                 float y1 = f1[g];
                 float y2 = f2[g];
 
@@ -90,12 +98,15 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
                 q0 = c0 + c1 * zin;
                 q1 = c1;
                 q2 = 0;
-            } else {
+            }
+            else
+            {
                 float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
                 float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                 float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
                 // cycle over energy groups
-                float y1 = f1[g]; 
+                // load neighboring sources
+                float y1 = f1[g];
                 float y2 = f2[g];
                 float y3 = f3[g];
 
@@ -117,34 +128,26 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
             tau = sigT * ds;
             sigT2 = sigT * sigT;
 
-            float expVal;
-            #ifdef TABLE
-            interpolateTable(table, tau, &expVal);  
-            #else
-            expVal = 1.f - expf(-tau); // EXP function is faster than table lookup
-            #endif
+            // Interpolate or calculate expVal
+            interpolateTable(table, tau, &expVal);
 
             // Flux Integral
-            reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2); 
+            reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
 
             // add contribution to new source flux
-            flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + 
-                             q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
+            flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
 
             // Prepare tally
             tally = weight * flux_integral;
 
-            // SHOULD BE ATOMIC HERE!
+            // Atomic addition
             #pragma omp atomic
             FSR_flux[g] += tally;
 
-            // Term 1
-            t1 = q0 * expVal / sigT;  
-            // Term 2
-            t2 = q1 * mu * (tau - expVal) / sigT2; 
-            // Term 3
+            // Term calculations
+            t1 = q0 * expVal / sigT;
+            t2 = q1 * mu * (tau - expVal) / sigT2;
             t3 = q2 * mu2 * reuse;
-            // Term 4
             t4 = state_flux[g] * (1.f - expVal);
             // Total psi
             state_flux[g] = t1 + t2 + t3 + t4;
@@ -172,9 +175,9 @@ void interpolateTable(Table *table, float x, float *out)
 ```
 
 ### Key Changes:
-1. **Kernel Launch**: The CUDA kernel launch syntax has been replaced with OpenMP directives. The `#pragma omp target teams distribute parallel for` directive is used to offload the computation to the target device.
-2. **Shared Memory**: The shared memory concept from CUDA has been replaced with local arrays in the function scope, as OpenMP handles thread-local storage differently.
-3. **Atomic Operations**: The atomic addition operation has been preserved using `#pragma omp atomic`.
-4. **Random Number Generation**: The random number generation logic has been adapted to fit within the OpenMP parallel region.
+1. The CUDA kernel launch syntax has been replaced with OpenMP directives for offloading to the target device.
+2. The use of shared memory has been replaced with local arrays since OpenMP does not have a direct equivalent to CUDA's shared memory.
+3. The atomic operations are handled using OpenMP's `#pragma omp atomic` directive.
+4. The random number generation and initialization logic has been adapted to fit within the OpenMP parallel region. 
 
-This code assumes that the necessary OpenMP libraries and flags are set up in the build system to support offloading.
+Make sure to include the necessary OpenMP headers and compile with OpenMP support enabled.

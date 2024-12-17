@@ -52,7 +52,7 @@ typedef struct {
     int N;
 } Table;
 
-// Function prototypes for kernels and utility functions
+// kernel.c
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
 

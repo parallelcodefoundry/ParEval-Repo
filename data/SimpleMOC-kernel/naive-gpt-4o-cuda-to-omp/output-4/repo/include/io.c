@@ -80,26 +80,21 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    // OpenMP does not have a direct equivalent for CUDA device properties,
-    // so we will skip this part or replace it with a generic message.
-    printf("%-25s%s\n", "Device: ", "OpenMP Target Device");
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
     printf("%-25s%d\n", "Fine Axial Intervals:", I.fine_axial_intervals);
     printf("%-25s%d\n", "Axial Decomposition:", I.decomp_assemblies_ax);
     printf("%-25s%d\n", "3D Source Regions:", I.source_3D_regions);
-    printf("%-25s", "Segments:");
-    fancy_int(I.segments);
-    printf("%-25s", "Random Number Streams:");
-    fancy_int(I.streams);
+    printf("%-25s", "Segments:"); fancy_int(I.segments);
+    printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
-    printf("%-25s%d\n", "Segments per Thread:", I.seg_per_thread);
-#ifdef TABLE
+    printf("%-25s%d\n", "Segments per OpenMP thread:", I.seg_per_thread);
+    #ifdef TABLE
     printf("%-25s%s\n", "Exponential Table:", "ON");
-#else
+    #else
     printf("%-25s%s\n", "Exponential Table:", "OFF");
-#endif
+    #endif
     border_print();
 }
 
@@ -107,11 +102,13 @@ void print_input_summary(Input I)
 void read_CLI(int argc, char *argv[], Input *input)
 {
     // Collect Raw Input
-    for (int i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++)
+    {
         char *arg = argv[i];
 
         // nthreads (-t)
-        if (strcmp(arg, "-t") == 0) {
+        if (strcmp(arg, "-t") == 0)
+        {
             if (++i < argc)
                 input->nthreads = atoi(argv[i]);
             else
@@ -119,7 +116,8 @@ void read_CLI(int argc, char *argv[], Input *input)
         }
 
         // segments (-s)
-        else if (strcmp(arg, "-s") == 0) {
+        else if (strcmp(arg, "-s") == 0)
+        {
             if (++i < argc)
                 input->segments = atoi(argv[i]);
             else
@@ -127,27 +125,22 @@ void read_CLI(int argc, char *argv[], Input *input)
         }
 
         // egroups (-e)
-        else if (strcmp(arg, "-e") == 0) {
+        else if (strcmp(arg, "-e") == 0)
+        {
             if (++i < argc)
                 input->egroups = atoi(argv[i]);
             else
                 print_CLI_error();
         }
         // segments per thread (-p)
-        else if (strcmp(arg, "-p") == 0) {
+        else if (strcmp(arg, "-p") == 0)
+        {
             if (++i < argc)
                 input->seg_per_thread = atoi(argv[i]);
             else
                 print_CLI_error();
         }
-        // Device Number (-d)
-        else if (strcmp(arg, "-d") == 0) {
-            // OpenMP does not require setting a device ID in the same way CUDA does
-            if (++i < argc) {
-                // Placeholder for device selection logic if needed
-            } else
-                print_CLI_error();
-        } else
+        else
             print_CLI_error();
     }
 }
@@ -160,8 +153,7 @@ void print_CLI_error(void)
     printf("  -t <threads>          Number of OpenMP threads to run\n");
     printf("  -s <segments>         Number of segments to process\n");
     printf("  -e <energy groups>    Number of energy groups\n");
-    printf("  -p <segs per thread>  Number of segments per thread\n");
-    printf("  -d <device ID>        Device ID number (not used in OpenMP)\n");
+    printf("  -p <segs per thread>  Number of segments per OpenMP thread\n");
     printf("See readme for full description of default run values\n");
     exit(1);
 }

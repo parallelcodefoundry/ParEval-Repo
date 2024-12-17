@@ -53,18 +53,15 @@ typedef struct {
 // Function prototypes
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-void setup_kernel(Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I);
+void setup_kernel(int streams, unsigned long *state);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned long *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
 double mem_estimate(Input I);
 
-// Error handling
-void check_omp_error(int err, const char *file, const int line);
-
-#define OMP_CALL(x) do { int err = (x); if (err != 0) { \
-    check_omp_error(err, __FILE__, __LINE__); }} while(0)
+// Error checking
+void __ompCheckError(const char *file, const int line);
 
 #endif

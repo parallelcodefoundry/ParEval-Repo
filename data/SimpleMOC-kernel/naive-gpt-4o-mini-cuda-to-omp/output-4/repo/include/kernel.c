@@ -5,16 +5,15 @@
  * block represent a single energy phase. On the CPU, the
  * inner SIMD-ized loop is over energy (i.e, 100 energy groups).
  * This should allow for each BLOCK to have:
- * 		- A single state variable for the RNG
- * 		- A set of __shared__ SIMD vectors, each thread id being its idx
+ *      - A single state variable for the RNG
+ *      - A set of __shared__ SIMD vectors, each thread id being its idx
  */
 
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState *state,
                 float *state_fluxes, int N_state_fluxes)
 {
-    #pragma omp target teams distribute parallel for collapse(2) \
-        num_threads(I.nthreads) // Offload to the device
-    for (int blockId = 0; blockId < (I.segments / I.seg_per_thread); blockId++) {
+    #pragma omp target teams distribute parallel for
+    for (int blockId = 0; blockId < I.segments / I.seg_per_thread; blockId++) {
         // Assign RNG state
         curandState *localState = &state[blockId % I.streams];
 
@@ -23,11 +22,12 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
         // Thread Local (i.e., specific to E group) variables
         float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
 
-        // Randomized variables (common across all thread within block)
+        // Randomized variables (common across all threads within block)
         int state_flux_id[I.seg_per_thread];
         int QSR_id[I.seg_per_thread];
         int FAI_id[I.seg_per_thread];
 
+        // Initialize RNG states for the segment
         if (omp_get_thread_num() == 0) {
             for (int i = 0; i < I.seg_per_thread; i++) {
                 state_flux_id[i] = curand(localState) % N_state_fluxes;
@@ -43,18 +43,9 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
 
             float *state_flux = &state_fluxes[state_flux_id[i]];
 
-            #pragma omp barrier
-
-            //////////////////////////////////////////////////////////
             // Attenuate Segment
-            //////////////////////////////////////////////////////////
-
-            // Some placeholder constants - In the full app some of these are
-            // calculated based off position in geometry. This treatment
-            // shaves off a few FLOPS, but is not significant compared to the
-            // rest of the function.
             float dz = 0.1f;
-            float zin = 0.3f;
+            float zin = 0.3f; 
             float weight = 0.5f;
             float mu = 0.9f;
             float mu2 = 0.3f;
@@ -69,7 +60,6 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
                 float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                 float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
                 // cycle over energy groups
-                // load neighboring sources
                 float y2 = f2[g];
                 float y3 = f3[g];
 
@@ -85,7 +75,6 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
                 float *f1 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] - 1) * egroups];
                 float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                 // cycle over energy groups
-                // load neighboring sources
                 float y1 = f1[g];
                 float y2 = f2[g];
 
@@ -102,8 +91,7 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
                 float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
                 float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
                 // cycle over energy groups
-                // load neighboring sources
-                float y1 = f1[g];
+                float y1 = f1[g]; 
                 float y2 = f2[g];
                 float y3 = f3[g];
 
@@ -125,32 +113,29 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
             tau = sigT * ds;
             sigT2 = sigT * sigT;
 
+            float expVal;
             #ifdef TABLE
-            interpolateTable(table, tau, &expVal);
+            interpolateTable(table, tau, &expVal);  
             #else
             expVal = 1.f - expf(-tau); // EXP function is faster than table lookup
             #endif
 
             // Flux Integral
-
-            // Re-used Term
-            reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
-
-            // add contribution to new source flux
-            flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
+            reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2); 
+            flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + 
+                             q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
 
             // Prepare tally
             tally = weight * flux_integral;
 
             // SHOULD BE ATOMIC HERE!
-            // FSR_flux[g] += tally;
             #pragma omp atomic
             FSR_flux[g] += tally;
 
             // Term 1
-            t1 = q0 * expVal / sigT;
+            t1 = q0 * expVal / sigT;  
             // Term 2
-            t2 = q1 * mu * (tau - expVal) / sigT2;
+            t2 = q1 * mu * (tau - expVal) / sigT2; 
             // Term 3
             t3 = q2 * mu2 * reuse;
             // Term 4
@@ -161,8 +146,8 @@ void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState 
     }
 }
 
-/* Interpolates a formed exponential table to compute ( 1- exp(-x) )
- *  at the desired x value */
+/* Interpolates a formed exponential table to compute (1 - exp(-x))
+ * at the desired x value */
 void interpolateTable(Table *table, float x, float *out)
 {
     // check to ensure value is in domain

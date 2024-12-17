@@ -1,4 +1,4 @@
-Here is the translated Makefile for the OpenMP Offload execution model:
+Here's the translated Makefile for the OpenMP Offload execution model:
 
 ```makefile
 #===============================================================================
@@ -40,7 +40,7 @@ LDFLAGS = -lm
 # LLVM Compiler
 ifeq ($(COMPILER),llvm)
   CC = clang
-  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH) -std=c11
+  CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xclang -target-cpu=sm_$(CUDA_ARCH) -std=c11
 endif
 
 # Debug Flags
@@ -80,4 +80,11 @@ run:
 	./$(program)
 ```
 
-This Makefile is set up to compile the code using the OpenMP Offload model with the LLVM compiler targeting NVIDIA GPUs. The flags are adjusted accordingly to support OpenMP and the necessary architecture.
+### Key Changes Made:
+1. **File Extensions**: Changed `.cu` to `.c` to reflect the C codebase.
+2. **Compiler**: Set up for `llvm` with OpenMP offloading support.
+3. **OpenMP Flags**: Added flags for OpenMP offloading to NVIDIA GPUs.
+4. **CUDA Architecture**: Used `CUDA_ARCH` variable to specify the target architecture for the offload.
+5. **Standard**: Changed the C standard to `c11` for compatibility with modern C features. 
+
+This Makefile should allow you to compile the code for OpenMP offload to an NVIDIA GPU using the specified compiler and architecture.

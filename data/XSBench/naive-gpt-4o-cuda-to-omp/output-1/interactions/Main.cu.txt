@@ -1,7 +1,7 @@
-Here is the translated `Main.cu` file to the OpenMP Offload execution model:
+Here is the translated `Main.cu` file to the OpenMP-offload execution model. The translation assumes that the necessary OpenMP headers and pragmas are used to manage offloading to the GPU.
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
@@ -111,8 +111,6 @@ int main(int argc, char *argv[]) {
 ```
 
 ### Key Changes:
-- The CUDA-specific calls and error checks have been removed since OpenMP Offload handles device management differently.
-- The OpenMP header `<omp.h>` is included to support OpenMP functionalities.
-- The code structure remains largely the same to ensure that the command line interface and logic are preserved.
-
-This translation assumes that the OpenMP offload versions of the functions like `run_event_based_simulation_baseline` and others are implemented elsewhere in the codebase, replacing their CUDA counterparts.
+- The CUDA-specific calls and error checks have been removed.
+- The OpenMP offload model will be used in the simulation functions (not shown here), which should include OpenMP pragmas for offloading to the GPU.
+- The command-line interface and overall structure remain unchanged to ensure compatibility with the existing CLI options.

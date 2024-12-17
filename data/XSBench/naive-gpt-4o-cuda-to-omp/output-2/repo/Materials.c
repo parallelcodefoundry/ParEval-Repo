@@ -1,4 +1,9 @@
-#include "XSbench_header.cuh"
+// Material data is hard coded into the functions in this file.
+// Note that there are 12 materials present in H-M (large or small)
+
+#include "XSbench_header.h"
+#include <stdlib.h>
+#include <string.h>
 #include <omp.h>
 
 // num_nucs represents the number of nuclides that each material contains

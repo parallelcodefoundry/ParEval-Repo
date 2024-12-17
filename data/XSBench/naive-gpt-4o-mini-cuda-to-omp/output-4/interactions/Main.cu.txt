@@ -1,7 +1,7 @@
-Here's the translated `Main.cu` file using the OpenMP offload execution model:
+Here is the translated `Main.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification, profile)
+    #pragma omp target
     {
         if (in.simulation_method == EVENT_BASED) {
             if (in.kernel_id == 0)
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
             }
         } else {
             printf(
-                "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
+                "History-based simulation not implemented in OpenMP code. Instead,\nuse "
                 "the event-based method with \"-m event\" argument.\n");
             exit(1);
         }
@@ -113,9 +113,9 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-### Key Changes Made:
-1. **OpenMP Target Directives**: The `#pragma omp target data` directive is used to manage data movement between the host and device. This allows the specified variables to be transferred to the device for computation.
-2. **Maintained Command Line Interface**: The command line interface remains unchanged, ensuring that the program can still be executed with the same arguments as before.
-3. **Data Mapping**: The `map(to: ...)` and `map(from: ...)` clauses are used to specify which variables should be transferred to and from the device, respectively.
+### Key Changes:
+1. **OpenMP Directives**: The `#pragma omp target` directive is used to offload the simulation execution to the target device.
+2. **Function Calls**: The function calls remain the same, as they will be executed on the target device when offloaded.
+3. **Command Line Interface**: The command line interface remains unchanged, ensuring that the functionality of the program is preserved.
 
-This translation assumes that the functions called within the simulation (like `run_event_based_simulation_baseline`, etc.) are compatible with the OpenMP offload model and have been appropriately modified to work with OpenMP offloading.
+This code should work as expected with the command line interface, allowing for commands like `./XSBench -m event -s large` to run the event-based simulation with the specified input size.

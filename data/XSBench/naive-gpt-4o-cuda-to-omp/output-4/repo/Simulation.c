@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -41,17 +41,16 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
+
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
         verification_scalar += SD.verification[i];
-    profile->device_to_host_time = get_time() - start;
 
     release_device_memory(GSD);
 
     return verification_scalar;
 }
 
-// In this kernel, we perform a single lookup with each thread.
 void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 {
     if (i >= in.lookups)
@@ -75,22 +74,24 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
         mat,             // Sampled material type index neutron is in
         in.n_isotopes,   // Total number of isotopes in simulation
         in.n_gridpoints, // Number of gridpoints per isotope in simulation
-        GSD.num_nucs,     // 1-D array with number of nuclides per material
-        GSD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
+        GSD.num_nucs,    // 1-D array with number of nuclides per material
+        GSD.concs,       // Flattened 2-D array with concentration of each nuclide in each material
         GSD.unionized_energy_array, // 1-D Unionized energy array
-        GSD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
+        GSD.index_grid,  // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
         GSD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
-        GSD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
+        GSD.mats,        // Flattened 2-D array with nuclide indices defining composition of each type of material
         macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
         in.grid_type,    // Lookup type (nuclide, hash, or unionized)
         in.hash_bins,    // Number of hash bins used (if using hash lookup type)
-        GSD.max_num_nucs  // Maximum number of nuclides present in any material
+        GSD.max_num_nucs // Maximum number of nuclides present in any material
     );
 
     // For verification, and to prevent the compiler from optimizing
     // all work out, we interrogate the returned macro_xs_vector array
     // to find its maximum value index, then increment the verification
-    // value by that index.
+    // value by that index. In this implementation, we have each thread
+    // write to its thread_id index in an array, which we will reduce
+    // with a thrust reduction kernel after the main simulation kernel.
     double max = -1.0;
     int max_idx = 0;
     for (int j = 0; j < 5; j++) {
@@ -222,8 +223,10 @@ void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
     // looked up & interpolatied (via calculate_micro_xs). Then, the
     // micro XS is multiplied by the concentration of that nuclide
     // in the material, and added to the total macro XS array.
-    for (int j = 0; j < num_nucs[mat]; j++)
-    {
+    // (Independent -- though if parallelizing, must use atomic operations
+    //  or otherwise control access to the xs_vector and macro_xs_vector to
+    //  avoid simulataneous writing to the same data structure)
+    for (int j = 0; j < num_nucs[mat]; j++) {
         double xs_vector[5];
         p_nuc = mats[mat * max_num_nucs + j];
         conc = concs[mat * max_num_nucs + j];
@@ -244,8 +247,7 @@ long grid_search(long n, double quarry, double* __restrict__ A)
     long examinationPoint;
     long length = upperLimit - lowerLimit;
 
-    while (length > 1)
-    {
+    while (length > 1) {
         examinationPoint = lowerLimit + (length / 2);
 
         if (A[examinationPoint] > quarry)
@@ -267,8 +269,7 @@ long grid_search_nuclide(long n, double quarry, NuclideGridPoint* A, long low, l
     long examinationPoint;
     long length = upperLimit - lowerLimit;
 
-    while (length > 1)
-    {
+    while (length > 1) {
         examinationPoint = lowerLimit + (length / 2);
 
         if (A[examinationPoint].energy > quarry)
@@ -285,25 +286,10 @@ long grid_search_nuclide(long n, double quarry, NuclideGridPoint* A, long low, l
 // picks a material based on a probabilistic distribution
 int pick_mat(uint64_t* seed)
 {
-    double dist[12];
-    dist[0] = 0.140;    // fuel
-    dist[1] = 0.052;    // cladding
-    dist[2] = 0.275;    // cold, borated water
-    dist[3] = 0.134;    // hot, borated water
-    dist[4] = 0.154;    // RPV
-    dist[5] = 0.064;    // Lower, radial reflector
-    dist[6] = 0.066;    // Upper reflector / top plate
-    dist[7] = 0.055;    // bottom plate
-    dist[8] = 0.008;    // bottom nozzle
-    dist[9] = 0.015;    // top nozzle
-    dist[10] = 0.025;   // top of fuel assemblies
-    dist[11] = 0.013;   // bottom of fuel assemblies
-
+    double dist[12] = {0.140, 0.052, 0.275, 0.134, 0.154, 0.064, 0.066, 0.055, 0.008, 0.015, 0.025, 0.013};
     double roll = LCG_random_double(seed);
 
-    // makes a pick based on the distro
-    for (int i = 0; i < 12; i++)
-    {
+    for (int i = 0; i < 12; i++) {
         double running = 0;
         for (int j = i; j > 0; j--)
             running += dist[j];
@@ -334,10 +320,8 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n)
     uint64_t a_new = 1;
     uint64_t c_new = 0;
 
-    while (n > 0)
-    {
-        if (n & 1)
-        {
+    while (n > 0) {
+        if (n & 1) {
             a_new *= a;
             c_new = c_new * a + c;
         }

@@ -3,7 +3,7 @@ Here is the translated Makefile for the OpenMP Offload execution model:
 ```Makefile
 # Makefile for OpenMP Offload microXOR
 
-CXX ?= $(CXX_COMPILER)
+CXX ?= clang++
 SM_VERSION ?= 80
 SRC = src
 INC = include
@@ -14,7 +14,7 @@ ifneq ($(DEBUG), yes)
 else
 	CXXFLAGS += -g
 endif
-LDFLAGS ?= 
+LDFLAGS ?= -lomp
 
 CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
 DEPS = $(INC)/microXOR.hpp
@@ -37,7 +37,8 @@ clean:
 ```
 
 ### Changes Made:
-1. Changed the compiler from `nvcc` to a C++ compiler that supports OpenMP Offload (e.g., `clang++`).
-2. Updated the flags to use OpenMP Offload options (`-fopenmp` and `-fopenmp-targets=nvptx-none`).
-3. Changed file extensions from `.cu` to `.cpp` and `.cuh` to `.hpp` to reflect C++ conventions.
-4. Adjusted the architecture flag to use `-march=sm$(SM_VERSION)` for OpenMP Offload compatibility.
+1. Changed the compiler from `nvcc` to `clang++` for OpenMP Offload.
+2. Updated the flags to use OpenMP Offload (`-fopenmp` and `-fopenmp-targets=nvptx-none`).
+3. Renamed the source and header files from `.cu` to `.cpp` and `.cuh` to `.hpp` respectively.
+4. Adjusted the architecture flag to use `-march=sm$(SM_VERSION)` for specifying the target architecture.
+5. Updated the linking flags to include OpenMP (`-lomp`).

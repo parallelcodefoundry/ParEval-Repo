@@ -10,8 +10,8 @@ int main(int argc, char *argv[]) {
     read_CLI(argc, argv, &I);
 
     // Calculate Number of 3D Source Regions
-    I.source_3D_regions = (int)ceil((double)I.source_2D_regions *
-                                    I.coarse_axial_intervals / I.decomp_assemblies_ax);
+    I.source_3D_regions = (int) ceil((double)I.source_2D_regions *
+                                     I.coarse_axial_intervals / I.decomp_assemblies_ax);
 
     logo(version);
 
@@ -34,94 +34,67 @@ int main(int argc, char *argv[]) {
     table_d = &table;
 #endif
 
-    // Setup OpenMP target
+    // Setup OpenMP offloading
     int n_blocks = sqrt(I.segments);
-    int blocks_x = n_blocks;
-    int blocks_y = n_blocks;
-    if (blocks_x * blocks_y < I.segments)
-        blocks_x++;
-    if (blocks_x * blocks_y < I.segments)
-        blocks_y++;
-    assert(blocks_x * blocks_y >= I.segments);
+    if (n_blocks * n_blocks < I.segments)
+        n_blocks++;
+    if (n_blocks * n_blocks < I.segments)
+        n_blocks++;
+    assert(n_blocks * n_blocks >= I.segments);
 
-    // Setup RNG on Device
+    // Setup RNG states
     printf("Setting up RNG...\n");
-    curandState *RNG_states;
-    RNG_states = (curandState *)malloc(I.streams * sizeof(curandState));
-
-    #pragma omp target data map(to: I, SA_d, sources_d[:I.source_3D_regions]) \
-                            map(alloc: RNG_states[:I.streams])
-    {
-        #pragma omp target teams distribute parallel for
-        for (int i = 0; i < I.streams; i++) {
-            setup_kernel(&RNG_states[i], I);
-        }
-
-        // Allocate Some Flux State vectors to randomly pick from
-        printf("Setting up Flux State Vectors...\n");
-        float *flux_states;
-        int N_flux_states = 10000;
-        assert(I.segments >= N_flux_states);
-        flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
-
-        #pragma omp target teams distribute parallel for collapse(2)
-        for (int bx = 0; bx < blocks_x; bx++) {
-            for (int by = 0; by < blocks_y; by++) {
-                init_flux_states(flux_states, N_flux_states, I, RNG_states);
-            }
-        }
-
-        printf("Initialization Complete.\n");
-        border_print();
-        center_print("SIMULATION", 79);
-        border_print();
-        printf("Attenuating fluxes across segments...\n");
-
-        // OpenMP timer variables
-        double start, stop;
-        start = omp_get_wtime();
-
-        // Setup kernel call block parameters
-        assert(I.segments % I.seg_per_thread == 0);
-        n_blocks = sqrt(I.segments / I.seg_per_thread);
-        blocks_x = n_blocks;
-        blocks_y = n_blocks;
-        if (blocks_x * blocks_y < I.segments / I.seg_per_thread)
-            blocks_x++;
-        if (blocks_x * blocks_y < I.segments / I.seg_per_thread)
-            blocks_y++;
-        assert(blocks_x * blocks_y >= I.segments / I.seg_per_thread);
-
-        // Run Simulation Kernel Loop
-        #pragma omp target teams distribute parallel for collapse(2) \
-            map(to: I, SA_d, sources_d[:I.source_3D_regions], table_d[:1], RNG_states[:I.streams], flux_states[:N_flux_states * I.egroups])
-        for (int bx = 0; bx < blocks_x; bx++) {
-            for (int by = 0; by < blocks_y; by++) {
-                run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
-            }
-        }
-
-        stop = omp_get_wtime();
-
-        float *host_flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
-        #pragma omp target update from(host_flux_states[:N_flux_states * I.egroups])
-
-        printf("Simulation Complete.\n");
-
-        border_print();
-        center_print("RESULTS SUMMARY", 79);
-        border_print();
-
-        double time = stop - start;
-        double tpi = (time / (double)I.segments / (double)I.egroups) * 1.0e9;
-        printf("%-25s%.3f seconds\n", "Runtime:", time);
-        printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
-        border_print();
+    curandState *RNG_states = (curandState *) malloc(I.streams * sizeof(curandState));
+    #pragma omp target enter data map(alloc: RNG_states[0:I.streams])
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < I.streams; i++) {
+        setup_kernel(&RNG_states[i], I);
     }
 
-    free(RNG_states);
-    free(flux_states);
+    // Allocate Some Flux State vectors to randomly pick from
+    printf("Setting up Flux State Vectors...\n");
+    float *flux_states;
+    int N_flux_states = 10000;
+    assert(I.segments >= N_flux_states);
+    #pragma omp target enter data map(alloc: flux_states[0:N_flux_states * I.egroups])
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < N_flux_states; i++) {
+        init_flux_states(flux_states, N_flux_states, I, RNG_states);
+    }
+
+    printf("Initialization Complete.\n");
+    border_print();
+    center_print("SIMULATION", 79);
+    border_print();
+    printf("Attenuating fluxes across segments...\n");
+
+    // Run Simulation Kernel Loop
+    double start_time = omp_get_wtime();
+    #pragma omp target teams distribute parallel for
+    for (int blockId = 0; blockId < n_blocks * n_blocks; blockId++) {
+        run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
+    }
+    double end_time = omp_get_wtime();
+    double time = end_time - start_time;
+
+    float *host_flux_states = (float *) malloc(N_flux_states * I.egroups * sizeof(float));
+    #pragma omp target update from(flux_states[0:N_flux_states * I.egroups])
+
+    printf("Simulation Complete.\n");
+
+    border_print();
+    center_print("RESULTS SUMMARY", 79);
+    border_print();
+
+    double tpi = (time / (double)I.segments / (double)I.egroups) * 1.0e9;
+    printf("%-25s%.3f seconds\n", "Runtime:", time);
+    printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
+    border_print();
+
+    // Free allocated memory
     free(host_flux_states);
+    #pragma omp target exit data map(delete: flux_states[0:N_flux_states * I.egroups])
+    #pragma omp target exit data map(delete: RNG_states[0:I.streams])
 
     return 0;
 }

@@ -27,7 +27,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in OpenMP with offloading capabilities for use with various accelerator architectures. 
+XSBench has been implemented in OpenMP Offload for use with various accelerator architectures. 
 
 ## Compilation
 
@@ -49,10 +49,10 @@ DEBUG    = no
 PROFILE  = no
 MPI      = no
 ```
-- Optimization enables the `-O3` optimization flag.
-- Debugging enables the `-g` flag.
-- Profiling enables the `-pg` flag. When profiling the code, you may
-wish to significantly increase the number of lookups (with the `-l`
+- Optimization enables the -O3 optimization flag.
+- Debugging enables the -g flag.
+- Profiling enables the -pg flag. When profiling the code, you may
+wish to significantly increase the number of lookups (with the -l
 flag) in order to wash out the initialization phase of the code.
 - MPI enables MPI support in the code.
 
@@ -111,11 +111,11 @@ While XSBench is primarily used to investigate "on node parallelism" issues, som
 
 ### Verification Support
 
-Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on GPU vs CPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc, will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
+Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on GPU vs CPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
 
 ### Binary File Support
 
-Instead of initializing the randomized synthetic cross section data structres in XSBench everytime it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization. This process is controlled with the "-b (read, write)" command line argument. This feature may be extremely useful for users running on simulators where walltime minimization is critical for logistical purposes, or for users who are doing many sequential runs. Note that identical input parameters (problem size, solution method etc) must be used when reading and writing a binary file. No runtime checks are made to validate that the file correctly corresponds to the selected input parameters.
+Instead of initializing the randomized synthetic cross section data structures in XSBench every time it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization. This process is controlled with the "-b (read, write)" command line argument. This feature may be extremely useful for users running on simulators where walltime minimization is critical for logistical purposes, or for users who are doing many sequential runs. Note that identical input parameters (problem size, solution method etc) must be used when reading and writing a binary file. No runtime checks are made to validate that the file correctly corresponds to the selected input parameters.
 
 
 ## Algorithms
@@ -148,7 +148,7 @@ while any particles are alive do	     // Dependent
 		Process particle collision
 	Sort/consolidate surviving particles
 ```
-This method of parallelism is requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels. The benefit of this model is that kernels can potentially be execute in a SIMD manner and with higher cache efficiency due to the potential to sort particles by material and energy. On CPU architectures, the costs of sorting and buffering particles typically outweigh the benefits of the event-based model, but on accelerator architectures the tradeoff has been found to usually be more favorable.
+This method of parallelism requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels. The benefit of this model is that kernels can potentially be executed in a SIMD manner and with higher cache efficiency due to the potential to sort particles by material and energy. On CPU architectures, the costs of sorting and buffering particles typically outweigh the benefits of the event-based model, but on accelerator architectures the tradeoff has been found to usually be more favorable.
 
 ### Cross Section (XS) Lookup Methods
 
@@ -156,7 +156,7 @@ XSBench represents the macroscopic cross section lookup kernel. This kernel is r
 
 <p align="center"> <img src="docs/img/XS_equation.svg" alt="XS_Lookup_EQ" width="500"/> </p>
 
-Macroscopic cross section data is typically required for multiple reaction channels "c", such as the total cross section, fission cross section, etc. This data is typically stored in point-wise data form for each nuclide. There are multiple ways of accessesing this data in an efficient manner which will be discusses in this section.
+Macroscopic cross section data is typically required for multiple reaction channels "c", such as the total cross section, fission cross section, etc. This data is typically stored in point-wise data form for each nuclide. There are multiple ways of accessing this data in an efficient manner which will be discussed in this section.
 
 #### Nuclide Grid
 
@@ -201,4 +201,4 @@ Unionized_Grid_Search( Energy E, Material M ):
 
 #### Logarithmic Hash Grid
 
-An alternative to the unionized energy grid is the logarithmic hash grid. This method takes in account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform maner in
+An alternative to the unionized energy grid is the logarithmic hash grid. This method takes into account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform manner in log space. Therefore, the nuclide grid is augmented with

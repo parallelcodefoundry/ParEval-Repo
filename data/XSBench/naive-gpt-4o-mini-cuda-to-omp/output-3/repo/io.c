@@ -1,5 +1,4 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -12,7 +11,7 @@ void logo(int version)
     "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
     "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
     "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
-           );
+    );
     border_print();
     center_print("Developed at Argonne National Laboratory", 79);
     char v[100];
@@ -104,7 +103,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
     if(mype == 0 )
     {
         if( is_invalid_result )
-            printf("Verification checksum: %llu (WARNING - INVALID CHECKSUM!)\n", vhash);
+            printf("Verification checksum: %llu (WARNING - INAVALID CHECKSUM!)\n", vhash);
         else
             printf("Verification checksum: %llu (Valid)\n", vhash);
         border_print();
@@ -123,7 +122,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     printf("Programming Model:            OpenMP Offload\n");
     #pragma omp target
     {
-        printf("OpenMP Device:                  %s\n", "OpenMP Device"); // Placeholder for actual device info
+        printf("OpenMP Device:                  %s\n", "OpenMP Device"); // Placeholder for device info
     }
     if( in.simulation_method == EVENT_BASED )
         printf("Simulation Method:            Event Based\n");
@@ -172,6 +171,8 @@ void print_inputs(Inputs in, int nprocs, int version )
     else
         printf("Write\n");
     border_print();
+    center_print("INITIALIZATION - DO NOT PROFILE", 79);
+    border_print();
 }
 
 void border_print(void)
@@ -186,13 +187,10 @@ void fancy_int( long a )
 {
     if( a < 1000 )
         printf("%ld\n",a);
-
     else if( a >= 1000 && a < 1000000 )
         printf("%ld,%03ld\n", a / 1000, a % 1000);
-
     else if( a >= 1000000 && a < 1000000000 )
         printf("%ld,%03ld,%03ld\n",a / 1000000,(a % 1000000) / 1000,a % 1000 );
-
     else if( a >= 1000000000 )
         printf("%ld,%03ld,%03ld,%03ld\n",
                a / 1000000000,
@@ -337,7 +335,9 @@ Inputs read_CLI( int argc, char * argv[] )
         else if( strcmp(arg, "-h") == 0 )
         {
             if( ++i < argc )
+            {
                 input.hash_bins = atoi(argv[i]);
+            }
             else
                 print_CLI_error();
         }

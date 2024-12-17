@@ -1,7 +1,7 @@
-Here is the translated `Main.cu` file using the OpenMP offload execution model:
+Here is the translated `Main.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification)
+    #pragma omp target
     {
         if (in.simulation_method == EVENT_BASED) {
             if (in.kernel_id == 0)
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
             }
         } else {
             printf(
-                "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
+                "History-based simulation not implemented in OpenMP Offload code. Instead,\nuse "
                 "the event-based method with \"-m event\" argument.\n");
             exit(1);
         }
@@ -114,8 +114,8 @@ int main(int argc, char *argv[]) {
 ```
 
 ### Key Changes Made:
-1. **OpenMP Offload Directives**: The `#pragma omp target data` directive is used to manage data transfer between the host and the device. This ensures that the necessary data is available on the device for the simulation.
-2. **Data Mapping**: The `map(to: in, SD)` and `map(from: verification)` clauses are used to specify which variables should be transferred to the device and which should be transferred back to the host after execution.
-3. **Function Calls**: The function calls remain unchanged, as they will be executed on the device due to the OpenMP offload directives.
+1. **OpenMP Target Directive**: The simulation kernel execution is wrapped in `#pragma omp target` to indicate that it should be offloaded to the target device.
+2. **Function Signatures**: The function signatures remain unchanged, as they are assumed to be compatible with OpenMP Offload.
+3. **Command Line Interface**: The command line interface remains intact, ensuring that the program can still be executed with the same arguments as before.
 
-This translation maintains the command line interface functionality, allowing commands like `./XSBench -m event -s large` to work as expected.
+This code should work as expected with the OpenMP Offload execution model, allowing for the same command line interface functionality as the original CUDA implementation.

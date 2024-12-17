@@ -1,4 +1,5 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
+#include <omp.h>
 
 ////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
@@ -7,7 +8,7 @@
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
-    // Move Data to GPU
+    // Move Data to Device
     SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
     profile->host_to_device_time = get_time() - start;
 
@@ -17,29 +18,19 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
     if (mype == 0) printf("Running baseline event-based simulation...\n");
 
     int nthreads = 256;
-    int nblocks = ceil((double) in.lookups / (double) nthreads);
+    int nblocks = (in.lookups + nthreads - 1) / nthreads;
 
     int nwarmups = in.num_warmups;
     start = 0.0;
     for (int i = 0; i < in.num_iterations + nwarmups; i++) {
         if (i == nwarmups) {
-            #pragma omp target
-            {
-                // Synchronize the device
-                #pragma omp taskwait
-            }
             start = get_time();
         }
-        #pragma omp target
-        {
-            xs_lookup_kernel_baseline(in, GSD);
+
+        #pragma omp target teams distribute parallel for num_threads(nthreads)
+        for (int idx = 0; idx < in.lookups; idx++) {
+            xs_lookup_kernel_baseline(in, GSD, idx);
         }
-    }
-    
-    // Synchronize the device
-    #pragma omp target
-    {
-        #pragma omp taskwait
     }
 
     profile->kernel_time = get_time() - start;
@@ -50,37 +41,23 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    #pragma omp target
-    {
-        // Copy verification results back to host
-        #pragma omp task
-        {
-            memcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long));
-        }
-    }
+    // Copy verification results back to host
+    #pragma omp target update from(GSD.verification[0:in.lookups])
     profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
-        verification_scalar += SD.verification[i];
+        verification_scalar += GSD.verification[i];
 
     release_device_memory(GSD);
 
     return verification_scalar;
 }
 
-// In this kernel, we perform a single lookup with each thread. Threads within a warp
-// do not really have any relation to each other, and divergence due to high nuclide count fuel
-// material lookups are costly. This kernel constitutes baseline performance.
-#pragma omp declare target
-void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
+// In this kernel, we perform a single lookup with each thread.
+void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 {
     // The lookup ID. Used to set the seed, and to store the verification value
-    const int i = omp_get_thread_num();
-
-    if (i >= in.lookups)
-        return;
-
     // Set the initial seed value
     uint64_t seed = STARTING_SEED;
 
@@ -114,9 +91,7 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
     // For verification, and to prevent the compiler from optimizing
     // all work out, we interrogate the returned macro_xs_vector array
     // to find its maximum value index, then increment the verification
-    // value by that index. In this implementation, we have each thread
-    // write to its thread_id index in an array, which we will reduce
-    // with a thrust reduction kernel after the main simulation kernel.
+    // value by that index.
     double max = -1.0;
     int max_idx = 0;
     for (int j = 0; j < 5; j++)
@@ -129,6 +104,5 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
     }
     GSD.verification[i] = max_idx + 1;
 }
-#pragma omp end declare target
 
 // Other functions remain unchanged...

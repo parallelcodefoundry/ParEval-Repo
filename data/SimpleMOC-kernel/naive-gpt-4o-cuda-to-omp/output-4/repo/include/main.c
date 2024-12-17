@@ -34,19 +34,21 @@ int main(int argc, char *argv[]) {
     table_d = &table;
 #endif
 
-    // Setup OpenMP offload
+    // Setup OpenMP offloading
     int n_blocks = sqrt(I.segments);
-    if (n_blocks * n_blocks < I.segments)
-        n_blocks++;
-    if (n_blocks * n_blocks < I.segments)
-        n_blocks++;
-    assert(n_blocks * n_blocks >= I.segments);
+    int blocks_x = n_blocks;
+    int blocks_y = n_blocks;
+    if (blocks_x * blocks_y < I.segments)
+        blocks_x++;
+    if (blocks_x * blocks_y < I.segments)
+        blocks_y++;
+    assert(blocks_x * blocks_y >= I.segments);
 
     // Setup RNG on Device
     printf("Setting up RNG...\n");
     curandState *RNG_states;
     RNG_states = (curandState *)malloc(I.streams * sizeof(curandState));
-    #pragma omp target enter data map(alloc: RNG_states[0:I.streams])
+    #pragma omp target enter data map(to: RNG_states[0:I.streams])
     #pragma omp target teams distribute parallel for
     for (int i = 0; i < I.streams; i++) {
         setup_kernel(&RNG_states[i], I);
@@ -58,10 +60,12 @@ int main(int argc, char *argv[]) {
     int N_flux_states = 10000;
     assert(I.segments >= N_flux_states);
     flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
-    #pragma omp target enter data map(alloc: flux_states[0:N_flux_states * I.egroups])
-    #pragma omp target teams distribute parallel for
-    for (int i = 0; i < N_flux_states; i++) {
-        init_flux_states(&flux_states[i * I.egroups], N_flux_states, I, RNG_states);
+    #pragma omp target enter data map(to: flux_states[0:N_flux_states * I.egroups])
+    #pragma omp target teams distribute parallel for collapse(2)
+    for (int bx = 0; bx < blocks_x; bx++) {
+        for (int by = 0; by < blocks_y; by++) {
+            init_flux_states(bx, by, flux_states, N_flux_states, I, RNG_states);
+        }
     }
 
     printf("Initialization Complete.\n");
@@ -77,17 +81,21 @@ int main(int argc, char *argv[]) {
     // Setup kernel call block parameters
     assert(I.segments % I.seg_per_thread == 0);
     n_blocks = sqrt(I.segments / I.seg_per_thread);
-    if (n_blocks * n_blocks < I.segments / I.seg_per_thread)
-        n_blocks++;
-    if (n_blocks * n_blocks < I.segments / I.seg_per_thread)
-        n_blocks++;
-    assert(n_blocks * n_blocks >= I.segments / I.seg_per_thread);
+    blocks_x = n_blocks;
+    blocks_y = n_blocks;
+    if (blocks_x * blocks_y < I.segments / I.seg_per_thread)
+        blocks_x++;
+    if (blocks_x * blocks_y < I.segments / I.seg_per_thread)
+        blocks_y++;
+    assert(blocks_x * blocks_y >= I.segments / I.seg_per_thread);
 
     // Run Simulation Kernel Loop
     start = omp_get_wtime();
-    #pragma omp target teams distribute parallel for
-    for (int blockId = 0; blockId < n_blocks * n_blocks; blockId++) {
-        run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
+    #pragma omp target teams distribute parallel for collapse(2) map(to: I, sources_d[0:I.source_3D_regions], SA_d, table_d, RNG_states[0:I.streams], flux_states[0:N_flux_states * I.egroups]) map(from: flux_states[0:N_flux_states * I.egroups])
+    for (int bx = 0; bx < blocks_x; bx++) {
+        for (int by = 0; by < blocks_y; by++) {
+            run_kernel(bx, by, I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
+        }
     }
     stop = omp_get_wtime();
     time = stop - start;
@@ -107,10 +115,9 @@ int main(int argc, char *argv[]) {
     printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
     border_print();
 
-    // Free allocated memory
-    free(host_flux_states);
     free(RNG_states);
     free(flux_states);
+    free(host_flux_states);
 
     return 0;
 }

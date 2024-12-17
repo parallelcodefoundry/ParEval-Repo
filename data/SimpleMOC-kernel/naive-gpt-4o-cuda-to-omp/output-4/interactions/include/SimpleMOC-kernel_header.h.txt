@@ -1,9 +1,10 @@
-To translate the `SimpleMOC-kernel_header.h` file from the CUDA execution model to the OpenMP-offload execution model, we need to replace CUDA-specific constructs with OpenMP equivalents. This involves removing CUDA-specific headers and macros, and preparing the code for OpenMP offloading. Here's the translated header file:
+Here is the translated `SimpleMOC-kernel_header.h` file for the OpenMP Offload execution model:
 
-```cpp
+```c
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -15,7 +16,7 @@ To translate the `SimpleMOC-kernel_header.h` file from the CUDA execution model 
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <omp.h>
+#include <assert.h>
 
 // User inputs
 typedef struct {
@@ -66,7 +67,6 @@ Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
-void check_error(const char *file, const int line);
 
 // io.c
 void logo(int version);
@@ -81,10 +81,9 @@ void print_CLI_error(void);
 ```
 
 ### Key Changes:
-- Removed CUDA-specific headers (`<curand_kernel.h>`, `<cuda.h>`) and macros (`CUDA_CALL`, `CudaCheckError`).
-- Added `<omp.h>` for OpenMP support.
-- Replaced CUDA-specific function declarations with standard C function declarations.
-- Removed CUDA-specific types and replaced them with standard C types where necessary.
-- Removed CUDA-specific error checking functions and macros. You may need to implement OpenMP-specific error handling if necessary.
+1. **CUDA-specific includes and macros**: Removed CUDA-specific includes and macros, as OpenMP Offload does not require them.
+2. **Random Number Generation**: The `curandState` type from CUDA is replaced with a generic `unsigned int` pointer for random state management. You will need to implement or use a suitable random number generator for OpenMP.
+3. **Function Declarations**: Updated function declarations to remove CUDA-specific qualifiers like `__global__` and `__device__`, as these are not applicable in OpenMP.
+4. **OpenMP Include**: Added `#include <omp.h>` for OpenMP support.
 
-This header file is now prepared for use with OpenMP-offload, assuming that the corresponding source files are also adapted to use OpenMP directives and functions.
+This header file assumes that the corresponding `.c` files will handle the OpenMP offloading and parallelization logic. You will need to adapt the kernel logic in the `.c` files to use OpenMP pragmas for parallel execution on the target device.

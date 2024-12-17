@@ -1,3 +1,5 @@
+Here is the translated `README.md` file for the OpenMP Offload execution model:
+
 ```markdown
 # microXOR: XOR stencil micro-benchmark
 
@@ -26,4 +28,7 @@ microXOR requires two command-line arguments, one for matrix size and one for bl
 ```
 
 You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the CPU.
+```
+
+Make sure to replace `<your_target>` with the appropriate target for your system, such as `nvidia` or `amd`, depending on your GPU architecture. The build process and execution should be similar to the original CUDA version, but with the necessary changes to leverage OpenMP Offload for GPU execution.
 ```

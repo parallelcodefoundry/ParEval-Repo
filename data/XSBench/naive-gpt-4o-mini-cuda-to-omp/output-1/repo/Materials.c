@@ -1,5 +1,7 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
+#include <stdlib.h>
+#include <string.h>
 
 // num_nucs represents the number of nuclides that each material contains
 int * load_num_nucs(long n_isotopes)
@@ -38,7 +40,7 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
         if (num_nucs[m] > *max_num_nucs)
             *max_num_nucs = num_nucs[m];
     }
-    int * mats = (int *)malloc(num_mats * (*max_num_nucs) * sizeof(int));
+    int * mats = (int *) malloc(num_mats * (*max_num_nucs) * sizeof(int));
 
     // Small H-M has 34 fuel nuclides
     int mats0_Sml[] = { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
@@ -51,7 +53,7 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
     for (int i = 0; i < 321 - 34; i++)
         mats0_Lrg[34 + i] = 68 + i; // H-M large adds nuclides to fuel only
 
-    // These are the non-fuel materials	
+    // These are the non-fuel materials
     int mats1[] = { 63, 64, 65, 66, 67 }; // cladding
     int mats2[] = { 24, 41, 4, 5 }; // cold borated water
     int mats3[] = { 24, 41, 4, 5 }; // hot borated water
@@ -97,9 +99,9 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
 double * load_concs(int * num_nucs, int max_num_nucs)
 {
     uint64_t seed = STARTING_SEED * STARTING_SEED;
-    double * concs = (double *)malloc(12 * max_num_nucs * sizeof(double));
+    double * concs = (double *) malloc(12 * max_num_nucs * sizeof(double));
 
-    #pragma omp target teams distribute parallel for collapse(2)
+    #pragma omp target teams distribute parallel for
     for (int i = 0; i < 12; i++)
         for (int j = 0; j < num_nucs[i]; j++)
             concs[i * max_num_nucs + j] = LCG_random_double(&seed);

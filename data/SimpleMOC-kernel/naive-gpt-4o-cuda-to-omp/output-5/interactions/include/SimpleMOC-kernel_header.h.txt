@@ -1,4 +1,4 @@
-To translate the `SimpleMOC-kernel_header.h` file from the CUDA execution model to the OpenMP-offload execution model, we need to replace CUDA-specific constructs with their OpenMP equivalents. This involves removing CUDA-specific headers and macros, and preparing the code to use OpenMP directives for parallelism. Here's the translated file:
+To translate the `SimpleMOC-kernel_header.h` file to the OpenMP-offload execution model, we need to replace CUDA-specific constructs with OpenMP equivalents. This involves removing CUDA-specific headers and macros, and replacing them with OpenMP pragmas and functions. Here's the translated header file:
 
 ```c
 #ifndef __SimpleMOC_header
@@ -55,11 +55,11 @@ typedef struct {
     int N;
 } Table;
 
-// Function prototypes for kernel.c
+// kernel.c
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
 
-// Function prototypes for init.c
+// init.c
 double mem_estimate(Input I);
 void setup_kernel(unsigned int *state, Input I);
 void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
@@ -68,7 +68,7 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
 Table buildExponentialTable(void);
 Input set_default_input(void);
 
-// Function prototypes for io.c
+// io.c
 void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);
@@ -81,14 +81,9 @@ void print_CLI_error(void);
 ```
 
 ### Key Changes:
-1. **Removed CUDA Headers and Macros**: Removed `curand_kernel.h` and `cuda.h`, as well as CUDA-specific macros like `CUDA_CALL` and `CudaCheckError`.
+1. **Removed CUDA Headers**: Removed `curand_kernel.h` and `cuda.h` as they are specific to CUDA.
+2. **Removed CUDA Macros**: Removed CUDA-specific error checking macros and replaced them with OpenMP constructs where necessary.
+3. **Replaced CUDA Types**: Removed `curandState` and replaced it with a generic `unsigned int` for random state, assuming a simple random number generation approach.
+4. **Function Declarations**: Updated function declarations to remove CUDA-specific qualifiers like `__global__` and `__device__`.
 
-2. **OpenMP Headers**: Added `#include <omp.h>` to support OpenMP directives.
-
-3. **Random Number Generation**: The `curandState` type is replaced with a generic `unsigned int` pointer for random number states. You will need to implement or use an existing random number generator suitable for OpenMP.
-
-4. **Kernel Function Prototypes**: Changed the `__global__` and `__device__` CUDA qualifiers to standard C function prototypes. The actual implementation will need to use OpenMP directives for parallel execution.
-
-5. **Parallel Execution**: The actual implementation of `run_kernel` and other functions will need to use OpenMP pragmas to achieve parallelism, which is not shown in the header file but will be part of the `.c` or `.cpp` files.
-
-This header file sets up the necessary structures and function prototypes for an OpenMP-offload implementation. The actual parallel execution logic will be implemented in the corresponding source files using OpenMP pragmas.
+This header file is now set up for use with OpenMP offloading, assuming that the corresponding `.c` files will handle the OpenMP directives and parallelization logic.

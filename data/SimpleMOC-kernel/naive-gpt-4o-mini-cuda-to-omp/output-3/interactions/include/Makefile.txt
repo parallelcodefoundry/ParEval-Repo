@@ -31,10 +31,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/
 
 # Linker Flags
-LDFLAGS = -lm -lcurand
+LDFLAGS = -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -48,7 +48,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3 -ffast-math
+	CFLAGS += -O3
 endif
 
 # Exponential Table Build
@@ -76,4 +76,11 @@ run:
 	./$(program)
 ```
 
-This Makefile is set up to compile the code using the OpenMP Offload execution model with the specified compiler and options for an NVIDIA GPU. Adjust the paths and flags as necessary for your specific environment.
+### Key Changes:
+1. **Compiler**: Changed from `nvcc` to `clang` to support OpenMP offloading.
+2. **Flags**: Added `-fopenmp` and `-fopenmp-targets=nvptx-none` to enable OpenMP offloading.
+3. **Source Files**: Changed file extensions from `.cu` to `.c` to reflect the C codebase.
+4. **Linker Flags**: Removed `-lcurand` as it is not required for OpenMP offloading. Adjusted the library path for math libraries.
+5. **Removed CUDA-specific error checking**: The Makefile no longer includes CUDA-specific error checking or device properties since it is now targeting OpenMP offloading. 
+
+Make sure to adjust the paths and flags according to your specific environment and requirements.

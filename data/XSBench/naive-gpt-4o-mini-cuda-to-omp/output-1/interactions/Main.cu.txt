@@ -1,7 +1,7 @@
-Here is the translated `Main.cu` file using the OpenMP Offload execution model:
+Here's the translated `Main.c` file for the OpenMP Offload execution model. The translation involves replacing CUDA-specific constructs with OpenMP directives while ensuring that the command line interface remains functional.
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
@@ -60,11 +60,11 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification, profile)
+    #pragma omp target data map(to: in) map(from: verification)
     {
-        #pragma omp target
-        {
-            if (in.simulation_method == EVENT_BASED) {
+        if (in.simulation_method == EVENT_BASED) {
+            #pragma omp target
+            {
                 if (in.kernel_id == 0)
                     verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
                 else if (in.kernel_id == 1)
@@ -83,12 +83,12 @@ int main(int argc, char *argv[]) {
                     printf("Error: No kernel ID %d found!\n", in.kernel_id);
                     exit(1);
                 }
-            } else {
-                printf(
-                    "History-based simulation not implemented in CUDA code. Instead,\nuse "
-                    "the event-based method with \"-m event\" argument.\n");
-                exit(1);
             }
+        } else {
+            printf(
+                "History-based simulation not implemented in OpenMP code. Instead,\nuse "
+                "the event-based method with \"-m event\" argument.\n");
+            exit(1);
         }
     }
 
@@ -116,9 +116,9 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-### Key Changes:
-1. **OpenMP Directives**: Added `#pragma omp target data` to manage data transfer between host and device, and `#pragma omp target` to execute the simulation on the device.
-2. **Data Mapping**: Used `map(to: ...)` and `map(from: ...)` to specify which variables should be transferred to and from the device.
-3. **Maintained CLI Functionality**: The command line interface remains unchanged, ensuring that the program can still be executed with the same arguments as before. 
+### Key Changes Made:
+1. **OpenMP Directives**: The CUDA-specific constructs have been replaced with OpenMP directives. The `#pragma omp target data` directive is used to manage data movement between host and device.
+2. **Function Calls**: The function calls for running simulations remain the same, but they are now wrapped in OpenMP target regions to ensure they execute on the target device.
+3. **Command Line Interface**: The command line interface remains unchanged, ensuring that the program can still be executed with the same parameters as before.
 
-This translation assumes that the OpenMP environment is set up correctly and that the necessary OpenMP libraries are linked during compilation.
+This code should now work with an OpenMP Offload execution model while maintaining the same functionality as the original CUDA implementation.

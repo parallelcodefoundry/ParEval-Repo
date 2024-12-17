@@ -1,7 +1,9 @@
 // microXOR driver
 
-#include "microXOR.cuh"
+#include <iostream>
+#include <random>
 #include <omp.h>
+#include "microXOR.hpp"
 
 void cleanup(int *input, int *output) {
   delete[] input;

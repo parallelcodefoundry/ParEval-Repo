@@ -1,4 +1,4 @@
-Here's the translated `init.cu` file using the OpenMP Offload execution model:
+Here is the translated `init.c` file for the OpenMP Offload execution model:
 
 ```c
 #include "SimpleMOC-kernel_header.h"
@@ -16,13 +16,15 @@ void setup_kernel(curandState *state, Input I)
 void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state)
 {
     #pragma omp target teams distribute parallel for
-    for (int blockId = 0; blockId < N_flux_states; blockId++) {
+    for (int blockId = 0; blockId < N_flux_states; blockId++)
+    {
         // Assign RNG state
-        curandState localState = state[blockId % I.streams];
+        curandState *localState = &state[blockId % I.streams];
 
-        // Initialize flux state
-        for (int g = 0; g < I.egroups; g++) {
-            flux_states[blockId + g] = curand_uniform(&localState);
+        // Initialize flux states
+        for (int g = 0; g < I.egroups; g++)
+        {
+            flux_states[blockId + g] = curand_uniform(localState);
         }
     }
 }
@@ -107,64 +109,32 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
 {
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine]) map(from: SA_h->fine_source_arr[0:N_fine])
+    #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine])
     cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy Fine Flux Data
-    #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine]) map(from: SA_h->fine_flux_arr[0:N_fine])
+    #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine])
     cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
-    #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT]) map(from: SA_h->sigT_arr[0:N_sigT])
+    #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT])
     cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy Source Array Data
     Source *sources_d;
-    #pragma omp target enter data map(to: sources_h[0:I.source_3D_regions]) map(from: sources_d)
-    cudaMalloc((void **)&sources_d, I.source_3D_regions * sizeof(Source));
+    #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions])
     cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
 
     return sources_d;
 }
-
-// Builds a table of exponential values for linear interpolation
-Table buildExponentialTable(void)
-{
-    // define table
-    Table table;
-
-    float maxVal = 10.0;
-
-    // compute number of array values
-    int N = 353;
-
-    // compute spacing
-    float dx = maxVal / (float)N;
-
-    // store linear segment information (slope and y-intercept)
-    for (int n = 0; n < N; n++)
-    {
-        // compute slope and y-intercept for ( 1 - exp(-x) )
-        float exponential = exp(-n * dx);
-        table.values[2 * n] = -exponential;
-        table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;
-    }
-
-    // assign data to table
-    table.dx = dx;
-    table.maxVal = maxVal - table.dx;
-    table.N = N;
-
-    return table;
-}
 #pragma omp end declare target
 ```
 
-### Key Changes Made:
-1. **OpenMP Directives**: Added `#pragma omp declare target` to indicate which functions should be offloaded to the device.
-2. **Thread Management**: Replaced CUDA thread management with OpenMP thread management using `omp_get_thread_num()`.
-3. **Data Mapping**: Used OpenMP data mapping directives to manage data transfer between host and device.
-4. **Parallelization**: Used `#pragma omp target teams distribute parallel for` to parallelize the initialization of flux states.
+### Key Changes:
+1. The `setup_kernel` and `init_flux_states` functions are now defined with OpenMP directives to indicate they can be offloaded to the target device.
+2. The `#pragma omp target teams distribute parallel for` directive is used to parallelize the initialization of flux states.
+3. Memory management for device data is handled with `#pragma omp target enter data map` to ensure data is transferred to the device.
+4. The `curand_init` function is called directly within the OpenMP target region to initialize random number generation on the device. 
 
-This code assumes that the OpenMP environment is set up correctly for offloading to a compatible device.
+Make sure to adjust the rest of your codebase accordingly to handle the OpenMP Offload model, including linking against the appropriate OpenMP libraries during compilation.

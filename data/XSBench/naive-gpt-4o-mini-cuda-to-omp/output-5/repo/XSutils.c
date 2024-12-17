@@ -1,5 +1,4 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
 
 int double_compare(const void * a, const void * b)
 {
@@ -29,7 +28,7 @@ int NGP_compare(const void * a, const void * b)
 
 // RNG Used for Verification Option.
 // This one has a static seed (must be set manually in source).
-// Park & Miller Multiplicative Congruential Algorithm
+// Park & Miller Multiplicational Congruential Algorithm
 // From "Numerical Recipes" Second Edition
 double rn_v(void)
 {

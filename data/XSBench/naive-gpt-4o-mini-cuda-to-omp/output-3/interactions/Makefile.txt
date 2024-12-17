@@ -46,11 +46,13 @@ endif
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g
+  LDFLAGS  += -g
 endif
 
 # Profiling Flags
 ifeq ($(PROFILE),yes)
   CFLAGS += -pg
+  LDFLAGS  += -pg
 endif
 
 # Optimization Flags
@@ -78,4 +80,4 @@ run:
 	./$(program)
 ```
 
-This Makefile is set up to compile the code using the OpenMP Offload model with LLVM's clang compiler targeting NVIDIA GPUs. The flags are adjusted to enable OpenMP and specify the target architecture.
+This Makefile is set up to compile the code using the OpenMP Offload model with the LLVM compiler targeting NVIDIA GPUs. The flags are adjusted accordingly to enable OpenMP and specify the target architecture.

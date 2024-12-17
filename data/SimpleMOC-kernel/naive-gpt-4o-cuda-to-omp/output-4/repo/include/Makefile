@@ -28,10 +28,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcurand
+LDFLAGS = -lm -fopenmp -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ -lcurand
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

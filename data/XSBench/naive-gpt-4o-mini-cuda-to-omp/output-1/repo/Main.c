@@ -1,4 +1,4 @@
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
@@ -57,11 +57,11 @@ int main(int argc, char *argv[]) {
     omp_start = get_time();
 
     // Run simulation
-    #pragma omp target data map(to: in, SD) map(from: verification, profile)
+    #pragma omp target data map(to: in) map(from: verification)
     {
-        #pragma omp target
-        {
-            if (in.simulation_method == EVENT_BASED) {
+        if (in.simulation_method == EVENT_BASED) {
+            #pragma omp target
+            {
                 if (in.kernel_id == 0)
                     verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
                 else if (in.kernel_id == 1)
@@ -80,12 +80,12 @@ int main(int argc, char *argv[]) {
                     printf("Error: No kernel ID %d found!\n", in.kernel_id);
                     exit(1);
                 }
-            } else {
-                printf(
-                    "History-based simulation not implemented in CUDA code. Instead,\nuse "
-                    "the event-based method with \"-m event\" argument.\n");
-                exit(1);
             }
+        } else {
+            printf(
+                "History-based simulation not implemented in OpenMP code. Instead,\nuse "
+                "the event-based method with \"-m event\" argument.\n");
+            exit(1);
         }
     }
 

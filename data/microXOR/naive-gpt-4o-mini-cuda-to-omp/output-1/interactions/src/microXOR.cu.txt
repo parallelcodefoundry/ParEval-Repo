@@ -1,10 +1,8 @@
-Here is the translated `src/microXOR.cu` file using the OpenMP Offload execution model:
+Here is the translated `src/microXOR.cpp` file using the OpenMP Offload execution model:
 
 ```cpp
-// microXOR kernel
-
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
 /* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.
    Note that we only consider neighbors and not input_{i,j} when computing output_{i,j}.
@@ -21,25 +19,24 @@ Here is the translated `src/microXOR.cu` file using the OpenMP Offload execution
             [0, 0, 1, 0],
             [1, 0, 1, 0]]
 */
-
 void cellsXOR(const int *input, int *output, size_t N) {
-  #pragma omp target teams distribute parallel for collapse(2) map(to: input[0:N*N]) map(from: output[0:N*N])
-  for (size_t i = 0; i < N; i++) {
-    for (size_t j = 0; j < N; j++) {
-      int count = 0;
-      if (i > 0 && input[(i-1)*N + j] == 1) count++;
-      if (i < N-1 && input[(i+1)*N + j] == 1) count++;
-      if (j > 0 && input[i*N + (j-1)] == 1) count++;
-      if (j < N-1 && input[i*N + (j+1)] == 1) count++;
-      output[i*N + j] = (count == 1) ? 1 : 0;
+    #pragma omp target teams distribute parallel for collapse(2) map(to: input[0:N*N]) map(from: output[0:N*N])
+    for (size_t i = 0; i < N; i++) {
+        for (size_t j = 0; j < N; j++) {
+            int count = 0;
+            if (i > 0 && input[(i-1)*N + j] == 1) count++;
+            if (i < N-1 && input[(i+1)*N + j] == 1) count++;
+            if (j > 0 && input[i*N + (j-1)] == 1) count++;
+            if (j < N-1 && input[i*N + (j+1)] == 1) count++;
+            output[i*N + j] = (count == 1) ? 1 : 0;
+        }
     }
-  }
 }
 ```
 
 ### Key Changes:
-1. **Kernel Function**: The `cellsXOR` function is now a regular function instead of a CUDA kernel. It uses OpenMP directives to offload the computation to the target device.
-2. **OpenMP Directives**: The `#pragma omp target teams distribute parallel for collapse(2)` directive is used to parallelize the nested loops. The `map` clauses are used to specify the data transfer between the host and the device.
-3. **Data Mapping**: The `map(to: input[0:N*N])` clause indicates that the `input` array should be copied to the device, and `map(from: output[0:N*N])` indicates that the `output` array will be copied back to the host after computation. 
+1. **Kernel Function**: The `cellsXOR` function is now a regular C++ function instead of a CUDA kernel. It uses OpenMP directives to offload the computation to the target device.
+2. **OpenMP Directives**: The `#pragma omp target teams distribute parallel for collapse(2)` directive is used to parallelize the nested loops over the 2D grid.
+3. **Data Mapping**: The `map(to: input[0:N*N])` and `map(from: output[0:N*N])` clauses are used to specify which data should be transferred to and from the device.
 
-This code is now ready to be used with OpenMP Offload for parallel execution on a supported device.
+Make sure to update the corresponding header file to reflect the changes in the function signature if necessary.

@@ -1,24 +1,29 @@
 #include "SimpleMOC-kernel_header.h"
+#include <omp.h>
 
-#pragma omp declare target
 void setup_kernel(curandState *state, Input I)
 {
-    int threadId = omp_get_thread_num();
-    if (threadId >= I.streams)
-        return;
-    curand_init(1234, threadId, 0, &state[threadId]);
+    #pragma omp target teams distribute parallel for
+    for (int threadId = 0; threadId < I.streams; threadId++)
+    {
+        curand_init(1234, threadId, 0, &state[threadId]);
+    }
 }
 
 // Initialize global flux states to random numbers on device
+// Slow, poor use of GPU, but fine since it's just initialization code
 void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state)
 {
     #pragma omp target teams distribute parallel for
-    for (int blockId = 0; blockId < N_flux_states; blockId++) {
+    for (int blockId = 0; blockId < N_flux_states; blockId++)
+    {
         // Assign RNG state
-        curandState localState = state[blockId % I.streams];
+        curandState *localState = &state[blockId % I.streams];
 
-        for (int i = 0; i < I.egroups; i++) {
-            flux_states[blockId + i] = curand_uniform(&localState);
+        // Initialize flux states
+        for (int g = 0; g < I.egroups; g++)
+        {
+            flux_states[blockId + g] = curand_uniform(localState);
         }
     }
 }
@@ -104,22 +109,55 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
     #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine]) 
+    cudaMalloc((void **)&SA_d->fine_source_arr, N_fine * sizeof(float));
     cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy Fine Flux Data
     #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine]) 
+    cudaMalloc((void **)&SA_d->fine_flux_arr, N_fine * sizeof(float));
     cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
     #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT]) 
+    cudaMalloc((void **)&SA_d->sigT_arr, N_sigT * sizeof(float));
     cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
 
     // Allocate & Copy Source Array Data
     Source *sources_d;
-    #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions]) 
+    cudaMalloc((void **)&sources_d, I.source_3D_regions * sizeof(Source));
     cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
 
     return sources_d;
 }
-#pragma omp end declare target
+
+// Builds a table of exponential values for linear interpolation
+Table buildExponentialTable(void)
+{
+    // define table
+    Table table;
+
+    float maxVal = 10.0;
+
+    // compute number of array values
+    int N = 353;
+
+    // compute spacing
+    float dx = maxVal / (float)N;
+
+    // store linear segment information (slope and y-intercept)
+    for (int n = 0; n < N; n++)
+    {
+        // compute slope and y-intercept for ( 1 - exp(-x) )
+        float exponential = exp(-n * dx);
+        table.values[2 * n] = -exponential;
+        table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    // assign data to table
+    table.dx = dx;
+    table.maxVal = maxVal - table.dx;
+    table.N = N;
+
+    return table;
+}

@@ -1,4 +1,4 @@
-// microXOR header file for OpenMP Offload
+// microXOR header file
 
 #ifndef MICROXOR_HPP
 #define MICROXOR_HPP

@@ -12,7 +12,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Support](#OpenMP-Support)
+	* [MPI Support](#MPI-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -47,12 +47,14 @@ There are also a number of switches that can be set in the makefile. Here is a s
 OPTIMIZE = yes
 DEBUG    = no
 PROFILE  = no
+MPI      = no
 ```
-- Optimization enables the `-O3` optimization flag.
-- Debugging enables the `-g` flag.
-- Profiling enables the `-pg` flag. When profiling the code, you may
-wish to significantly increase the number of lookups (with the `-l`
+- Optimization enables the -O3 optimization flag.
+- Debugging enables the -g flag.
+- Profiling enables the -pg flag. When profiling the code, you may
+wish to significantly increase the number of lookups (with the -l
 flag) in order to wash out the initialization phase of the code.
+- MPI enables MPI support in the code.
 
 ## Running XSBench
 
@@ -103,13 +105,13 @@ There are several optimized variants of the main kernel. All source bases run ba
 
 ## Feature Discussion
 
-### OpenMP Support
+### MPI Support
 
-XSBench is designed to leverage OpenMP for parallel execution on CPU architectures. The implementation allows for offloading computations to available threads, enabling efficient parallel processing of cross-section lookups. The OpenMP model provides a straightforward way to manage parallelism, allowing developers to focus on algorithm design while benefiting from automatic thread management.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the makefile flag "MPI". If you are not using the mpicc wrapper on your system, you may need to alter the makefile to make use of your desired compiler.
 
 ### Verification Support
 
-Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on GPU vs CPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
+Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on GPU vs CPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc, will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
 
 ### Binary File Support
 
@@ -199,7 +201,4 @@ Unionized_Grid_Search( Energy E, Material M ):
 
 #### Logarithmic Hash Grid
 
-An alternative to the unionized energy grid is the logarithmic hash grid. This method takes into account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform manner in log space. Therefore, the nuclide grid is augmented with a separate acceleration structure similar to the unionized grid. However, the number of columns is capped at some number of bins spaced evenly in log space, with each row therefore corresponding to an approximate location within each nuclide's grid for that energy level. While the unionized grid points exactly to the correct index in the nuclide grid, the logarithmic hash grid points to only an approximate location below the true point -- meaning that a fast binary or iterative search must still be performed over the constrained area (typically only 10 or so elements in size):
-
-```
-Logarithmic_Hash_Grid_Search( Energy E
+An alternative to the unionized energy grid is the logarithmic hash grid. This method takes into account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform manner in log space. Therefore, the nuclide grid is augmented with

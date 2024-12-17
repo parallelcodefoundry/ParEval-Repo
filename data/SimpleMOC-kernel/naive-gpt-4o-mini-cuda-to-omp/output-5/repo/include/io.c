@@ -1,20 +1,21 @@
 #include "SimpleMOC-kernel_header.h"
+#include <omp.h>
 
 // Prints program logo
 void logo(int version)
 {
     border_print();
     printf(
-        "   __           __        ___        __   __           ___  __        ___     \n"
-        "  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
-        "  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n"
-        "\n"
-        "                         ������������������������������   ������������������������������  ������������������\n"
-        "                        ���������������������������������   ���������������������������������������������������������\n"
-        "                        ���������     ���������   ������������������  ���������������������������������\n"
-        "                        ���������     ���������   ������������������  ���������������������������������\n"
-        "                        ������������������������������������������������������������������������������������  ���������\n"
-        "                         ��������������������� ��������������������� ��������������������� ���������  ���������\n"
+"   __           __        ___        __   __           ___  __        ___     \n"
+"  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
+"  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
+"\n"
+"                         ������������������������������   ������������������������������  ������������������\n" 
+"                        ���������������������������������   ���������������������������������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ������������������������������������������������������������������������������������  ���������\n"
+"                         ��������������������� ��������������������� ��������������������� ���������  ���������\n"
     );
     printf("\n");
     border_print();
@@ -37,7 +38,7 @@ void center_print(const char *s, int width)
 {
     int length = strlen(s);
     int i;
-    for (i = 0; i <= (width - length) / 2; i++) {
+    for (i=0; i<=(width-length)/2; i++) {
         fputs(" ", stdout);
     }
     fputs(s, stdout);
@@ -48,7 +49,8 @@ void center_print(const char *s, int width)
 void border_print(void)
 {
     printf(
-        "===================================================================\n");
+    "==================================================================="
+    "=============\n");
 }
 
 // Prints comma separated integers - for ease of reading
@@ -76,14 +78,14 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    // Device properties can be fetched using OpenMP offload
+    // Use OpenMP to get device properties
     #pragma omp target
     {
         cudaDeviceProp prop;
         int device;
         cudaGetDevice(&device);
         cudaGetDeviceProperties(&prop, device);
-        printf("%-25s%s\n", "CUDA Device: ", prop.name);
+        printf("%-25s%s\n", "CUDA Device: ", prop.name); 
     }
 
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
@@ -97,20 +99,20 @@ void print_input_summary(Input I)
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
     printf("%-25s%d\n", "Segments per CUDA block:", I.seg_per_thread);
     #ifdef TABLE
-    printf("%-25s%s\n", "Exponential Table:", "ON");
+    printf("%-25s%s\n", "Exponential Table:","ON");
     #else
-    printf("%-25s%s\n", "Exponential Table:", "OFF");
+    printf("%-25s%s\n", "Exponential Table:","OFF");
     #endif
     border_print();
 }
 
 // reads command line inputs and applies options
-void read_CLI(int argc, char *argv[], Input *input)
+void read_CLI(int argc, char * argv[], Input * input)
 {
     // Collect Raw Input
     for (int i = 1; i < argc; i++)
     {
-        char *arg = argv[i];
+        char * arg = argv[i];
 
         // nthreads (-t)
         if (strcmp(arg, "-t") == 0)
@@ -129,7 +131,7 @@ void read_CLI(int argc, char *argv[], Input *input)
             else
                 print_CLI_error();
         }
-
+        
         // egroups (-e)
         else if (strcmp(arg, "-e") == 0)
         {

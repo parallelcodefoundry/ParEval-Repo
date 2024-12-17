@@ -35,21 +35,21 @@ int main(int argc, char *argv[]) {
     omp_target_memcpy(table_d, &table, sizeof(Table), 0, 0, omp_get_default_device(), omp_get_initial_device());
 #endif
 
-    // Setup RNG states on device
-    printf("Setting up RNG states...\n");
+    // Setup RNG on Device
+    printf("Setting up RNG...\n");
     curandState *RNG_states = (curandState *) omp_target_alloc(I.streams * sizeof(curandState), omp_get_default_device());
-    #pragma omp target teams distribute parallel for is_device_ptr(RNG_states)
-    for (int i = 0; i < I.streams; i++) {
-        setup_kernel<<<1, 1>>>(RNG_states, I);
+    #pragma omp target teams distribute parallel for
+    for (int i = 0; i < I.streams; ++i) {
+        setup_kernel(&RNG_states[i], I);
     }
 
     // Allocate Some Flux State vectors to randomly pick from
     printf("Setting up Flux State Vectors...\n");
     float *flux_states = (float *) omp_target_alloc(N_flux_states * I.egroups * sizeof(float), omp_get_default_device());
-    #pragma omp target teams distribute parallel for collapse(2) is_device_ptr(flux_states, RNG_states)
-    for (int i = 0; i < N_flux_states; i++) {
-        for (int j = 0; j < I.egroups; j++) {
-            init_flux_states<<<1, 1>>>(flux_states, N_flux_states, I, RNG_states);
+    #pragma omp target teams distribute parallel for collapse(2)
+    for (int i = 0; i < N_flux_states; ++i) {
+        for (int j = 0; j < I.egroups; ++j) {
+            init_flux_states(&flux_states[i * I.egroups + j], N_flux_states, I, RNG_states);
         }
     }
 
@@ -59,12 +59,24 @@ int main(int argc, char *argv[]) {
     border_print();
     printf("Attenuating fluxes across segments...\n");
 
+    // Setup kernel call block parameters
+    assert(I.segments % I.seg_per_thread == 0);
+    int n_blocks = sqrt(I.segments / I.seg_per_thread);
+    dim3 blocks_k(n_blocks, n_blocks);
+    if (blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread)
+        blocks_k.x++;
+    if (blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread)
+        blocks_k.y++;
+    assert(blocks_k.x * blocks_k.y >= I.segments / I.seg_per_thread);
+
     // Run Simulation Kernel Loop
     double start_time = omp_get_wtime();
-    #pragma omp target teams distribute parallel for collapse(2) is_device_ptr(sources_d, SA_d.fine_flux_arr, SA_d.fine_source_arr, SA_d.sigT_arr, table_d, RNG_states, flux_states)
-    for (int blockId = 0; blockId < I.segments / I.seg_per_thread; blockId++) {
-        for (int g = 0; g < I.egroups; g++) {
-            run_kernel<<<1, 1>>>(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
+    #pragma omp target teams distribute parallel for collapse(2) \
+        map(to: I, sources_d[0:I.source_3D_regions], SA_d, table_d, RNG_states[0:I.streams], flux_states[0:N_flux_states * I.egroups]) \
+        map(from: flux_states[0:N_flux_states * I.egroups])
+    for (int bx = 0; bx < blocks_k.x; ++bx) {
+        for (int by = 0; by < blocks_k.y; ++by) {
+            run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
         }
     }
     double end_time = omp_get_wtime();
@@ -87,7 +99,11 @@ int main(int argc, char *argv[]) {
     // Free allocated memory
     omp_target_free(RNG_states, omp_get_default_device());
     omp_target_free(flux_states, omp_get_default_device());
+#ifdef TABLE
     omp_target_free(table_d, omp_get_default_device());
+#endif
+
+    free(host_flux_states);
 
     return 0;
 }

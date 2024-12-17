@@ -33,4 +33,4 @@ clean:
 .PHONY: clean
 ```
 
-This Makefile is adapted for compiling C++ code using OpenMP offloading with `clang++`. It assumes that the source files have been renamed to `.cpp` and `.hpp` extensions. The `CXXFLAGS` include options for OpenMP offloading to NVIDIA GPUs, targeting the specified `SM_VERSION`. The user can specify the compute capability and the compiler when invoking `make`.
+This Makefile is configured to compile the code using OpenMP offloading with `clang++`. It assumes that the source files have been renamed to `.cpp` and `.hpp` extensions for C++ code. The `-fopenmp` and `-fopenmp-targets=nvptx64-nvidia-cuda` flags are used to enable OpenMP offloading to NVIDIA GPUs, and the `-Xopenmp-target -march=sm_$(SM_VERSION)` flag specifies the target GPU architecture.

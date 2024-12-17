@@ -1,7 +1,9 @@
 // Material data is hard coded into the functions in this file.
 // Note that there are 12 materials present in H-M (large or small)
 
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
+#include <stdlib.h>
+#include <string.h>
 #include <omp.h>
 
 // num_nucs represents the number of nuclides that each material contains
@@ -102,7 +104,7 @@ double * load_concs( int * num_nucs, int max_num_nucs )
     uint64_t seed = STARTING_SEED * STARTING_SEED;
     double * concs = (double *) malloc( 12 * max_num_nucs * sizeof( double ) );
 
-    #pragma omp target teams distribute parallel for map(tofrom: seed)
+    #pragma omp target teams distribute parallel for map(tofrom:concs[0:12*max_num_nucs])
     for( int i = 0; i < 12; i++ )
         for( int j = 0; j < num_nucs[i]; j++ )
             concs[i * max_num_nucs + j] = LCG_random_double(&seed);

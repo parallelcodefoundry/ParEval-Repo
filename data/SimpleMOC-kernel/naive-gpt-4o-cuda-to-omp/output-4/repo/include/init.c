@@ -1,27 +1,35 @@
 #include "SimpleMOC-kernel_header.h"
 #include <omp.h>
 
-// Initialize the random number generator states
-void setup_kernel(curandState *state, Input I) {
+// Initialize the random number generator state
+void setup_kernel(curandState *state, Input I)
+{
     #pragma omp target teams distribute parallel for
-    for (int threadId = 0; threadId < I.streams; ++threadId) {
+    for (int threadId = 0; threadId < I.streams; ++threadId)
+    {
         curand_init(1234, threadId, 0, &state[threadId]);
     }
 }
 
-// Initialize global flux states to random numbers on the device
-void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state) {
+// Initialize global flux states to random numbers on device
+// Slow, poor use of GPU, but fine since it's just initialization code
+void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state)
+{
     #pragma omp target teams distribute parallel for
-    for (int blockId = 0; blockId < N_flux_states; ++blockId) {
+    for (int blockId = 0; blockId < N_flux_states; ++blockId)
+    {
         curandState localState = state[blockId % I.streams];
-        for (int i = 0; i < I.egroups; ++i) {
+
+        for (int i = 0; i < I.egroups; ++i)
+        {
             flux_states[blockId * I.egroups + i] = curand_uniform(&localState);
         }
     }
 }
 
 // Gets I from user and sets defaults
-Input set_default_input(void) {
+Input set_default_input(void)
+{
     Input I;
 
     I.source_2D_regions = 5000;
@@ -37,7 +45,8 @@ Input set_default_input(void) {
 }
 
 // Returns a memory estimate (in MB) for the program's primary data structures
-double mem_estimate(Input I) {
+double mem_estimate(Input I)
+{
     size_t nbytes = 0;
 
     // Sources Array
@@ -58,7 +67,8 @@ double mem_estimate(Input I) {
     return (double)nbytes / 1024.0 / 1024.0;
 }
 
-Source *initialize_sources(Input I, Source_Arrays *SA) {
+Source *initialize_sources(Input I, Source_Arrays *SA)
+{
     // Source Data Structure Allocation
     Source *sources = (Source *)malloc(I.source_3D_regions * sizeof(Source));
 
@@ -80,7 +90,8 @@ Source *initialize_sources(Input I, Source_Arrays *SA) {
         sources[i].sigT_id = i * I.egroups;
 
     // Initialize fine source and flux to random numbers
-    for (long i = 0; i < N_fine; i++) {
+    for (long i = 0; i < N_fine; i++)
+    {
         SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
         SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
     }
@@ -92,31 +103,33 @@ Source *initialize_sources(Input I, Source_Arrays *SA) {
     return sources;
 }
 
-Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h)
+{
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine])
+    #pragma omp target enter data map(alloc: SA_d->fine_source_arr[0:N_fine])
     #pragma omp target update to(SA_d->fine_source_arr[0:N_fine])
 
     // Allocate & Copy Fine Flux Data
-    #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine])
+    #pragma omp target enter data map(alloc: SA_d->fine_flux_arr[0:N_fine])
     #pragma omp target update to(SA_d->fine_flux_arr[0:N_fine])
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
-    #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT])
+    #pragma omp target enter data map(alloc: SA_d->sigT_arr[0:N_sigT])
     #pragma omp target update to(SA_d->sigT_arr[0:N_sigT])
 
     // Allocate & Copy Source Array Data
     Source *sources_d;
-    #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions])
+    #pragma omp target enter data map(alloc: sources_d[0:I.source_3D_regions])
     #pragma omp target update to(sources_d[0:I.source_3D_regions])
 
     return sources_d;
 }
 
 // Builds a table of exponential values for linear interpolation
-Table buildExponentialTable(void) {
+Table buildExponentialTable(void)
+{
     // define table
     Table table;
 
@@ -131,7 +144,8 @@ Table buildExponentialTable(void) {
     float dx = maxVal / (float)N;
 
     // store linear segment information (slope and y-intercept)
-    for (int n = 0; n < N; n++) {
+    for (int n = 0; n < N; n++)
+    {
         // compute slope and y-intercept for ( 1 - exp(-x) )
         float exponential = exp(-n * dx);
         table.values[2 * n] = -exponential;
@@ -146,7 +160,27 @@ Table buildExponentialTable(void) {
     return table;
 }
 
-void __cudaCheckError(const char *file, const int line) {
-    // Error checking is not directly applicable in OpenMP Offload as in CUDA
-    // You may need to check for errors using OpenMP specific methods or handle them differently
+void __cudaCheckError(const char *file, const int line)
+{
+#ifdef CUDA_ERROR_CHECK
+    cudaError err = cudaGetLastError();
+    if (cudaSuccess != err)
+    {
+        fprintf(stderr, "cudaCheckError() failed at %s:%i : %s\n",
+                file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+
+    // More careful checking. However, this will affect performance.
+    // Comment away if needed.
+    err = cudaDeviceSynchronize();
+    if (cudaSuccess != err)
+    {
+        fprintf(stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
+                file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+#endif
+
+    return;
 }

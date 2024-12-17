@@ -58,9 +58,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now ported to support OpenMP Offload for heterogeneous
-architectures, including support for NVIDIA GPUs and other accelerators
-compatible with OpenMP Offload.
+SimpleMOC-kernel is now an OpenMP Offload code and supports architectures that
+are compatible with OpenMP 4.5+ offloading, including many modern CPUs and GPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -86,7 +85,7 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings using OpenMP Offload, use the following command:
+	To compile SimpleMOC-kernel with default settings, use the following command:
 
 	>$ make
 
@@ -101,7 +100,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 
 	Usage: ./SimpleMOC-kernel <options>
 	Options include:
-	  -t <threads>          Number of OpenMP threads to run
+	  -t <threads>          Number of threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per OpenMP thread
@@ -122,14 +121,14 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = clang
+COMPILER    = gcc
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
 
 Explanation of Flags:
 
-COMPILER <clang> - This selects your compiler (Clang with OpenMP Offload support).
+COMPILER <gcc> - This selects your compiler (GCC with OpenMP support is required).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
@@ -141,7 +140,7 @@ PROFILE - Adds the compiler flag "-pg".
 SimpleMOC-kernel Strawman Reactor Definition
 ===============================================================================
 
-For the purposes of simplicity this mini-app uses a conservative "strawman"
+For the purposes of simplicity, this mini-app uses a conservative "strawman"
 reactor model to represent a good target problem for full core reactor
 simulations to be run on exascale class supercomputers. Arbitrary
 user-defined geometries are not supported.

@@ -1,7 +1,7 @@
 // microXOR kernel using OpenMP Offloading
 
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
 /* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.
    Note that we only consider neighbors and not input_{i,j} when computing output_{i,j}.

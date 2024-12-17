@@ -1,8 +1,12 @@
-Here is the translated `Materials.cu` file to the OpenMP-offload execution model:
+Here is the translated `Materials.cu` file into the OpenMP Offload execution model. The file is now named `Materials.c` and assumes the use of OpenMP directives for offloading computations to a target device:
 
-```cpp
-#include "XSbench_header.cuh"
-#include <omp.h>
+```c
+// Material data is hard coded into the functions in this file.
+// Note that there are 12 materials present in H-M (large or small)
+
+#include "XSbench_header.h"
+#include <stdlib.h>
+#include <string.h>
 
 // num_nucs represents the number of nuclides that each material contains
 int * load_num_nucs(long n_isotopes)
@@ -102,7 +106,7 @@ double * load_concs( int * num_nucs, int max_num_nucs )
     uint64_t seed = STARTING_SEED * STARTING_SEED;
     double * concs = (double *) malloc( 12 * max_num_nucs * sizeof( double ) );
 
-    #pragma omp target teams distribute parallel for map(tofrom:concs[0:12*max_num_nucs])
+    #pragma omp target teams distribute parallel for collapse(2) map(tofrom:concs[0:12*max_num_nucs])
     for( int i = 0; i < 12; i++ )
         for( int j = 0; j < num_nucs[i]; j++ )
             concs[i * max_num_nucs + j] = LCG_random_double(&seed);
@@ -111,7 +115,4 @@ double * load_concs( int * num_nucs, int max_num_nucs )
 }
 ```
 
-### Key Changes:
-- The CUDA-specific constructs have been removed.
-- OpenMP offloading is used for parallelizing the `load_concs` function. The `#pragma omp target teams distribute parallel for` directive is used to offload the loop to the GPU.
-- The rest of the code remains largely unchanged as it does not involve GPU-specific operations.
+In this translation, the CUDA-specific constructs have been replaced with OpenMP directives. The `load_concs` function uses `#pragma omp target teams distribute parallel for collapse(2)` to offload the nested loops to a target device, which is typically a GPU. The `map(tofrom:concs[0:12*max_num_nucs])` clause is used to specify that the `concs` array should be mapped to and from the device.

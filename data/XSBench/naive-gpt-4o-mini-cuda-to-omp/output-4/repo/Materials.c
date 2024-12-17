@@ -1,9 +1,7 @@
-// Materials.cu
-// Material data is hard coded into the functions in this file.
-// Note that there are 12 materials present in H-M (large or small)
-
-#include "XSbench_header.cuh"
+#include "XSbench_header.h"
 #include <omp.h>
+#include <stdlib.h>
+#include <string.h>
 
 // num_nucs represents the number of nuclides that each material contains
 int * load_num_nucs(long n_isotopes)
@@ -17,15 +15,15 @@ int * load_num_nucs(long n_isotopes)
     else
         num_nucs[0] = 321; // HM Small is 34, H-M Large is 321
 
-    num_nucs[1] = 5;
-    num_nucs[2] = 4;
-    num_nucs[3] = 4;
-    num_nucs[4] = 27;
-    num_nucs[5] = 21;
-    num_nucs[6] = 21;
-    num_nucs[7] = 21;
-    num_nucs[8] = 21;
-    num_nucs[9] = 21;
+    num_nucs[1]  = 5;
+    num_nucs[2]  = 4;
+    num_nucs[3]  = 4;
+    num_nucs[4]  = 27;
+    num_nucs[5]  = 21;
+    num_nucs[6]  = 21;
+    num_nucs[7]  = 21;
+    num_nucs[8]  = 21;
+    num_nucs[9]  = 21;
     num_nucs[10] = 9;
     num_nucs[11] = 9;
 
@@ -46,16 +44,16 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
 
     // Small H-M has 34 fuel nuclides
     int mats0_Sml[] = { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
-                        8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53,
-                        54, 55, 56, 18, 23, 41 }; //fuel
+                        8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53, 
+                        54, 55, 56, 18, 23, 41 }; // fuel
     // Large H-M has 300 fuel nuclides
     int mats0_Lrg[321] = { 58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
-                           8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53,
-                           54, 55, 56, 18, 23, 41 }; //fuel
+                            8, 9, 10, 29, 57, 47, 48, 0, 62, 15, 33, 34, 52, 53,
+                            54, 55, 56, 18, 23, 41 }; // fuel
     for (int i = 0; i < 321 - 34; i++)
         mats0_Lrg[34 + i] = 68 + i; // H-M large adds nuclides to fuel only
 
-    // These are the non-fuel materials	
+    // These are the non-fuel materials    
     int mats1[] = { 63, 64, 65, 66, 67 }; // cladding
     int mats2[] = { 24, 41, 4, 5 }; // cold borated water
     int mats3[] = { 24, 41, 4, 5 }; // hot borated water
@@ -77,22 +75,22 @@ int * load_mats(int * num_nucs, long n_isotopes, int * max_num_nucs)
 
     // H-M large v small dependency
     if (n_isotopes == 68)
-        memcpy(mats, mats0_Sml, num_nucs[0] * sizeof(int));
+        memcpy(mats, mats0_Sml, num_nucs[0] * sizeof(int));    
     else
         memcpy(mats, mats0_Lrg, num_nucs[0] * sizeof(int));
 
     // Copy other materials
-    memcpy(mats + *max_num_nucs * 1, mats1, num_nucs[1] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 2, mats2, num_nucs[2] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 3, mats3, num_nucs[3] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 4, mats4, num_nucs[4] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 5, mats5, num_nucs[5] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 6, mats6, num_nucs[6] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 7, mats7, num_nucs[7] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 8, mats8, num_nucs[8] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 9, mats9, num_nucs[9] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 10, mats10, num_nucs[10] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 11, mats11, num_nucs[11] * sizeof(int));
+    memcpy(mats + *max_num_nucs * 1, mats1, num_nucs[1] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 2, mats2, num_nucs[2] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 3, mats3, num_nucs[3] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 4, mats4, num_nucs[4] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 5, mats5, num_nucs[5] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 6, mats6, num_nucs[6] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 7, mats7, num_nucs[7] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 8, mats8, num_nucs[8] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 9, mats9, num_nucs[9] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 10, mats10, num_nucs[10] * sizeof(int));    
+    memcpy(mats + *max_num_nucs * 11, mats11, num_nucs[11] * sizeof(int));    
 
     return mats;
 }
@@ -103,7 +101,7 @@ double * load_concs(int * num_nucs, int max_num_nucs)
     uint64_t seed = STARTING_SEED * STARTING_SEED;
     double * concs = (double *) malloc(12 * max_num_nucs * sizeof(double));
 
-    #pragma omp target teams distribute parallel for collapse(2) map(to: num_nucs[:12]) map(to: seed) map(from: concs[:12 * max_num_nucs])
+    #pragma omp target teams distribute parallel for collapse(2)
     for (int i = 0; i < 12; i++)
         for (int j = 0; j < num_nucs[i]; j++)
             concs[i * max_num_nucs + j] = LCG_random_double(&seed);

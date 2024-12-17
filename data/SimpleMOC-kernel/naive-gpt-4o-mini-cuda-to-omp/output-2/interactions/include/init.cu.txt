@@ -1,35 +1,35 @@
-Here is the translated `init.cu` file using the OpenMP Offload execution model:
+Here is the translated `init.c` file using the OpenMP Offload execution model:
 
 ```c
 #include "SimpleMOC-kernel_header.h"
+#include <omp.h>
 
 #pragma omp declare target
-void setup_kernel(curandState *state, Input I)
-{
+void setup_kernel(curandState *state, Input I) {
     int threadId = omp_get_thread_num();
     if (threadId >= I.streams)
         return;
     curand_init(1234, threadId, 0, &state[threadId]);
 }
 
-void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state)
-{
-    int threadId = omp_get_thread_num();
-    if (threadId >= N_flux_states)
+void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state) {
+    int blockId = omp_get_thread_num(); // geometric segment
+
+    if (blockId >= N_flux_states)
         return;
 
     // Assign RNG state
-    curandState *localState = &state[threadId % I.streams];
+    curandState *localState = &state[blockId % I.streams];
 
-    if (threadId == 0)
-        for (int i = 0; i < I.egroups; i++)
-            flux_states[threadId + i] = curand_uniform(localState);
+    // Initialize flux states
+    for (int i = 0; i < I.egroups; i++) {
+        flux_states[blockId + i] = curand_uniform(localState);
+    }
 }
 #pragma omp end declare target
 
 // Gets I from user and sets defaults
-Input set_default_input(void)
-{
+Input set_default_input(void) {
     Input I;
 
     I.source_2D_regions = 5000;
@@ -45,8 +45,7 @@ Input set_default_input(void)
 }
 
 // Returns a memory estimate (in MB) for the program's primary data structures
-double mem_estimate(Input I)
-{
+double mem_estimate(Input I) {
     size_t nbytes = 0;
 
     // Sources Array
@@ -67,8 +66,7 @@ double mem_estimate(Input I)
     return (double)nbytes / 1024.0 / 1024.0;
 }
 
-Source *initialize_sources(Input I, Source_Arrays *SA)
-{
+Source *initialize_sources(Input I, Source_Arrays *SA) {
     // Source Data Structure Allocation
     Source *sources = (Source *)malloc(I.source_3D_regions * sizeof(Source));
 
@@ -90,52 +88,75 @@ Source *initialize_sources(Input I, Source_Arrays *SA)
         sources[i].sigT_id = i * I.egroups;
 
     // Initialize fine source and flux to random numbers
-    #pragma omp target
-    {
-        for (long i = 0; i < N_fine; i++)
-        {
-            SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
-            SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
-        }
-
-        // Initialize SigT Values
-        for (int i = 0; i < N_sigT; i++)
-            SA->sigT_arr[i] = (float)rand() / RAND_MAX;
+    for (long i = 0; i < N_fine; i++) {
+        SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
+        SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
     }
+
+    // Initialize SigT Values
+    for (int i = 0; i < N_sigT; i++)
+        SA->sigT_arr[i] = (float)rand() / RAND_MAX;
 
     return sources;
 }
 
-Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h)
-{
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
     #pragma omp target enter data map(to: SA_d->fine_source_arr[0:N_fine]) map(from: SA_h->fine_source_arr[0:N_fine])
-    cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+    #pragma omp target update to(SA_d->fine_source_arr[0:N_fine]) from(SA_h->fine_source_arr[0:N_fine]);
 
     // Allocate & Copy Fine Flux Data
     #pragma omp target enter data map(to: SA_d->fine_flux_arr[0:N_fine]) map(from: SA_h->fine_flux_arr[0:N_fine])
-    cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+    #pragma omp target update to(SA_d->fine_flux_arr[0:N_fine]) from(SA_h->fine_flux_arr[0:N_fine]);
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
     #pragma omp target enter data map(to: SA_d->sigT_arr[0:N_sigT]) map(from: SA_h->sigT_arr[0:N_sigT])
-    cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+    #pragma omp target update to(SA_d->sigT_arr[0:N_sigT]) from(SA_h->sigT_arr[0:N_sigT]);
 
     // Allocate & Copy Source Array Data
     Source *sources_d;
     #pragma omp target enter data map(to: sources_d[0:I.source_3D_regions]) map(from: sources_h[0:I.source_3D_regions])
-    cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
+    #pragma omp target update to(sources_d) from(sources_h);
 
     return sources_d;
 }
+
+// Builds a table of exponential values for linear interpolation
+Table buildExponentialTable(void) {
+    // define table
+    Table table;
+
+    float maxVal = 10.0;
+
+    // compute number of array values
+    int N = 353;
+
+    // compute spacing
+    float dx = maxVal / (float)N;
+
+    // store linear segment information (slope and y-intercept)
+    for (int n = 0; n < N; n++) {
+        // compute slope and y-intercept for ( 1 - exp(-x) )
+        float exponential = exp(-n * dx);
+        table.values[2 * n] = -exponential;
+        table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    // assign data to table
+    table.dx = dx;
+    table.maxVal = maxVal - table.dx;
+    table.N = N;
+
+    return table;
+}
 ```
 
-### Changes Made:
-1. Added `#pragma omp declare target` to declare functions that will be offloaded to the device.
-2. Replaced CUDA kernel launch syntax with OpenMP parallel constructs.
-3. Used `omp_get_thread_num()` to get the thread ID in place of CUDA's thread indexing.
-4. Used `#pragma omp target` to offload the initialization of random numbers to the device.
-5. Adjusted memory copy operations to use OpenMP's data mapping features. 
+### Key Changes:
+1. **OpenMP Directives**: The `#pragma omp declare target` and `#pragma omp target` directives are used to specify which functions and data should be offloaded to the device.
+2. **Random Number Generation**: The random number generation logic is retained, but it is adapted to use OpenMP's thread management.
+3. **Data Management**: The data transfer between host and device is managed using OpenMP's data mapping features.
+4. **Function Signatures**: The functions are modified to be compatible with OpenMP's offloading model.
 
-This code assumes that the OpenMP environment is set up correctly to support offloading to a compatible device.
+Make sure to include the necessary OpenMP headers and link against the OpenMP library when compiling this code.

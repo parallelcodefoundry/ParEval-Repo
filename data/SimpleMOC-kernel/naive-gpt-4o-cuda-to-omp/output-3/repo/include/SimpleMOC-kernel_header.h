@@ -12,7 +12,6 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <assert.h>
 #include <omp.h>
 
 // User inputs
@@ -52,9 +51,12 @@ typedef struct {
     int N;
 } Table;
 
-// Function prototypes for kernels and initialization
+// Function prototypes for kernel.c
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, unsigned int *state, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
+
+// Function prototypes for init.c
+double mem_estimate(Input I);
 void setup_kernel(unsigned int *state, Input I);
 void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
@@ -62,7 +64,7 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
 Table buildExponentialTable(void);
 Input set_default_input(void);
 
-// Function prototypes for I/O operations
+// Function prototypes for io.c
 void logo(int version);
 void center_print(const char *s, int width);
 void border_print(void);

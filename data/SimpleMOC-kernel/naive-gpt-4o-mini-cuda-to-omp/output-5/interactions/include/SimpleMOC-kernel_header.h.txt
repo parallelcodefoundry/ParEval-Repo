@@ -53,7 +53,7 @@ typedef struct {
     int N;
 } Table;
 
-// Function declarations
+// Function prototypes
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
 void setup_kernel(Input I);
@@ -65,16 +65,16 @@ Input set_default_input(void);
 double mem_estimate(Input I);
 
 // Error handling
-void __ompCheckError(const char *file, const int line);
+void check_error(const char *file, const int line);
 
 #endif
 ```
 
 ### Key Changes:
-1. **CUDA Specific Includes**: Removed CUDA specific includes and replaced them with OpenMP includes.
-2. **Kernel Function Declaration**: Changed the kernel function declaration from `__global__` to a regular function declaration since OpenMP does not require the `__global__` qualifier.
-3. **Random Number Generation**: Removed `curandState` and related CUDA functions, as OpenMP will handle parallelism differently. You may need to implement a different random number generation strategy suitable for OpenMP.
-4. **Error Handling**: Updated error handling to be more appropriate for OpenMP.
-5. **Removed CUDA Specific Macros**: Removed CUDA specific macros and replaced them with OpenMP compatible constructs. 
+1. **CUDA Specific Includes and Types**: Removed CUDA specific includes and types such as `curand_kernel.h` and replaced them with OpenMP equivalents.
+2. **Kernel Function Declaration**: Changed the kernel function declaration from `__global__ void run_kernel(...)` to a regular function declaration `void run_kernel(...)`.
+3. **Random Number Generation**: The random number generation will need to be handled differently in OpenMP, so the `curand` related functions have been removed.
+4. **Error Handling**: The CUDA error checking macros have been replaced with a generic error checking function.
+5. **Removed CUDA Memory Management**: The memory management functions specific to CUDA have been removed, as OpenMP will manage memory differently.
 
-Make sure to implement the actual parallel execution logic using OpenMP pragmas in the corresponding source files.
+This header file is now set up for use with OpenMP Offload, and the corresponding implementation files will need to be modified similarly to accommodate the changes in execution model.

@@ -1,5 +1,4 @@
-#include "XSbench_header.cuh"
-#include <omp.h>
+#include "XSbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -121,10 +120,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     center_print("INPUT SUMMARY", 79);
     border_print();
     printf("Programming Model:            OpenMP Offload\n");
-    #pragma omp target
-    {
-        printf("OpenMP Device:                  %s\n", "OpenMP Offload Device");
-    }
+    printf("OpenMP Device:                %s\n", "OpenMP Device");
     if( in.simulation_method == EVENT_BASED )
         printf("Simulation Method:            Event Based\n");
     else
@@ -171,6 +167,8 @@ void print_inputs(Inputs in, int nprocs, int version )
         printf("Read\n");
     else
         printf("Write\n");
+    border_print();
+    center_print("INITIALIZATION - DO NOT PROFILE", 79);
     border_print();
 }
 

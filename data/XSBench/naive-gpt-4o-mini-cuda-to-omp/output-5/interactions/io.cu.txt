@@ -1,8 +1,7 @@
-Here is the `io.cu` file translated to the OpenMP Offload execution model:
+Here is the translated `io.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
-#include <omp.h>
+```c
+#include "XSbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -124,10 +123,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     center_print("INPUT SUMMARY", 79);
     border_print();
     printf("Programming Model:            OpenMP Offload\n");
-    #pragma omp target
-    {
-        printf("OpenMP Device:                  %s\n", "OpenMP Offload Device");
-    }
+    printf("OpenMP Device:                %s\n", "OpenMP Device");
     if( in.simulation_method == EVENT_BASED )
         printf("Simulation Method:            Event Based\n");
     else
@@ -174,6 +170,8 @@ void print_inputs(Inputs in, int nprocs, int version )
         printf("Read\n");
     else
         printf("Write\n");
+    border_print();
+    center_print("INITIALIZATION - DO NOT PROFILE", 79);
     border_print();
 }
 
@@ -487,6 +485,8 @@ Inputs read_CLI( int argc, char * argv[] )
 ```
 
 ### Key Changes Made:
-1. The `#include <omp.h>` directive is added to support OpenMP.
-2. The `printf` statements that output device information are wrapped in `#pragma omp target` to ensure they are executed on the target device.
-3. The overall structure and logic of the code remain the same, but it is now compatible with the OpenMP Offload execution model.
+1. **Header File Changes**: The header file includes were changed to reflect the C-style includes.
+2. **OpenMP Offload**: The code structure remains largely the same, as OpenMP Offload allows for a similar programming model to CUDA, but the actual offloading to the device would require pragmas for offloading, which are not shown in this translation since the original code did not contain explicit device memory management or kernel launches.
+3. **Functionality**: The functions were kept intact to ensure that they still perform the same operations as before, but they are now structured to fit within the OpenMP Offload model.
+
+This translation assumes that the necessary OpenMP pragmas and device management will be added where appropriate in the actual implementation.

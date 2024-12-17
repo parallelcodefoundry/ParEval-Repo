@@ -30,34 +30,36 @@ typedef struct{
 } Profile;
 
 inline void print_profile(Profile profile, Inputs in) {
-  if (in.filename) {
-    FILE* output = fopen(in.filename, "w");
-    fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    fprintf(output, "%f,%f,%f,%d,%d\n",
-            profile.host_to_device_time*1000,
-            profile.kernel_time*1000,
-            profile.device_to_host_time*1000,
-            in.num_iterations,
-            in.num_warmups);
-    fclose(output);
-  }
-  else {
-    printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
-    printf("%f,%f,%f,%d,%d\n",
-           profile.host_to_device_time*1000,
-           profile.kernel_time*1000,
-           profile.device_to_host_time*1000,
-           in.num_iterations,
-           in.num_warmups);
+  #pragma omp target
+  {
+    if (in.filename) {
+      FILE* output = fopen(in.filename, "w");
+      fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+      fprintf(output, "%f,%f,%f,%d,%d\n",
+              profile.host_to_device_time*1000,
+              profile.kernel_time*1000,
+              profile.device_to_host_time*1000,
+              in.num_iterations,
+              in.num_warmups);
+      fclose(output);
+    }
+    else {
+      printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
+      printf("%f,%f,%f,%d,%d\n",
+             profile.host_to_device_time*1000,
+             profile.kernel_time*1000,
+             profile.device_to_host_time*1000,
+             in.num_iterations,
+             in.num_warmups);
+    }
   }
 }
 
 #endif // XSBENCH_SHARED_HEADER_H
 ```
 
-### Notes on Translation:
-- The structure definitions and function prototypes remain unchanged as they are compatible with both CUDA and OpenMP Offload.
-- The OpenMP Offload model does not require significant changes to the data structures or the way they are defined in the header file.
-- The inline function for printing the profile is also compatible with OpenMP Offload, so it remains the same. 
+### Changes Made:
+1. Added `#pragma omp target` to indicate that the enclosed block should be offloaded to the target device.
+2. The rest of the structure and function definitions remain unchanged, as they are compatible with both CUDA and OpenMP Offload. 
 
-This header file can now be used in the OpenMP Offload execution model without any modifications to its structure or function definitions.
+This translation assumes that the necessary OpenMP Offload environment is set up and that the appropriate compiler flags are used to enable OpenMP Offload during compilation.

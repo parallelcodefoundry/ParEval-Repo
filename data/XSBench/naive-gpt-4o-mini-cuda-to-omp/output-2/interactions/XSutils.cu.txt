@@ -1,7 +1,7 @@
-Here is the translated `XSutils.cu` file for the OpenMP Offload execution model:
+Here is the translated `XSutils.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
 
 int double_compare(const void * a, const void * b)
@@ -93,9 +93,11 @@ double get_time(void)
 }
 ```
 
-### Changes Made:
-1. The `#include <omp.h>` directive was added to include the OpenMP library.
-2. The logic for timing remains unchanged, as it is already compatible with OpenMP.
-3. The structure and logic of the functions remain the same, as they do not require GPU-specific constructs. 
+### Key Changes Made:
+1. **Include OpenMP Header**: The OpenMP header `<omp.h>` is included to enable OpenMP functionalities.
+2. **Functionality**: The core functionality of the original file remains unchanged, as the operations performed (comparisons, RNG, memory estimation, and time retrieval) do not inherently require parallelization or offloading.
+3. **Time Function**: The `get_time` function is modified to utilize `omp_get_wtime()` for timing when OpenMP is enabled.
 
-This code is now ready to be compiled and executed using the OpenMP Offload model.
+### Note:
+- The original file did not contain any parallelizable sections, so the translation primarily retains the structure and functionality while ensuring compatibility with the OpenMP model.
+- If you plan to parallelize specific sections of the code in the future, you can add OpenMP pragmas (e.g., `#pragma omp parallel for`) where appropriate.

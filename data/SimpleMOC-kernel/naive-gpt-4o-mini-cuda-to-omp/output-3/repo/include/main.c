@@ -33,11 +33,11 @@ int main(int argc, char *argv[])
     printf("Building Exponential Table...\n");
     Table table = buildExponentialTable();
     table_d = (Table *)malloc(sizeof(Table));
-    memcpy(table_d, &table, sizeof(Table));
+    *table_d = table;
 #endif
 
-    // Setup OpenMP offload
-    #pragma omp target data map(to: I, sources_d[0:I.source_3D_regions], SA_d)
+    // Setup OpenMP Offload
+    #pragma omp target data map(to: I, sources_d[0:I.source_3D_regions], SA_d) map(from: table_d)
     {
         // Setup OpenMP RNG on Device
         printf("Setting up OpenMP RNG...\n");
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
         #pragma omp target
         {
             cudaMalloc((void **)&flux_states, N_flux_states * I.egroups * sizeof(float));
-            init_flux_states<<<(I.segments + 255) / 256, 256>>>(flux_states, N_flux_states, I, RNG_states);
+            init_flux_states<<<(I.segments + 255) / 256, I.egroups>>>(flux_states, N_flux_states, I, RNG_states);
             cudaDeviceSynchronize();
         }
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
         printf("Attenuating fluxes across segments...\n");
 
         // OpenMP timer variables
-        float time = 0;
+        double time = 0;
 
         // Setup kernel call block parameters
         assert(I.segments % I.seg_per_thread == 0);
@@ -88,21 +88,17 @@ int main(int argc, char *argv[])
 
         #pragma omp target
         {
-            run_kernel<<<blocks_k, I.egroups, I.seg_per_thread * 3 * sizeof(int)>>>(
-                I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
-            cudaDeviceSynchronize();
+            run_kernel<<<blocks_k, I.egroups, I.seg_per_thread * 3 * sizeof(int) >>>(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
         }
 
         cudaEventRecord(stop, 0);
         cudaEventSynchronize(start);
         cudaEventSynchronize(stop);
         cudaEventElapsedTime(&time, start, stop);
+        cudaDeviceSynchronize();
 
         float *host_flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
-        #pragma omp target
-        {
-            cudaMemcpy(host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost);
-        }
+        cudaMemcpy(host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost);
 
         printf("Simulation Complete.\n");
 
@@ -117,8 +113,5 @@ int main(int argc, char *argv[])
         border_print();
     }
 
-    // Free allocated memory
-    free(sources_h);
-    free(table_d);
     return 0;
 }

@@ -28,10 +28,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm
+LDFLAGS = -lm -lcudart
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

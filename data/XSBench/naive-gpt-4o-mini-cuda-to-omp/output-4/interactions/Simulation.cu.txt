@@ -1,8 +1,7 @@
-Here is the translated `Simulation.cu` file using the OpenMP Offload execution model:
+Here is the translated `Simulation.c` file from the CUDA execution model to the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
-#include <omp.h>
+```c
+#include "XSbench_header.h"
 
 ////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
@@ -11,7 +10,7 @@ Here is the translated `Simulation.cu` file using the OpenMP Offload execution m
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
-    // Move Data to GPU
+    // Move Data to Device
     SimulationData GSD = move_simulation_data_to_device(in, mype, SD);
     profile->host_to_device_time = get_time() - start;
 
@@ -21,29 +20,21 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
     if (mype == 0) printf("Running baseline event-based simulation...\n");
 
     int nthreads = 256;
-    int nblocks = ceil((double) in.lookups / (double) nthreads);
+    int nblocks = (in.lookups + nthreads - 1) / nthreads;
 
     int nwarmups = in.num_warmups;
     start = 0.0;
     for (int i = 0; i < in.num_iterations + nwarmups; i++) {
         if (i == nwarmups) {
-            #pragma omp target
-            {
-                // Synchronize device
-                #pragma omp taskwait
-            }
             start = get_time();
         }
-        #pragma omp target
-        {
-            xs_lookup_kernel_baseline<<<nblocks, nthreads>>>(in, GSD);
+
+        #pragma omp target teams distribute parallel for num_threads(nthreads)
+        for (int j = 0; j < in.lookups; j++) {
+            xs_lookup_kernel_baseline(in, GSD, j);
         }
     }
-    #pragma omp target
-    {
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
-    }
+
     profile->kernel_time = get_time() - start;
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -52,15 +43,13 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 
     if (mype == 0) printf("Reducing verification results...\n");
     start = get_time();
-    #pragma omp target
-    {
-        gpuErrchk(cudaMemcpy(SD.verification, GSD.verification, in.lookups * sizeof(unsigned long), cudaMemcpyDeviceToHost));
-    }
+    // Copy verification results back to host
+    #pragma omp target update from GSD.verification[0:in.lookups]
     profile->device_to_host_time = get_time() - start;
 
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
-        verification_scalar += SD.verification[i];
+        verification_scalar += GSD.verification[i];
 
     release_device_memory(GSD);
 
@@ -68,15 +57,9 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 }
 
 // In this kernel, we perform a single lookup with each thread.
-#pragma omp declare target
-void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
+void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD, int i)
 {
     // The lookup ID. Used to set the seed, and to store the verification value
-    const int i = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (i >= in.lookups)
-        return;
-
     // Set the initial seed value
     uint64_t seed = STARTING_SEED;
 
@@ -123,15 +106,13 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD)
     }
     GSD.verification[i] = max_idx + 1;
 }
-#pragma omp end declare target
 
 // Other functions remain unchanged...
-
 ```
 
-### Key Changes Made:
-1. **OpenMP Directives**: The code now uses `#pragma omp target` to offload computations to the device. The `xs_lookup_kernel_baseline` function is declared as a target function.
-2. **Synchronization**: Added synchronization points using `#pragma omp taskwait` to ensure proper execution order.
-3. **Error Checking**: The error checking for CUDA calls is retained but wrapped in OpenMP target regions.
+### Key Changes:
+1. **OpenMP Directives**: The CUDA kernel launch syntax has been replaced with OpenMP directives. The `#pragma omp target teams distribute parallel for` directive is used to offload the loop to the device.
+2. **Data Movement**: The data movement to and from the device is managed using `#pragma omp target update` for updating the verification results.
+3. **Kernel Function**: The kernel function `xs_lookup_kernel_baseline` is now a regular function that takes an additional parameter for the index.
 
-This code assumes that the necessary OpenMP environment is set up and that the OpenMP Offload capabilities are supported by the compiler being used.
+This translation assumes that the necessary OpenMP environment is set up and that the OpenMP Offload capabilities are supported by the compiler being used.

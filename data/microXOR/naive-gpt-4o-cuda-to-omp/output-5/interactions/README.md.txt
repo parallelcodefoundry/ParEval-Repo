@@ -3,21 +3,19 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP Offloading for GPU execution.
+This version of microXOR is written using OpenMP Offload for GPU execution.
 
 ## Prerequisites
 
-A compiler with OpenMP Offloading support must be installed. This typically includes compilers like GCC or Clang with OpenMP support.
+A compiler with OpenMP Offload support must be installed. This typically includes compilers like GCC (version 9 or later) or Clang (version 10 or later) with OpenMP support.
 
 ## Build
 
-To build microXOR, use `make`, setting the appropriate compiler and flags for OpenMP Offloading. For example, the following will build microXOR using GCC:
+To build microXOR, use `make`, setting `OMP_TARGET` as appropriate for your system. For example, the following will build microXOR for an NVIDIA GPU:
 
 ```
-make CC=gcc
+make OMP_TARGET=nvidia
 ```
-
-Ensure that your compiler supports OpenMP Offloading and is configured correctly for your GPU.
 
 ## Run
 

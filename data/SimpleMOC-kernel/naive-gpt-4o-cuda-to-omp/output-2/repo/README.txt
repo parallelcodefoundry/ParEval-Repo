@@ -57,8 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now an OpenMP Offload code and supports architectures with
-OpenMP 4.5+ support, including NVIDIA GPUs, AMD GPUs, and Intel Xe GPUs.
+SimpleMOC-kernel is now ported to support OpenMP Offload for execution on 
+various architectures including NVIDIA GPUs, AMD GPUs, and Intel GPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -99,7 +99,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 
 	Usage: ./SimpleMOC-kernel <options>
 	Options include:
-	  -t <threads>          Number of threads to run
+	  -t <threads>          Number of OpenMP threads to run
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per OpenMP thread
@@ -120,14 +120,14 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-COMPILER    = clang
+COMPILER    = gcc
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
 
 Explanation of Flags:
 
-COMPILER <clang> - This selects your compiler (Clang with OpenMP support is recommended).
+COMPILER <gcc> - This selects your compiler (GCC with OpenMP support is required).
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 

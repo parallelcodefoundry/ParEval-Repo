@@ -1,31 +1,21 @@
 #include "SimpleMOC-kernel_header.h"
 #include <omp.h>
 
-// Initialize the random number generator states
-void setup_kernel(curandState *state, Input I)
-{
-    #pragma omp target teams distribute parallel for
-    for (int threadId = 0; threadId < I.streams; ++threadId) {
-        curand_init(1234, threadId, 0, &state[threadId]);
-    }
-}
-
 // Initialize global flux states to random numbers on device
-void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state)
-{
-    #pragma omp target teams distribute parallel for collapse(2)
-    for (int blockId = 0; blockId < N_flux_states; ++blockId) {
-        for (int i = 0; i < I.egroups; ++i) {
-            // Assign RNG state
-            curandState localState = state[blockId % I.streams];
-            flux_states[blockId * I.egroups + i] = curand_uniform(&localState);
+// Slow, poor use of GPU, but fine since it's just initialization code
+void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned int seed) {
+    #pragma omp target teams distribute parallel for
+    for (int blockId = 0; blockId < N_flux_states; blockId++) {
+        unsigned int localState = seed + blockId % I.streams;
+
+        for (int i = 0; i < I.egroups; i++) {
+            flux_states[blockId * I.egroups + i] = rand_r(&localState) / (float)RAND_MAX;
         }
     }
 }
 
 // Gets I from user and sets defaults
-Input set_default_input(void)
-{
+Input set_default_input(void) {
     Input I;
 
     I.source_2D_regions = 5000;
@@ -41,8 +31,7 @@ Input set_default_input(void)
 }
 
 // Returns a memory estimate (in MB) for the program's primary data structures
-double mem_estimate(Input I)
-{
+double mem_estimate(Input I) {
     size_t nbytes = 0;
 
     // Sources Array
@@ -63,8 +52,7 @@ double mem_estimate(Input I)
     return (double)nbytes / 1024.0 / 1024.0;
 }
 
-Source *initialize_sources(Input I, Source_Arrays *SA)
-{
+Source *initialize_sources(Input I, Source_Arrays *SA) {
     // Source Data Structure Allocation
     Source *sources = (Source *)malloc(I.source_3D_regions * sizeof(Source));
 
@@ -86,8 +74,7 @@ Source *initialize_sources(Input I, Source_Arrays *SA)
         sources[i].sigT_id = i * I.egroups;
 
     // Initialize fine source and flux to random numbers
-    for (long i = 0; i < N_fine; i++)
-    {
+    for (long i = 0; i < N_fine; i++) {
         SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
         SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
     }
@@ -99,11 +86,10 @@ Source *initialize_sources(Input I, Source_Arrays *SA)
     return sources;
 }
 
-Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h)
-{
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    #pragma omp target enter data map(to: SA_d[0:1])
+    #pragma omp target enter data map(to: SA_d[:1])
     #pragma omp target enter data map(alloc: SA_d->fine_source_arr[0:N_fine])
     #pragma omp target update to(SA_d->fine_source_arr[0:N_fine])
 
@@ -125,24 +111,22 @@ Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *S
 }
 
 // Builds a table of exponential values for linear interpolation
-Table buildExponentialTable(void)
-{
+Table buildExponentialTable(void) {
     // define table
     Table table;
 
-    //float precision = 0.01;
+    // float precision = 0.01;
     float maxVal = 10.0;
 
     // compute number of array values
-    //int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
+    // int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
     int N = 353;
 
     // compute spacing
     float dx = maxVal / (float)N;
 
     // store linear segment information (slope and y-intercept)
-    for (int n = 0; n < N; n++)
-    {
+    for (int n = 0; n < N; n++) {
         // compute slope and y-intercept for ( 1 - exp(-x) )
         float exponential = exp(-n * dx);
         table.values[2 * n] = -exponential;
@@ -155,29 +139,4 @@ Table buildExponentialTable(void)
     table.N = N;
 
     return table;
-}
-
-void __cudaCheckError(const char *file, const int line)
-{
-    #ifdef CUDA_ERROR_CHECK
-    cudaError err = cudaGetLastError();
-    if (cudaSuccess != err)
-    {
-        fprintf(stderr, "cudaCheckError() failed at %s:%i : %s\n",
-                file, line, cudaGetErrorString(err));
-        exit(-1);
-    }
-
-    // More careful checking. However, this will affect performance.
-    // Comment away if needed.
-    err = cudaDeviceSynchronize();
-    if (cudaSuccess != err)
-    {
-        fprintf(stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
-                file, line, cudaGetErrorString(err));
-        exit(-1);
-    }
-    #endif
-
-    return;
 }

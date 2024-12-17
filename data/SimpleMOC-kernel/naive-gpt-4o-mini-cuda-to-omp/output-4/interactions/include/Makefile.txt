@@ -1,6 +1,6 @@
 Here is the translated Makefile for the OpenMP Offload execution model:
 
-```Makefile
+```makefile
 #===============================================================================
 # User Options
 #===============================================================================
@@ -31,10 +31,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx-none -I/usr/local/cuda/include
+override CFLAGS += -fopenmp -I/usr/local/cuda/include
 
 # Linker Flags
-LDFLAGS = -lm
+LDFLAGS = -lm -lcudart
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -76,10 +76,9 @@ run:
 	./$(program)
 ```
 
-### Key Changes:
-1. **Compiler**: Changed from `nvcc` to `clang` to support OpenMP Offload.
-2. **Flags**: Added `-fopenmp` and `-fopenmp-targets=nvptx-none` to enable OpenMP Offload.
-3. **Source Files**: Changed file extensions from `.cu` to `.c` to reflect the C codebase.
-4. **Removed CUDA Specific Flags**: Removed CUDA-specific flags and replaced them with OpenMP flags. 
-
-Make sure to adjust paths and flags according to your specific environment and requirements.
+### Notes:
+- The `COMPILER` variable is set to `clang` to reflect the use of the Clang compiler for OpenMP offloading.
+- The `CFLAGS` include the `-fopenmp` flag to enable OpenMP support.
+- The `LDFLAGS` include `-lcudart` for linking against the CUDA runtime library.
+- The `SM_VERSION` variable is set to 80 to target NVIDIA GPUs with compute capability 8.0.
+- The `run` target remains the same, allowing execution of the compiled program.

@@ -53,23 +53,20 @@ typedef struct {
 // Function declarations
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-
-// init.c
-double mem_estimate(Input I);
-void setup_kernel(Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I);
+void setup_kernel(float *state, Input I);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, float *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
+double mem_estimate(Input I);
 
-// io.c
-void logo(int version);
-void center_print(const char *s, int width);
-void border_print(void);
-void fancy_int(int a);
-void print_input_summary(Input input);
-void read_CLI(int argc, char *argv[], Input *input);
-void print_CLI_error(void);
+// Error checking
+void __ompCheckError(const char *file, const int line);
+
+// Error Handling Macro
+#define OMP_CALL(x) do { if((x) != 0) { \
+    printf("Error at %s:%d\n", __FILE__, __LINE__); \
+    return EXIT_FAILURE;}} while(0)
 
 #endif

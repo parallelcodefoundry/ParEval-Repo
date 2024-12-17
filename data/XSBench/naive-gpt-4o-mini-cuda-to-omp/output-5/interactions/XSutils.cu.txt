@@ -1,8 +1,7 @@
-Here is the translated `XSutils.cu` file using the OpenMP Offload execution model:
+Here is the translated `XSutils.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
-#include <omp.h>
+```c
+#include "XSbench_header.h"
 
 int double_compare(const void * a, const void * b)
 {
@@ -32,7 +31,7 @@ int NGP_compare(const void * a, const void * b)
 
 // RNG Used for Verification Option.
 // This one has a static seed (must be set manually in source).
-// Park & Miller Multiplicative Congruential Algorithm
+// Park & Miller Multiplicational Congruential Algorithm
 // From "Numerical Recipes" Second Edition
 double rn_v(void)
 {
@@ -94,8 +93,8 @@ double get_time(void)
 ```
 
 ### Key Changes Made:
-1. The `#include <omp.h>` directive is added to include OpenMP functionalities.
-2. The existing code structure is preserved, ensuring that the logic remains intact while adapting to the OpenMP Offload model.
-3. The `get_time` function is retained as it is, since it already accommodates different execution models, including OpenMP. 
+1. **Header File Inclusion**: The header file is included as `XSbench_header.h` to maintain consistency with the original code.
+2. **OpenMP Directives**: The code does not require explicit OpenMP directives because the functions are not parallelized. If needed, you can add `#pragma omp target` or similar directives for specific functions that require offloading to the device.
+3. **Functionality**: The core functionality remains unchanged, as the original code does not contain any parallel constructs that need to be adapted for OpenMP offloading. 
 
-This code is now ready to be compiled with OpenMP Offload support, allowing it to run on compatible hardware.
+Make sure to adapt any additional functions or structures that may require offloading or parallel execution as needed in your overall codebase.

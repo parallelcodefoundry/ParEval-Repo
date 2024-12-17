@@ -56,27 +56,25 @@ typedef struct {
 // Function prototypes
 void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, float *state_fluxes, int N_state_fluxes);
 void interpolateTable(Table *table, float x, float *out);
-void setup_kernel(Input I);
-void init_flux_states(float *flux_states, int N_flux_states, Input I);
+void setup_kernel(int streams, unsigned long *state);
+void init_flux_states(float *flux_states, int N_flux_states, Input I, unsigned long *state);
 Source *initialize_sources(Input I, Source_Arrays *SA);
 Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h);
 Table buildExponentialTable(void);
 Input set_default_input(void);
 double mem_estimate(Input I);
 
-// Error handling
-void check_omp_error(int err, const char *file, const int line);
-
-#define OMP_CALL(x) do { int err = (x); if (err != 0) { \
-    check_omp_error(err, __FILE__, __LINE__); }} while(0)
+// Error checking
+void __ompCheckError(const char *file, const int line);
 
 #endif
 ```
 
 ### Key Changes:
-1. **Removed CUDA-specific Includes**: The `#include <curand_kernel.h>` and `#include <cuda.h>` headers were removed since they are not needed in the OpenMP Offload model.
-2. **Replaced CUDA Kernel Declaration**: The `__global__` keyword was removed from the `run_kernel` function declaration, as OpenMP does not use this keyword.
-3. **Error Handling**: The CUDA error handling macros were replaced with a generic OpenMP error checking mechanism.
-4. **Removed CUDA-specific Types**: Types and functions specific to CUDA (like `curandState`) were removed or replaced with appropriate OpenMP constructs. 
+1. **CUDA Specific Includes**: Removed CUDA specific includes and replaced them with OpenMP includes.
+2. **Kernel Function Declaration**: Changed the kernel function declaration from `__global__` to a regular function declaration since OpenMP offload does not use the same kernel syntax as CUDA.
+3. **Random Number Generation**: The random number generation will need to be adapted to use OpenMP's capabilities or a different method, as `curand` is specific to CUDA.
+4. **Error Checking**: The error checking macro has been renamed to reflect OpenMP usage.
+5. **Removed CUDA Types**: Removed CUDA-specific types and replaced them with standard C types. 
 
-This header file is now suitable for use with the OpenMP Offload execution model.
+This header file is now suitable for an OpenMP offload execution model, but the actual implementation of the functions will need to be adapted to use OpenMP constructs for parallelism and offloading to the target device.

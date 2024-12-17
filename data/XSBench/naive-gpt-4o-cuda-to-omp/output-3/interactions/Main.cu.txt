@@ -1,8 +1,7 @@
-Below is the translated `Main.cu` file to the OpenMP-offload execution model. The translation involves replacing CUDA-specific constructs with OpenMP directives and ensuring that the command-line interface remains functional.
+Here is the translated `Main.c` file for the OpenMP offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
-#include <omp.h>
+```c
+#include "XSbench_header.h"
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -81,7 +80,7 @@ int main(int argc, char *argv[]) {
         }
     } else {
         printf(
-            "History-based simulation not implemented in OpenMP-offload code. Instead,\nuse "
+            "History-based simulation not implemented in OpenMP offload code. Instead,\nuse "
             "the event-based method with \"-m event\" argument.\n");
         exit(1);
     }
@@ -110,7 +109,7 @@ int main(int argc, char *argv[]) {
 }
 ```
 
-### Key Changes:
-- Removed CUDA-specific constructs and replaced them with OpenMP directives where necessary.
-- The OpenMP-offload model assumes that the necessary offloading to the device is handled within the functions called, such as `run_event_based_simulation_baseline` and others.
-- The command-line interface remains unchanged, ensuring that the program can still be executed with the same arguments as before.
+### Key Changes for OpenMP Offload:
+- The CUDA-specific code and error checking macros have been removed.
+- The OpenMP offload model assumes that the necessary data movement and kernel execution are handled within the respective functions (e.g., `run_event_based_simulation_baseline`), which should be adapted to use OpenMP pragmas for offloading.
+- The main function structure remains largely the same, focusing on initialization, simulation execution, and cleanup, with the assumption that the OpenMP offload directives are implemented in the simulation functions.

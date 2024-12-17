@@ -6,7 +6,7 @@ SM_VERSION ?= 80
 SRC = src
 INC = include
 OBJ = obj
-CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target -march=sm_$(SM_VERSION) -I$(INC) -std=c++17
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64 -Xopenmp-target -march=sm_$(SM_VERSION) -I$(INC) -std=c++17
 ifneq ($(DEBUG), yes)
 	CXXFLAGS += -O3
 else
@@ -33,4 +33,4 @@ clean:
 .PHONY: clean
 ```
 
-This Makefile is adapted for OpenMP offloading using `clang++` as the compiler. It assumes that the source files have been renamed to `.cpp` and `.hpp` extensions to reflect C++ source and header files. The OpenMP flags are set to target NVIDIA GPUs, and the architecture is specified using the `-march=sm_$(SM_VERSION)` flag.
+This Makefile is configured to compile the code using OpenMP offloading with Clang. It uses `-fopenmp` and `-fopenmp-targets=nvptx64` to enable OpenMP offloading to NVIDIA GPUs. The `-Xopenmp-target -march=sm_$(SM_VERSION)` flag specifies the target architecture for the GPU. The user can specify the SM version and the C++ compiler when invoking `make`.

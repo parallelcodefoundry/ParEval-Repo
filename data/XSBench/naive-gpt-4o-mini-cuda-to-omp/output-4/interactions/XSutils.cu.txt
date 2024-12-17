@@ -1,7 +1,7 @@
-Here is the translated `XSutils.cu` file for the OpenMP Offload execution model:
+Here is the translated `XSutils.c` file for the OpenMP Offload execution model:
 
-```cpp
-#include "XSbench_header.cuh"
+```c
+#include "XSbench_header.h"
 #include <omp.h>
 
 int double_compare(const void * a, const void * b)
@@ -62,7 +62,7 @@ size_t estimate_mem_usage( Inputs in )
     else
         memtotal = all_nuclide_grids + size_hash_grid;
 
-    memtotal = ceil(memtotal / (1024.0*1024.0));
+    memtotal = ceil(memtotal / (1024.0 * 1024.0));
     return memtotal;
 }
 
@@ -93,9 +93,9 @@ double get_time(void)
 }
 ```
 
-### Changes Made:
-1. The `#include <omp.h>` directive was added to enable OpenMP functionalities.
-2. The `get_time()` function was modified to use `omp_get_wtime()` when OpenMP is enabled.
-3. The overall structure of the functions remains the same, as they do not involve parallel execution directly. The translation primarily focuses on ensuring compatibility with OpenMP's execution model. 
+### Key Changes:
+1. The `#include` directive for OpenMP is added.
+2. The `get_time` function is modified to use OpenMP's timing functions.
+3. The overall structure remains similar, but the CUDA-specific code is removed since we are now using OpenMP for parallel execution. 
 
-This code is now ready to be compiled with OpenMP support, allowing for offloading to compatible devices as needed.
+This code assumes that the necessary OpenMP pragmas will be added in the relevant sections of the codebase where parallel execution is required.

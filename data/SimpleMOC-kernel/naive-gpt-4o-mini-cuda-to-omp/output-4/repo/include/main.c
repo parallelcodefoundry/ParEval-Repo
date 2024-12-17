@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 
     // Calculate Number of 3D Source Regions
     I.source_3D_regions = (int)ceil((double)I.source_2D_regions *
-        I.coarse_axial_intervals / I.decomp_assemblies_ax);
+                                     I.coarse_axial_intervals / I.decomp_assemblies_ax);
 
     logo(version);
 
@@ -25,40 +25,34 @@ int main(int argc, char *argv[])
     printf("Building Source Data Arrays...\n");
     Source_Arrays SA_h, SA_d;
     Source *sources_h = initialize_sources(I, &SA_h);
-    
-    // Offload initialization of sources to the device
-    #pragma omp target data map(to: I, SA_h, sources_h) map(from: SA_d)
-    {
-        initialize_device_sources(I, &SA_h, &SA_d, sources_h);
-    }
+    Source *sources_d = initialize_device_sources(I, &SA_h, &SA_d, sources_h);
 
     // Build Exponential Table
     Table *table_d = NULL;
-    #ifdef TABLE
+#ifdef TABLE
     printf("Building Exponential Table...\n");
     Table table = buildExponentialTable();
-    #pragma omp target
-    {
-        table_d = (Table *)omp_target_alloc(sizeof(Table), omp_get_default_device());
-        #pragma omp target enter data map(to: table) map(to: table_d)
-        {
-            *table_d = table;
-        }
-    }
-    #endif
+    table_d = (Table *)malloc(sizeof(Table));
+    memcpy(table_d, &table, sizeof(Table));
+#endif
 
     // Setup OpenMP Offload
-    printf("Setting up OpenMP Offload...\n");
-    #pragma omp target
+    #pragma omp target data map(to: I, sources_d[0:I.source_3D_regions], SA_d) \
+                             map(to: table_d) map(from: sources_h[0:I.source_3D_regions])
     {
-        // Setup RNG states on device
+        // Setup OpenMP RNG on Device
+        printf("Setting up OpenMP RNG...\n");
         curandState *RNG_states;
         #pragma omp target
         {
-            RNG_states = (curandState *)omp_target_alloc(I.streams * sizeof(curandState), omp_get_default_device());
-            setup_kernel<<<(I.streams + 255) / 256, 256>>>(RNG_states, I);
+            #pragma omp parallel
+            {
+                int threadId = omp_get_thread_num();
+                if (threadId < I.streams) {
+                    curand_init(1234, threadId, 0, &RNG_states[threadId]);
+                }
+            }
         }
-        #pragma omp target update to(RNG_states)
 
         // Allocate Some Flux State vectors to randomly pick from
         printf("Setting up Flux State Vectors...\n");
@@ -67,8 +61,8 @@ int main(int argc, char *argv[])
         assert(I.segments >= N_flux_states);
         #pragma omp target
         {
-            flux_states = (float *)omp_target_alloc(N_flux_states * I.egroups * sizeof(float), omp_get_default_device());
-            init_flux_states<<<(I.segments + 255) / 256, 256>>>(flux_states, N_flux_states, I, RNG_states);
+            flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
+            init_flux_states(flux_states, N_flux_states, I, RNG_states);
         }
 
         printf("Initialization Complete.\n");
@@ -77,17 +71,22 @@ int main(int argc, char *argv[])
         border_print();
         printf("Attenuating fluxes across segments...\n");
 
-        // OpenMP Offload kernel call
-        float *host_flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
-        #pragma omp target
-        {
-            run_kernel<<<(I.segments / I.seg_per_thread + 255) / 256, 256>>>(I, sources_d, SA_d, table_d,
-                RNG_states, flux_states, N_flux_states);
-        }
+        // OpenMP timer variables
+        double start, stop;
+        start = omp_get_wtime();
 
-        // Copy results back to host
-        #pragma omp target update from(flux_states)
-        cudaMemcpy(host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost);
+        // Setup kernel call block parameters
+        assert(I.segments % I.seg_per_thread == 0);
+        int n_blocks = sqrt(I.segments / I.seg_per_thread);
+        
+        // Run Simulation Kernel Loop
+        run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
+
+        stop = omp_get_wtime();
+        float time = (float)(stop - start) * 1000.0; // Convert to milliseconds
+
+        float *host_flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
+        memcpy(host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float));
 
         printf("Simulation Complete.\n");
 
@@ -96,11 +95,16 @@ int main(int argc, char *argv[])
         border_print();
 
         double tpi = ((double)(time / 1000.0) /
-            (double)I.segments / (double)I.egroups) * 1.0e9;
+                      (double)I.segments / (double)I.egroups) * 1.0e9;
         printf("%-25s%.3f seconds\n", "Runtime:", time / 1000.0);
         printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
         border_print();
     }
 
+    free(table_d);
+    free(flux_states);
+    free(sources_h);
+    free(sources_d);
+    
     return 0;
 }
