@@ -1,9 +1,24 @@
 ```cpp
-// microXOR kernel for OpenMP offloading
+// microXOR kernel
 
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
+/* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.
+   Note that we only consider neighbors and not input_{i,j} when computing output_{i,j}.
+   input and output are NxN grids of ints in row-major.
+   Use OpenMP to compute in parallel. The kernel is launched on an NxN grid of threads.
+   Example:
+
+   input: [[0, 1, 1, 0],
+           [1, 0, 0, 0],
+           [0, 0, 0, 0],
+           [0, 1, 0, 0]
+   output: [[0, 0, 1, 1],
+            [1, 0, 0, 1],
+            [0, 0, 1, 0],
+            [1, 0, 1, 0]]
+*/
 void cellsXOR(const int *input, int *output, size_t N) {
   #pragma omp target teams distribute parallel for
   for (size_t i = 0; i < N; i++) {
@@ -17,17 +32,4 @@ void cellsXOR(const int *input, int *output, size_t N) {
     }
   }
 }
-```
-
-Note: The `omp.h` header is included for OpenMP directives. The `cellsXOR` function now uses OpenMP's offloading model, where the computation is distributed across multiple teams on the target device using the `teams distribute parallel for` directive. This will automatically handle the data transfer and execution on the target device.
-
-Also note that this code assumes a compiler that supports OpenMP 4.5 or later, which provides the `target` directive for offloading to accelerators like GPUs. The specific syntax may vary depending on the compiler and its version. 
-
-To compile this code with GCC, you would use:
-```bash
-gcc -fopenmp -foffload=nvptx-none -o microXOR microXOR.c
-```
-For Intel compilers:
-```bash
-icc -qopenmp -offload-attribute=target=gpu -o microXOR microXOR.c
 ```

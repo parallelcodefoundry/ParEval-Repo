@@ -58,8 +58,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is an OpenMP-offload code and supports multiple architectures,
-including x86, PowerPC, and NVIDIA GPUs.
+SimpleMOC-kernel is an OpenMP-offload code and supports various architectures,
+including CPUs and accelerators.
 
 ==============================================================================
 Quick Start Guide
@@ -88,13 +88,6 @@ Compilation-------------------------------------------------------------------
 	To compile SimpleMOC-kernel with default settings, use the following command:
 
 	>$ make
-
-	Note: You may need to set the compiler and flags according to your system.
-	For example, you can add the following lines to your Makefile:
-	```makefile
-CC = gcc
-CFLAGS = -fopenmp -foffload-nvptx=-std=c++14
-```
 
 Running SimpleMOC-kernel-------------------------------------------------------
 
@@ -127,17 +120,14 @@ with more advanced compilation features.
 
 Here is a sample of the control panel at the top of the makefile:
 
-```makefile
-CC = gcc
-CFLAGS = -fopenmp -foffload-nvptx=-std=c++14
-OPTIMIZE = yes
-DEBUG = no
-PROFILE = no
-```
+COMPILER    = gcc
+OPTIMIZE    = yes
+DEBUG       = no
+PROFILE     = no
 
 Explanation of Flags:
 
-CC <gcc> - This selects your compiler (GNU is the only one supported).
+COMPILER <gcc> - This selects your compiler.
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 

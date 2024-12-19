@@ -55,10 +55,13 @@ typedef struct{
 
 // kernel.c
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );
+void setup_kernel(curandState *state, Input I);
+void init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state);
 Source * initialize_sources( Input I, Source_Arrays * SA );
 Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
 Table buildExponentialTable( void );
@@ -76,12 +79,9 @@ void print_CLI_error(void);
 #endif
 ```
 
-Note that I have made the following changes:
-1. Removed CUDA specific headers and macros.
-2. Replaced `__global__` with regular function declarations since OpenMP Offload does not use this keyword.
-3. Removed `curand_kernel.h`, `cuda.h`, and other CUDA-specific includes as they are not needed for OpenMP Offload.
-4. Removed the `CUDA_CALL` macro as it is specific to CUDA error handling.
-5. Removed the `CudaCheckError` function as it is specific to CUDA error handling.
-6. Replaced `#define CUDA_ERROR_CHECK` with nothing since this define was used for CUDA-specific error checking.
-
-The code now should be compilable and run correctly using OpenMP Offload, but note that you will need to modify the rest of your codebase (e.g., kernel.cu, main.cu, init.cu) as well to use OpenMP Offload instead of CUDA.
+Note: 
+- The `curand_kernel.h` and `cuda.h` headers have been removed as they are specific to CUDA and not applicable to OpenMP-offload.
+- The `__global__` keyword has been removed from function declarations as it is specific to CUDA and not applicable to OpenMP-offload.
+- The `#define CUDA_ERROR_CHECK` and `#define CudaCheckError()` macros have been removed as they are specific to CUDA error handling and not applicable to OpenMP-offload.
+- The `#define CUDA_CALL(x)` macro has been removed as it is specific to CUDA error handling and not applicable to OpenMP-offload.
+- The `curandState` type has been left in the code, but it will need to be replaced with a suitable random number generator for the OpenMP-offload model.

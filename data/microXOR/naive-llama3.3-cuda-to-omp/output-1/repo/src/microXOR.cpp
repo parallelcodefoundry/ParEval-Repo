@@ -1,10 +1,10 @@
-// microXOR kernel translated to OpenMP offload
+// microXOR kernel
 
 #include <omp.h>
-#include "microXOR.h"
+#include "microXOR.hpp"
 
 void cellsXOR(const int *input, int *output, size_t N) {
-  #pragma omp target teams distribute parallel for collapse(2)
+  #pragma omp target teams distribute parallel for
   for (size_t i = 0; i < N; i++) {
     for (size_t j = 0; j < N; j++) {
       int count = 0;

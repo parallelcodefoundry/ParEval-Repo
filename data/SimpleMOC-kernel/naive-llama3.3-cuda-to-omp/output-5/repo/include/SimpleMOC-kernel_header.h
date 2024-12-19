@@ -54,10 +54,13 @@ typedef struct{
 
 // kernel.c
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );
+void setup_kernel(curandState *state, Input I);
+void init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state);
 Source * initialize_sources( Input I, Source_Arrays * SA );
 Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
 Table buildExponentialTable( void );

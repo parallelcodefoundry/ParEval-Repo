@@ -1,7 +1,7 @@
 // microXOR kernel
 
+#include "microXOR.hpp"
 #include <omp.h>
-#include "microXOR.cuh"
 
 void cellsXOR(const int *input, int *output, size_t N) {
   #pragma omp target teams distribute parallel for

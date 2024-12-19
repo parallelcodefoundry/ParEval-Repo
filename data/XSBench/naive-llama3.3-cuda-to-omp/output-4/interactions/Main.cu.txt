@@ -1,5 +1,34 @@
 ```c
-#include "XSbench_header.cuh"
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
+#include <omp.h>
+#include "XSbench_shared_header.h"
+#include "XSbench_header.h"
+
+// Structure to hold all allocated simulation data arrays
+typedef struct {
+    int *num_nucs;
+    double *concs;
+    int *mats;
+    double *unionized_energy_array;
+    int *index_grid;
+    NuclideGridPoint *nuclide_grid;
+    int length_num_nucs;
+    int length_concs;
+    int length_mats;
+    int length_unionized_energy_array;
+    long length_index_grid;
+    int length_nuclide_grid;
+    int max_num_nucs;
+    unsigned long *verification;
+    int length_verification;
+    double *p_energy_samples;
+    int length_p_energy_samples;
+    int *mat_samples;
+    int length_mat_samples;
+} SimulationData;
 
 int main(int argc, char *argv[]) {
     // =====================================================================
@@ -56,42 +85,37 @@ int main(int argc, char *argv[]) {
     // Start Simulation Timer
     omp_start = get_time();
 
-#pragma offload target(mic:0) \
-    in(in), SD \
-    nocopy(profile)
-    {
-        // Run simulation
-        if (in.simulation_method == EVENT_BASED) {
-            if (in.kernel_id == 0)
-                verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
-            else if (in.kernel_id == 1)
-                verification = run_event_based_simulation_optimization_1(in, SD, mype);
-            else if (in.kernel_id == 2)
-                verification = run_event_based_simulation_optimization_2(in, SD, mype);
-            else if (in.kernel_id == 3)
-                verification = run_event_based_simulation_optimization_3(in, SD, mype);
-            else if (in.kernel_id == 4)
-                verification = run_event_based_simulation_optimization_4(in, SD, mype);
-            else if (in.kernel_id == 5)
-                verification = run_event_based_simulation_optimization_5(in, SD, mype);
-            else if (in.kernel_id == 6)
-                verification = run_event_based_simulation_optimization_6(in, SD, mype);
-            else {
-                printf("Error: No kernel ID %d found!\n", in.kernel_id);
-                exit(1);
-            }
-        } else {
-            printf(
-                    "History-based simulation not implemented in OpenMP-Offload code. Instead,\nuse "
-                    "the event-based method with \"-m event\" argument.\n");
+    // Run simulation
+    if (in.simulation_method == EVENT_BASED) {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, mype);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, mype);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, mype);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, mype);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, mype);
+        else {
+            printf("Error: No kernel ID %d found!\n", in.kernel_id);
             exit(1);
         }
+    } else {
+        printf(
+                "History-based simulation not implemented in OpenMP-offload code. Instead,\nuse "
+                "the event-based method with \"-m event\" argument.\n");
+        exit(1);
+    }
 
-        if (mype == 0) {
-            printf("\n");
-            printf("Simulation complete.\n");
-        }
-    } // End offload region
+    if (mype == 0) {
+        printf("\n");
+        printf("Simulation complete.\n");
+    }
 
     // End Simulation Timer
     omp_end = get_time();

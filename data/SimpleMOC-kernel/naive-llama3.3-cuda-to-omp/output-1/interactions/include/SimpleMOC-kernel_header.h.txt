@@ -2,7 +2,6 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
-#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -14,6 +13,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
+#include <omp.h>
 
 // User inputs
 typedef struct{
@@ -54,10 +54,13 @@ typedef struct{
 
 // kernel.c
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );
+void setup_kernel(curandState *state, Input I);
+void init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state);
 Source * initialize_sources( Input I, Source_Arrays * SA );
 Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
 Table buildExponentialTable( void );
@@ -74,13 +77,3 @@ void print_CLI_error(void);
 
 #endif
 ```
-
-The changes made were:
-
-- Removed `#include <curand_kernel.h>` and `#include <cuda.h>` since they are specific to CUDA.
-- Removed the `__global__` keyword from function declarations as it is not applicable in OpenMP-offload model.
-- Removed `CUDA_CALL(x)` macro and replaced with standard error checking mechanisms if needed.
-- Removed `CudaCheckError()` macro and its implementation as it is not applicable in OpenMP-offload model.
-- Removed the `#define CUDA_ERROR_CHECK` directive as it is not applicable in OpenMP-offload model. 
-
-Note that further changes will be required to translate the rest of the codebase, including modifying kernel functions to use OpenMP-offload directives and adjusting memory management to work with the target device.

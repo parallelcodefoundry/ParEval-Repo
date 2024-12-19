@@ -1,11 +1,10 @@
 ```cpp
-// microXOR driver translated to OpenMP-offload execution model
+// microXOR driver
 
-#include "microXOR.h"
+#include "microXOR.hpp"
+#include <iostream>
+#include <random>
 #include <omp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 void cleanup(int *input, int *output) {
   delete[] input;
@@ -43,10 +42,11 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-#pragma omp target enter data map(to: input[0:N*N])
-#pragma omp target teams distribute parallel for
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
+  #pragma omp target enter data map(to: input[0:N*N]) map(alloc: output[0:N*N])
+
+  #pragma omp target teams distribute parallel for collapse(2)
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
       int count = 0;
       if (i > 0 && input[(i-1)*N + j] == 1) count++;
       if (i < N-1 && input[(i+1)*N + j] == 1) count++;
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     }
   }
 
-#pragma omp target exit data map(from: output[0:N*N])
+  #pragma omp target exit data map(from: output[0:N*N]) map(delete: output[0:N*N]) map(release: input[0:N*N])
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {
@@ -85,17 +85,4 @@ int main(int argc, char **argv) {
   cleanup(input, output);
   return 0;
 }
-```
-
-Note that this translation uses OpenMP-offload directives to manage the data transfer and parallel execution on the target device (e.g., GPU). The `cellsXOR` function is no longer needed as its functionality has been directly translated into the main function using OpenMP directives. 
-
-To compile this code, you may use a compiler that supports OpenMP, such as GCC or Clang, with the `-fopenmp` flag and additional flags to enable offloading (e.g., `-foffload=nvptx-none` for NVIDIA GPUs). The exact compilation command will depend on your specific hardware and compiler version. 
-
-For example:
-```bash
-g++ -std=c++11 -fopenmp -foffload=nvptx-none microXOR.cpp -o microXOR.exe
-```
-You can then run the program with a 1024 by 1024 input matrix and a kernel with 32 times 32 threads per block using:
-```bash
-./microXOR.exe 1024 32
 ```

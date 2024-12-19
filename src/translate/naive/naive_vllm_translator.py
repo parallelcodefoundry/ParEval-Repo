@@ -29,9 +29,13 @@ class NaiveVLLMTranslator(NaiveTranslator):
             self._llm_name = 'meta-llama/Llama-3.2-3B-Instruct'
         elif self._llm_name == 'llama3.1':
             self._llm_name = 'meta-llama/Llama-3.1-8B-Instruct'
-        completion = chat(model=self._llm_name,
-                          messages=[{"role": "system", "content": system_prompt},
-                                    {"role": "user", "content": prompt}],
-                          stream=False,
-                          options={"num_ctx": 65536})
-        return completion.message.content
+        completion = self._model.chat.completions.create(
+            model=self._llm_name,
+            messages=[{"role": "system", "content": system_prompt},
+                      {"role": "user", "content": prompt}],
+            stream=False,
+            temperature=0.2,
+            top_p=0.96,
+            n=1
+        )
+        return completion.choices[0].message.content

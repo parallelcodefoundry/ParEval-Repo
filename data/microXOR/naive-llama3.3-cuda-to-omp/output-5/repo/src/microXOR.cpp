@@ -1,5 +1,6 @@
-// microXOR kernel for OpenMP-Offload
+// microXOR kernel
 
+#include "microXOR.hpp"
 #include <omp.h>
 
 void cellsXOR(const int *input, int *output, size_t N) {

@@ -1,7 +1,7 @@
-// microXOR kernel for OpenMP offloading
+// microXOR kernel
 
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
 void cellsXOR(const int *input, int *output, size_t N) {
   #pragma omp target teams distribute parallel for

@@ -3,27 +3,25 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP offload for parallel execution on accelerators.
+This version of microXOR is written in C++ for execution on a host with offloading to a target device using OpenMP.
 
 ## Prerequisites
 
-A compiler supporting OpenMP 4.5 or later and an accelerator device (e.g., GPU) must be available.
+A C++ compiler supporting OpenMP 4.5 or later, and a compatible target device, must be installed.
 
 ## Build
 
-To build microXOR, use a compiler that supports OpenMP offload, such as GCC or Intel Compiler. The exact compilation command may vary depending on the compiler and system configuration. For example:
+To build microXOR, use a C++ compiler that supports OpenMP, such as GCC or Clang. For example, the following will build microXOR:
 ```bash
-gcc -fopenmp -o microXOR microXOR.c -foffload=nvptx-none
+g++ -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda microXOR.cpp main.cpp -o microXOR.exe
 ```
-Replace `microXOR.c` with the actual source file name.
+Replace `nvptx64-nvidia-cuda` with the target device type for your system.
 
 ## Run
 
-To run microXOR, ensure that the accelerator device is properly installed and configured. The program can be executed as follows:
+microXOR requires two command-line arguments, one for matrix size and one for block size. For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block:
 ```bash
-./microXOR N blockEdge
+./microXOR.exe 1024 32
 ```
-Replace `N` with the size of the grid and `blockEdge` with the edge length of each block.
-
-Note: The `N` must be divisible by `blockEdge`, and `blockEdge` should be between 2 and 32. Additionally, `N` must be at least 4.
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the CPU.
 ```

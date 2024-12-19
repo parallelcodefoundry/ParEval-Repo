@@ -1,4 +1,4 @@
-#include "XSbench_header.h"
+#include "XSutils.h"
 
 int double_compare(const void * a, const void * b)
 {
@@ -64,7 +64,7 @@ size_t estimate_mem_usage( Inputs in )
 
 double get_time(void)
 {
-	#ifdef OPENMP
+	#ifdef _OPENMP
 	return omp_get_wtime();
 	#endif
 

@@ -1,3 +1,5 @@
+#include "SimpleMOC-kernel_header.h"
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -9,84 +11,36 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <omp.h>
-
-// User inputs
-typedef struct{
-    int source_2D_regions;
-    int source_3D_regions;
-    int coarse_axial_intervals;
-    int fine_axial_intervals;
-    int decomp_assemblies_ax; // Number of subdomains per assembly axially
-    long segments;
-    int egroups;
-    int nthreads;
-    int streams;
-    int seg_per_thread;
-    size_t nbytes;
-} Input;
-
-// Source Region Structure
-typedef struct{
-    long fine_flux_id;
-    long fine_source_id;
-    long sigT_id;
-} Source;
-
-// Source Arrays
-typedef struct{
-    float * fine_flux_arr;
-    float * fine_source_arr;
-    float * sigT_arr;
-} Source_Arrays;
-
-// Table structure for computing exponential
-typedef struct{
-    float values[706];
-    float dx;
-    float maxVal;
-    int N;
-} Table;
-
-// Function declarations
-void logo(int version);
-void center_print(const char *s, int width);
-void border_print(void);
-void fancy_int( int a );
-void print_input_summary(Input input);
-void read_CLI( int argc, char * argv[], Input * input );
-void print_CLI_error(void);
 
 // Prints program logo
 void logo(int version)
 {
-    border_print();
     printf(
 "   __           __        ___        __   __           ___  __        ___     \n"
 "  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
 "  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
 "\n"
-"                         ***************   *******************   ******************\n" 
-"                        *****************************   ************************************\n"
-"                        *****     *****   *****  *****  *****   *****     *****   *****\n"
-"                        *****     *****   *****  *****  *****   *****     *****   *****\n"
-"                        *************************************   *********************************\n"
-"                         ***************   *****   *****************   *****   *****   *****\n"
+"                         *************   *************  *************\n" 
+"                        *************   *************  ****************\n"
+"                        *****     *****   *************  ****************\n"
+"                        *****     *****   *************  ****************\n"
+"                        *********************  ****************  *************\n"
+"                         *************   *************   *****   *****\n"
     );
     printf("\n");
-    border_print();
+    printf("===============================================================================\n");
     printf("\n");
 
-    center_print("Developed at", 79);
-    center_print("The Massachusetts Institute of Technology", 79);
-    center_print("and", 79);
-    center_print("Argonne National Laboratory", 79);
+    printf("Developed at\n");
+    printf("The Massachusetts Institute of Technology\n");
+    printf("and\n");
+    printf("Argonne National Laboratory\n");
     printf("\n");
     char v[100];
     sprintf(v, "Version: %d", version);
-    center_print(v, 79);
+    printf("%s\n", v);
     printf("\n");
-    border_print();
+    printf("===============================================================================\n");
 }
 
 // Prints Section titles in center of 80 char terminal
@@ -105,8 +59,7 @@ void center_print(const char *s, int width)
 void border_print(void)
 {
     printf(
-"=============================================================================="
-"=============\n");
+"===============================================================================\n");
 }
 
 // Prints comma separated integers - for ease of reading
@@ -145,6 +98,8 @@ void print_input_summary(Input I)
     printf("%-25s%d\n", "3D Source Regions:", I.source_3D_regions);
     printf("%-25s", "Segments:"); fancy_int(I.segments);
     printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
+    printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
+    printf("%-25s%d\n", "Segments per Thread:", I.seg_per_thread);
     border_print();
 }
 
@@ -203,7 +158,7 @@ void print_CLI_error(void)
     printf("  -t <threads>          Number of OpenMP threads to run\n");
     printf("  -s <segments>         Number of segments to process\n");
     printf("  -e <energy groups>    Number of energy groups\n");
-    printf("  -p <segs per thread>  Number of segments per CUDA Block\n");
+    printf("  -p <segs per thread>  Number of segments per thread\n");
     printf("See readme for full description of default run values\n");
     exit(1);
 }

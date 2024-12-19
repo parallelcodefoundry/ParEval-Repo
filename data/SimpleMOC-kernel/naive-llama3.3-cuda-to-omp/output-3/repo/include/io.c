@@ -1,4 +1,16 @@
 #include "SimpleMOC-kernel_header.h"
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <malloc.h>
 
 // Prints program logo
 void logo(int version)
@@ -9,12 +21,12 @@ void logo(int version)
 "  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
 "  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
 "\n"
-"                         ������������������������������   ������������������������������  ������������������\n" 
-"                        ���������������������������������   ���������������������������������������������������������\n"
-"                        ���������     ���������   ������������������  ���������������������������������\n"
-"                        ���������     ���������   ������������������  ���������������������������������\n"
-"                        ������������������������������������������������������������������������������������  ���������\n"
-"                         ��������������������� ��������������������� ��������������������� ���������  ���������\n"
+"                         ************   ************  ************\n" 
+"                        ************   ************  ****************\n"
+"                        *****     *****   ************  ************\n"
+"                        *****     *****   ************  ************\n"
+"                        ************   ************  ************  *****\n"
+"                         ************   ************  ************  *****\n"
     );
     printf("\n");
     border_print();
@@ -80,12 +92,6 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    #pragma omp target map(from: I)
-    {
-        // Print platform and device information
-        printf("Target Device: OpenMP Offload\n");
-    }
-
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -96,11 +102,6 @@ void print_input_summary(Input I)
     printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
     printf("%-25s%d\n", "Segments per Thread:", I.seg_per_thread);
-    #ifdef TABLE
-    printf("%-25s%s\n", "Exponential Table:","ON");
-    #else
-    printf("%-25s%s\n", "Exponential Table:","OFF");
-    #endif
     border_print();
 }
 
@@ -146,6 +147,8 @@ void read_CLI( int argc, char * argv[], Input * input )
             else
                 print_CLI_error();
         }
+        else
+            print_CLI_error();
     }
 }
 

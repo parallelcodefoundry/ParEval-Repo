@@ -17,7 +17,7 @@ from translator import Translator
 from naive.naive_openai_translator import NaiveOpenAITranslator
 from naive.naive_gemini_translator import NaiveGeminiTranslator
 from naive.naive_ollama_translator import NaiveOllamaTranslator
-#from naive.naive_vllm_translator import NaiveVLLMTranslator
+from naive.naive_vllm_translator import NaiveVLLMTranslator
 from naive.naive_tgi_translator import NaiveTGITranslator
 
 def get_args():
@@ -37,7 +37,7 @@ def get_args():
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama3.3", "llama3.2", "llama3.1", "gpt-4o", "tgi"], default="gemini", help="The LLM to use for translation.")
+    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama3.3", "llama3.2", "llama3.1", "gpt-4o", "tgi", "ollama3.3", "ollama3.2", "ollama3.1"], default="gemini", help="The LLM to use for translation.")
     return parser.parse_args()
 
 
@@ -47,8 +47,10 @@ def get_translator_cls(method: str, naive_llm: str):
             return NaiveGeminiTranslator
         elif naive_llm == "tgi":
             return NaiveTGITranslator
-        elif "llama" in naive_llm:
+        elif "ollama" in naive_llm:
             return NaiveOllamaTranslator
+        elif "llama" in naive_llm:
+            return NaiveVLLMTranslator
         else:
             return NaiveOpenAITranslator
     else:

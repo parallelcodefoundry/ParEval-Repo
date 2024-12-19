@@ -1,23 +1,33 @@
 #include "SimpleMOC-kernel_header.h"
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <malloc.h>
 
 // Initialize global flux states to random numbers on device
 void init_flux_states(float *flux_states, int N_flux_states, Input I) {
-    #pragma omp target teams distribute map(tofrom: flux_states[0:N_flux_states*I.egroups])
+    #pragma omp target teams distribute map(to: I) map(tofrom: flux_states[0:N_flux_states*I.egroups])
     for (int blockId = 0; blockId < N_flux_states; blockId++) {
-        // Assign RNG state
-        double rand_state = (double)rand() / RAND_MAX;
-        
         #pragma omp parallel for
         for (int i = 0; i < I.egroups; i++) {
-            flux_states[blockId * I.egroups + i] = (float)rand_state;
+            flux_states[blockId * I.egroups + i] = (float)rand() / RAND_MAX;
         }
     }
 }
 
-// Setup OpenMP offload RNG on host
-void setup_kernel(Input I, double* state) {
+// Setup OpenMP offload RNG on device
+void setup_kernel(curandState *state, Input I) {
+    #pragma omp target teams distribute map(to: I) map(to: state[0:I.streams])
     for (int threadId = 0; threadId < I.streams; threadId++) {
-        state[threadId] = (double)rand() / RAND_MAX;
+        curand_init(1234, threadId, 0, &state[threadId]);
     }
 }
 
@@ -59,24 +69,24 @@ double mem_estimate(Input I) {
     return (double)nbytes / 1024.0 / 1024.0;
 }
 
-Source* initialize_sources(Input I, Source_Arrays* SA) {
+Source *initialize_sources(Input I, Source_Arrays *SA) {
     // Source Data Structure Allocation
-    Source* sources = (Source*)malloc(I.source_3D_regions * sizeof(Source));
+    Source *sources = (Source *)malloc(I.source_3D_regions * sizeof(Source));
 
     // Allocate Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    SA->fine_source_arr = (float*)malloc(N_fine * sizeof(float));
+    SA->fine_source_arr = (float *)malloc(N_fine * sizeof(float));
     for (int i = 0; i < I.source_3D_regions; i++)
         sources[i].fine_source_id = i * I.fine_axial_intervals * I.egroups;
 
     // Allocate Fine Flux Data
-    SA->fine_flux_arr = (float*)malloc(N_fine * sizeof(float));
+    SA->fine_flux_arr = (float *)malloc(N_fine * sizeof(float));
     for (int i = 0; i < I.source_3D_regions; i++)
         sources[i].fine_flux_id = i * I.fine_axial_intervals * I.egroups;
 
     // Allocate SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
-    SA->sigT_arr = (float*)malloc(N_sigT * sizeof(float));
+    SA->sigT_arr = (float *)malloc(N_sigT * sizeof(float));
     for (int i = 0; i < I.source_3D_regions; i++)
         sources[i].sigT_id = i * I.egroups;
 
@@ -93,24 +103,54 @@ Source* initialize_sources(Input I, Source_Arrays* SA) {
     return sources;
 }
 
+Source *initialize_device_sources(Input I, Source_Arrays *SA_h, Source_Arrays *SA_d, Source *sources_h) {
+    // Allocate & Copy Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    SA_d->fine_source_arr = (float *)malloc(N_fine * sizeof(float));
+    #pragma omp target map(to: SA_h->fine_source_arr[0:N_fine]) map(to: SA_d->fine_source_arr[0:N_fine])
+    for (int i = 0; i < N_fine; i++)
+        SA_d->fine_source_arr[i] = SA_h->fine_source_arr[i];
+
+    // Allocate & Copy Fine Flux Data
+    SA_d->fine_flux_arr = (float *)malloc(N_fine * sizeof(float));
+    #pragma omp target map(to: SA_h->fine_flux_arr[0:N_fine]) map(to: SA_d->fine_flux_arr[0:N_fine])
+    for (int i = 0; i < N_fine; i++)
+        SA_d->fine_flux_arr[i] = SA_h->fine_flux_arr[i];
+
+    // Allocate & Copy SigT Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    SA_d->sigT_arr = (float *)malloc(N_sigT * sizeof(float));
+    #pragma omp target map(to: SA_h->sigT_arr[0:N_sigT]) map(to: SA_d->sigT_arr[0:N_sigT])
+    for (int i = 0; i < N_sigT; i++)
+        SA_d->sigT_arr[i] = SA_h->sigT_arr[i];
+
+    // Allocate & Copy Source Array Data
+    Source *sources_d = (Source *)malloc(I.source_3D_regions * sizeof(Source));
+    #pragma omp target map(to: sources_h[0:I.source_3D_regions]) map(to: sources_d[0:I.source_3D_regions])
+    for (int i = 0; i < I.source_3D_regions; i++)
+        sources_d[i] = sources_h[i];
+
+    return sources_d;
+}
+
 // Builds a table of exponential values for linear interpolation
 Table buildExponentialTable(void) {
     // define table
     Table table;
 
     // float precision = 0.01;
-    float maxVal = 10.0;    
+    float maxVal = 10.0;
 
     // compute number of array values
-    // int N = (int) (maxVal * sqrt(1.0 / (8.0 * precision * 0.01)));
-    int N = 353; 
+    // int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
+    int N = 353;
 
     // compute spacing
     float dx = maxVal / (float)N;
 
     // store linear segment information (slope and y-intercept)
     for (int n = 0; n < N; n++) {
-        // compute slope and y-intercept for (1 - exp(-x))
+        // compute slope and y-intercept for ( 1 - exp(-x) )
         float exponential = exp(-n * dx);
         table.values[2 * n] = -exponential;
         table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;

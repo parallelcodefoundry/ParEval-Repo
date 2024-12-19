@@ -1,7 +1,7 @@
 #include "XSbench_header.h"
 
 // Moves all required data structures to the target's memory space
-SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD )
+SimulationData move_simulation_data_to_target( Inputs in, int mype, SimulationData SD )
 {
         if(mype == 0) printf("Allocating and moving simulation data to target memory space...\n");
 
@@ -65,7 +65,7 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
         total_sz += sz;
         GSD.length_verification = in.lookups;
 
-        if(mype == 0 ) printf("Target initialization complete. Allocated %.0lf MB of data on target.\n", total_sz/1024.0/1024.0 );
+        if(mype == 0 ) printf("Target Initialization complete. Allocated %.0lf MB of data on target.\n", total_sz/1024.0/1024.0 );
 
         return GSD;
 
@@ -76,17 +76,26 @@ void release_target_memory(SimulationData GSD) {
         #pragma omp target exit data map(delete: GSD.num_nucs[0:GSD.length_num_nucs])
         #pragma omp target exit data map(delete: GSD.concs[0:GSD.length_concs])
         #pragma omp target exit data map(delete: GSD.mats[0:GSD.length_mats])
-        if (GSD.length_unionized_energy_array > 0) {
-                #pragma omp target exit data map(delete: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
-        }
+        if (GSD.length_unionized_energy_array > 0) #pragma omp target exit data map(delete: GSD.unionized_energy_array[0:GSD.length_unionized_energy_array])
         #pragma omp target exit data map(delete: GSD.nuclide_grid[0:GSD.length_nuclide_grid])
         #pragma omp target exit data map(delete: GSD.verification[0:GSD.length_verification])
+}
+
+void release_memory(SimulationData SD) {
+        free(SD.num_nucs);
+        free(SD.concs);
+        free(SD.mats);
+        if (SD.length_unionized_energy_array > 0) free(SD.unionized_energy_array);
+        free(SD.nuclide_grid);
+        free(SD.verification);
 }
 
 SimulationData grid_init_do_not_profile( Inputs in, int mype )
 {
         // Structure to hold all allocated simuluation data arrays
         SimulationData SD;
+
+
 
         // Keep track of how much data we're allocating
         size_t nbytes = 0;
@@ -136,7 +145,7 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         {
                 printf("NUCLIDE %d ==============================\n", i);
                 for( int j = 0; j < in.n_gridpoints; j++ )
-                        printf("E%d = %lf\n", j, SD.nuclide_grid[i * in.n_gridpoints + j].energy);
+                printf("E%d = %lf\n", j, SD.nuclide_grid[i * in.n_gridpoints + j].energy);
         }
         */
 

@@ -1,8 +1,23 @@
-// microXOR kernel for OpenMP offloading
+// microXOR kernel
 
 #include <omp.h>
-#include "microXOR.cuh"
+#include "microXOR.hpp"
 
+/* Set every cell's value to 1 if it has exactly one neighbor that's a 1. Otherwise set it to 0.
+   Note that we only consider neighbors and not input_{i,j} when computing output_{i,j}.
+   input and output are NxN grids of ints in row-major.
+   Use OpenMP to compute in parallel. The kernel is launched on an NxN grid of threads.
+   Example:
+
+   input: [[0, 1, 1, 0],
+           [1, 0, 0, 0],
+           [0, 0, 0, 0],
+           [0, 1, 0, 0]
+   output: [[0, 0, 1, 1],
+            [1, 0, 0, 1],
+            [0, 0, 1, 0],
+            [1, 0, 1, 0]]
+*/
 void cellsXOR(const int *input, int *output, size_t N) {
   #pragma omp target teams distribute parallel for
   for (size_t i = 0; i < N; i++) {

@@ -28,8 +28,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda -target-cpu=haswell -march=skylake -mtune=skylake -O3 --offload-arch=sm_$(SM_VERSION)
-LDFLAGS = -lm
+override CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target=nvptx64-nvidia-cuda -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
+
+# Linker Flags
+LDFLAGS = -lm -lcurand -fopenmp
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -43,7 +45,7 @@ endif
 
 # Optimization Flags
 ifeq ($(OPTIMIZE),yes)
-	CFLAGS += -O3 --use_fast_math
+	CFLAGS += -O3
 endif
 
 # Exponential Table Build

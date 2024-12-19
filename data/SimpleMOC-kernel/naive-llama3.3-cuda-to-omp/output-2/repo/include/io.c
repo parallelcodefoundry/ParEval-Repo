@@ -1,38 +1,50 @@
-// OpenMP-Offload version of io.cu
-
 #include "SimpleMOC-kernel_header.h"
 #include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <malloc.h>
 
 // Prints program logo
 void logo(int version)
 {
-    border_print();
     printf(
 "   __           __        ___        __   __           ___  __        ___     \n"
 "  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
 "  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
 "\n"
-"                         ������������������������������   ������������������������������  ������������������\n" 
-"                        ���������������������������������   ���������������������������������������������������������\n"
-"                        ���������     ���������   ������������������  ���������������������������������\n"
-"                        ���������     ���������   ������������������  ���������������������������������\n"
-"                        ������������������������������������������������������������������������������������  ���������\n"
-"                         ��������������������� ��������������������� ��������������������� ���������  ���������\n"
+"                         *****************************   *****************************  *******************\n" 
+"                        *****************************   *****************************  ***************************\n"
+"                        ********     ********   ****************  ****************  ***************************\n"
+"                        ********     ********   ****************  ****************  ***************************\n"
+"                        ***************************** *****************************  ***************************  ********\n"
+"                         ***************************** *****************************  ***************************  ********\n"
     );
     printf("\n");
-    border_print();
+    printf(
+"==============================================================================="
+"=============\n");
     printf("\n");
 
-    center_print("Developed at", 79);
-    center_print("The Massachusetts Institute of Technology", 79);
-    center_print("and", 79);
-    center_print("Argonne National Laboratory", 79);
+    printf("Developed at\n");
+    printf("The Massachusetts Institute of Technology\n");
+    printf("and\n");
+    printf("Argonne National Laboratory\n");
     printf("\n");
     char v[100];
     sprintf(v, "Version: %d", version);
-    center_print(v, 79);
+    printf("%s\n", v);
     printf("\n");
-    border_print();
+    printf(
+"==============================================================================="
+"=============\n");
 }
 
 // Prints Section titles in center of 80 char terminal
@@ -51,7 +63,7 @@ void center_print(const char *s, int width)
 void border_print(void)
 {
     printf(
-"==================================================================="
+"==============================================================================="
 "=============\n");
 }
 
@@ -83,10 +95,6 @@ void print_input_summary(Input I)
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    // Note: OpenMP-Offload does not have direct access to CUDA device properties.
-    // The following line is commented out as it's specific to CUDA.
-    // printf("%-25s%s\n", "CUDA Device: ", prop.name); 
-
     printf("%-25s%d\n", "Energy Groups:", I.egroups);
     printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
     printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
@@ -97,11 +105,6 @@ void print_input_summary(Input I)
     printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
     printf("%-25s%d\n", "Segments per Thread:", I.seg_per_thread);
-    #ifdef TABLE
-    printf("%-25s%s\n", "Exponential Table:","ON");
-    #else
-    printf("%-25s%s\n", "Exponential Table:","OFF");
-    #endif
     border_print();
 }
 
