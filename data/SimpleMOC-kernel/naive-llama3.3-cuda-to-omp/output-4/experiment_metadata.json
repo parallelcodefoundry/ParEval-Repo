@@ -1,9 +1,9 @@
 {
     "app": "SimpleMOC-kernel",
     "prompt_strategy": "naive",
-    "llm_name": "llama3.3",
+    "llm_name": "meta-llama/Llama-3.3-70B-Instruct",
     "source_model": "cuda",
     "dest_model": "openmp-offload",
     "output_number": 4,
-    "path": "../../../data/SimpleMOC-kernel/naive-llama-3.3-cuda-to-omp/output-4/repo"
+    "path": "../../../data/SimpleMOC-kernel/naive-llama3.3-cuda-to-omp/output-4/repo"
 }

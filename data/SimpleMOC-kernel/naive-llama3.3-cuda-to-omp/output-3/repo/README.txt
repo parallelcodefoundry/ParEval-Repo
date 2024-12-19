@@ -57,7 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is an OpenMP-offload code and supports various CPU architectures.
+SimpleMOC-kernel is an OpenMP-offload code and supports various architectures,
+including x86, ARM, and NVIDIA GPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -102,6 +103,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per OpenMP thread
+	  -d <device>           Device to offload to (e.g. gpu, cpu)
 
 	If not options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -122,16 +124,19 @@ COMPILER    = gcc
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
+OFFLOAD     = yes
 
 Explanation of Flags:
 
-COMPILER <gcc> - This selects your compiler (GNU Compiler Collection is only one supported).
+COMPILER <gcc> - This selects your compiler.
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
 DEBUG - Adds the compiler flag "-g".
 
 PROFILE - Adds the compiler flag "-pg".
+
+OFFLOAD - Enables OpenMP-offload.
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion

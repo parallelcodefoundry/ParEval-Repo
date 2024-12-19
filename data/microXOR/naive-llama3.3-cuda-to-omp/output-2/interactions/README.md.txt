@@ -3,38 +3,29 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP Offload for heterogeneous execution on CPUs and accelerators (e.g., GPUs).
+This version of microXOR is written in C++ for execution on a host with offloading to a target device using OpenMP.
 
 ## Prerequisites
 
-* A C++ compiler that supports OpenMP Offload
-* An OpenMP implementation with offloading capabilities (e.g., GCC, Clang)
+A C++ compiler with OpenMP support and a compatible target device are required.
 
-## Building and Running
+## Build
 
-To build microXOR, compile the code using a C++ compiler that supports OpenMP Offload. The exact command may vary depending on your compiler and system configuration.
+To build microXOR, use a C++ compiler with OpenMP support, such as GCC or Clang. For example, the following will build microXOR:
 
-Example (using GCC):
 ```bash
-g++ -fopenmp -o microXOR microXOR.cpp
+g++ -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda microXOR.cpp main.cpp -o microXOR.exe
 ```
-Run the executable with the desired input size (`N`) and block edge (`blockEdge`):
+
+## Run
+
+microXOR requires two command-line arguments, one for matrix size and one for block size. For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block:
+
 ```bash
-./microXOR N blockEdge
+./microXOR.exe 1024 32
 ```
-Replace `N` and `blockEdge` with the actual values you want to use.
 
-## Notes
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the host.
 
-* The `blockEdge` parameter controls the tile size for parallelization. It should be a power of 2 for optimal performance.
-* The `N` parameter must be divisible by `blockEdge`.
-* For best results, ensure that your system has an OpenMP implementation with offloading capabilities installed and configured correctly.
-
-## Example Use Case
-
-To run microXOR with a 1024x1024 grid and a block edge of 16:
-```bash
-./microXOR 1024 16
-```
-This will execute the XOR stencil operation on the specified grid using OpenMP Offload, leveraging the available CPU and accelerator resources.
+Note: The actual command to run the executable may vary depending on the system and compiler used.
 ```

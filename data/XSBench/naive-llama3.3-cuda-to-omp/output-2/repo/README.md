@@ -26,7 +26,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in OpenMP for use with CPU architectures. NOTE: You will likely want to specify the number of threads when compiling and running the code.
+XSBench has been implemented in OpenMP for use with CPU architectures. 
 
 ## Compilation
 

@@ -55,9 +55,8 @@ typedef struct{
 
 // kernel.c
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
-
-void interpolateTable(Table *  table, float x, float *  out);
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );
@@ -79,8 +78,3 @@ void print_CLI_error(void);
 
 #endif
 ```
-Note that I made the following changes:
-1. Removed CUDA-specific includes and macros.
-2. Replaced `__global__` with empty declarations since OpenMP-offload does not require this keyword for function declarations.
-3. Changed the type of `curandState` to a placeholder, assuming you will define it elsewhere or use an equivalent random number generator in your OpenMP-offload implementation.
-4. Removed CUDA-specific error checking macros and replaced them with standard C error handling mechanisms. You may need to add additional error checking depending on your specific use case.

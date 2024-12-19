@@ -2,12 +2,12 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP for offloading computations to accelerators (e.g., GPUs).
+This version of microXOR is written in C++ for execution on a host with offloading to a target device using OpenMP.
 
 ## Prerequisites
 
-A C/C++ compiler supporting OpenMP and an accelerator device are required.
+A C++ compiler supporting OpenMP 4.5 or later, and a compatible target device, must be installed.
 
 ## Build
 
-To build microXOR, use your preferred C/C++ compiler with OpenMP support. For example:
+To build microXOR, use a C++ compiler that supports OpenMP, such as GCC or Clang. For example, the following will build microXOR:

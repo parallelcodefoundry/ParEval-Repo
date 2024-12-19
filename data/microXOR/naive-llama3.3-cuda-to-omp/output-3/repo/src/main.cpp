@@ -1,10 +1,9 @@
-// microXOR driver translated to OpenMP-offload execution model
+// microXOR driver
 
-#include "microXOR.h"
+#include "microXOR.hpp"
+#include <iostream>
+#include <random>
 #include <omp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 void cleanup(int *input, int *output) {
   delete[] input;
@@ -42,10 +41,11 @@ int main(int argc, char **argv) {
     input[i] = dis(gen);
   }
 
-#pragma omp target enter data map(to: input[0:N*N])
-#pragma omp target teams distribute parallel for
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
+  #pragma omp target enter data map(to: input[0:N*N]) map(alloc: output[0:N*N])
+
+  #pragma omp target teams distribute parallel for collapse(2)
+  for (size_t i = 0; i < N; i++) {
+    for (size_t j = 0; j < N; j++) {
       int count = 0;
       if (i > 0 && input[(i-1)*N + j] == 1) count++;
       if (i < N-1 && input[(i+1)*N + j] == 1) count++;
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     }
   }
 
-#pragma omp target exit data map(from: output[0:N*N])
+  #pragma omp target exit data map(from: output[0:N*N]) map(delete: output[0:N*N]) map(release: input[0:N*N])
 
   // Validate the output
   for (size_t i = 0; i < N; i++) {

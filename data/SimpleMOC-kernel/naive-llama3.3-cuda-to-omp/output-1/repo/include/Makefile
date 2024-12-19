@@ -16,7 +16,10 @@ SM_VERSION  ?= 80
 program = SimpleMOC-kernel
 
 source = \
-main.c init.c io.c kernel.c
+main.c \
+kernel.c \
+init.c \
+io.c
 
 obj = $(source:.c=.o)
 
@@ -25,8 +28,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-override CFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -O3
-override LDFLAGS += -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -lm
+override CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target=nvptx64-nvidia-cuda -march=sm_$(SM_VERSION) -I/usr/local/cuda/include
+
+# Linker Flags
+LDFLAGS = -lm -lcurand -fopenmp
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

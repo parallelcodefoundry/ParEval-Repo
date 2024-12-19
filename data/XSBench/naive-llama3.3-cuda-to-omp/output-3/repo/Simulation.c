@@ -1,53 +1,82 @@
 #include "XSbench_header.h"
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <assert.h>
 
-////////////////////////////////////////////////////////////////////////////////////
 // BASELINE FUNCTIONS
-////////////////////////////////////////////////////////////////////////////////////
-// All "baseline" code is at the top of this file. The baseline code is a simple
-// port of the original CPU OpenMP code to offload with few significant changes or
-// optimizations made. Following these functions are a number of optimized variants,
-// which each deploy a different combination of optimizations strategies. By
-// default, XSBench will only run the baseline implementation. Optimized variants
-// must be specifically selected using the "-k <optimized variant ID>" command
-// line argument.
-////////////////////////////////////////////////////////////////////////////////////
 
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile)
 {
     double start = get_time();
     // Move Data to target
-    #pragma omp target enter data map(to: SD)
-    {
-        // Configure & Launch Simulation Kernel
-        ////////////////////////////////////////////////////////////////////////////////
-        if (mype == 0) printf("Running baseline event-based simulation...\n");
+    SimulationData GSD = move_simulation_data_to_target(in, mype, SD);
+    profile->host_to_device_time = get_time() - start;
 
-        int nthreads = 256;
-        int nblocks = ceil((double)in.lookups / (double)nthreads);
+    // Configure & Launch Simulation Kernel
+    if (mype == 0) printf("Running baseline event-based simulation...\n");
 
-        int nwarmups = in.num_warmups;
-        start = 0.0;
-        for (int i = 0; i < in.num_iterations + nwarmups; i++) {
-            if (i == nwarmups) {
-                #pragma omp target exit data map(from: SD)
-                start = get_time();
-            }
-            #pragma omp target teams distribute parallel for
-            for (int j = 0; j < nblocks; j++) {
-                xs_lookup_kernel_baseline(in, SD, j);
+    int nthreads = 256;
+    int nblocks = ceil((double)in.lookups / (double)nthreads);
+
+    int nwarmups = in.num_warmups;
+    start = 0.0;
+    for (int i = 0; i < in.num_iterations + nwarmups; i++) {
+        if (i == nwarmups) {
+            #pragma omp target exit data map(delete: GSD[0:GSD.length_verification])
+            start = get_time();
+        }
+        #pragma omp target teams distribute map(to: in, GSD[0:GSD.length_verification]) map(from: GSD.verification[0:in.lookups])
+        for (int i = 0; i < nblocks; i++) {
+            #pragma omp parallel for
+            for (int j = 0; j < nthreads; j++) {
+                int idx = i * nthreads + j;
+                if (idx >= in.lookups) continue;
+
+                // Set the initial seed value
+                uint64_t seed = STARTING_SEED;
+
+                // Forward seed to lookup index (we need 2 samples per lookup)
+                seed = fast_forward_LCG(seed, 2 * idx);
+
+                // Randomly pick an energy and material for the particle
+                double p_energy = LCG_random_double(&seed);
+                int mat = pick_mat(&seed);
+
+                double macro_xs_vector[5] = {0};
+
+                // Perform macroscopic Cross Section Lookup
+                calculate_macro_xs(p_energy, mat, in.n_isotopes, in.n_gridpoints, GSD.num_nucs, GSD.concs, GSD.unionized_energy_array, GSD.index_grid, GSD.nuclide_grid, GSD.mats, macro_xs_vector, in.grid_type, in.hash_bins, GSD.max_num_nucs);
+
+                // For verification, and to prevent the compiler from optimizing
+                // all work out, we interrogate the returned macro_xs_vector array
+                // to find its maximum value index, then increment the verification
+                // value by that index. In this implementation, we have each thread
+                // write to its thread_id index in an array, which we will reduce
+                // with a thrust reduction kernel after the main simulation kernel.
+                double max = -1.0;
+                int max_idx = 0;
+                for (int k = 0; k < 5; k++) {
+                    if (macro_xs_vector[k] > max) {
+                        max = macro_xs_vector[k];
+                        max_idx = k;
+                    }
+                }
+                GSD.verification[idx] = max_idx + 1;
             }
         }
-        profile->kernel_time = get_time() - start;
+    profile->kernel_time = get_time() - start;
 
-        // Reduce Verification Results
-        ////////////////////////////////////////////////////////////////////////////////
-        if (mype == 0) printf("Reducing verification results...\n");
-        #pragma omp target exit data map(from: SD.verification[0:in.lookups])
-    }
-
+    // Reduce Verification Results
+    if (mype == 0) printf("Reducing verification results...\n");
+    start = get_time();
     unsigned long verification_scalar = 0;
     for (int i = 0; i < in.lookups; i++)
-        verification_scalar += SD.verification[i];
+        verification_scalar += GSD.verification[i];
+    profile->device_to_host_time = get_time() - start;
+
+    release_target_memory(GSD);
 
     return verification_scalar;
 }
@@ -55,10 +84,9 @@ unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData
 // In this kernel, we perform a single lookup with each thread. Threads within a warp
 // do not really have any relation to each other, and divergence due to high nuclide count fuel
 // material lookups are costly. This kernel constitutes baseline performance.
-void xs_lookup_kernel_baseline(Inputs in, SimulationData SD, int block_idx)
-{
+void xs_lookup_kernel_baseline(Inputs in, SimulationData GSD) {
     // The lookup ID. Used to set the seed, and to store the verification value
-    const int i = block_idx * 256 + omp_get_thread_num();
+    int i = omp_get_thread_num();
 
     if (i >= in.lookups)
         return;
@@ -76,29 +104,14 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData SD, int block_idx)
     double macro_xs_vector[5] = {0};
 
     // Perform macroscopic Cross Section Lookup
-    calculate_macro_xs(
-            p_energy,        // Sampled neutron energy (in lethargy)
-            mat,             // Sampled material type index neutron is in
-            in.n_isotopes,   // Total number of isotopes in simulation
-            in.n_gridpoints, // Number of gridpoints per isotope in simulation
-            SD.num_nucs,     // 1-D array with number of nuclides per material
-            SD.concs,        // Flattened 2-D array with concentration of each nuclide in each material
-            SD.unionized_energy_array, // 1-D Unionized energy array
-            SD.index_grid,   // Flattened 2-D grid holding indices into nuclide grid for each unionized energy level
-            SD.nuclide_grid, // Flattened 2-D grid holding energy levels and XS_data for all nuclides in simulation
-            SD.mats,         // Flattened 2-D array with nuclide indices defining composition of each type of material
-            macro_xs_vector, // 1-D array with result of the macroscopic cross section (5 different reaction channels)
-            in.grid_type,    // Lookup type (nuclide, hash, or unionized)
-            in.hash_bins,    // Number of hash bins used (if using hash lookup type)
-            SD.max_num_nucs  // Maximum number of nuclides present in any material
-    );
+    calculate_macro_xs(p_energy, mat, in.n_isotopes, in.n_gridpoints, GSD.num_nucs, GSD.concs, GSD.unionized_energy_array, GSD.index_grid, GSD.nuclide_grid, GSD.mats, macro_xs_vector, in.grid_type, in.hash_bins, GSD.max_num_nucs);
 
     // For verification, and to prevent the compiler from optimizing
     // all work out, we interrogate the returned macro_xs_vector array
     // to find its maximum value index, then increment the verification
     // value by that index. In this implementation, we have each thread
     // write to its thread_id index in an array, which we will reduce
-    // with a reduction kernel after the main simulation kernel.
+    // with a thrust reduction kernel after the main simulation kernel.
     double max = -1.0;
     int max_idx = 0;
     for (int j = 0; j < 5; j++) {
@@ -107,15 +120,11 @@ void xs_lookup_kernel_baseline(Inputs in, SimulationData SD, int block_idx)
             max_idx = j;
         }
     }
-    SD.verification[i] = max_idx + 1;
+    GSD.verification[i] = max_idx + 1;
 }
 
 // Calculates the microscopic cross section for a given nuclide & energy
-void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
-                         long n_gridpoints,
-                         double* egrid, int* index_data,
-                         NuclideGridPoint* nuclide_grids,
-                         long idx, double* xs_vector, int grid_type, int hash_bins) {
+void calculate_micro_xs(double p_energy, int nuc, long n_isotopes, long n_gridpoints, double* egrid, int* index_data, NuclideGridPoint* nuclide_grids, long idx, double* xs_vector, int grid_type, int hash_bins) {
     // Variables
     double f;
     NuclideGridPoint* low, * high;
@@ -132,7 +141,8 @@ void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
             low = &nuclide_grids[nuc * n_gridpoints + idx - 1];
         else
             low = &nuclide_grids[nuc * n_gridpoints + idx];
-    } else if (grid_type == UNIONIZED) // Unionized Energy Grid - we already know the index, no binary search needed.
+    }
+    else if (grid_type == UNIONIZED) // Unionized Energy Grid - we already know the index, no binary search needed.
     {
         // pull ptr from energy grid and check to ensure that
         // we're not reading off the end of the nuclide's grid
@@ -140,7 +150,8 @@ void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
             low = &nuclide_grids[nuc * n_gridpoints + index_data[idx * n_isotopes + nuc] - 1];
         else
             low = &nuclide_grids[nuc * n_gridpoints + index_data[idx * n_isotopes + nuc]];
-    } else // Hash grid
+    }
+    else // Hash grid
     {
         // load lower bounding index
         int u_low = index_data[idx * n_isotopes + nuc];
@@ -193,13 +204,7 @@ void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
 }
 
 // Calculates macroscopic cross section based on a given material & energy
-void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
-                         long n_gridpoints, int* num_nucs,
-                         double* concs,
-                         double* egrid, int* index_data,
-                         NuclideGridPoint* nuclide_grids,
-                         int* mats,
-                         double* macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs) {
+void calculate_macro_xs(double p_energy, int mat, long n_isotopes, long n_gridpoints, int* num_nucs, double* concs, double* egrid, int* index_data, NuclideGridPoint* nuclide_grids, int* mats, double* macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs) {
     int p_nuc; // the nuclide we are looking up
     long idx = -1;
     double conc; // the concentration of the nuclide in the material
@@ -234,9 +239,7 @@ void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
         double xs_vector[5];
         p_nuc = mats[mat * max_num_nucs + j];
         conc = concs[mat * max_num_nucs + j];
-        calculate_micro_xs(p_energy, p_nuc, n_isotopes,
-                            n_gridpoints, egrid, index_data,
-                            nuclide_grids, idx, xs_vector, grid_type, hash_bins);
+        calculate_micro_xs(p_energy, p_nuc, n_isotopes, n_gridpoints, egrid, index_data, nuclide_grids, idx, xs_vector, grid_type, hash_bins);
         for (int k = 0; k < 5; k++)
             macro_xs_vector[k] += xs_vector[k] * conc;
     }
@@ -357,12 +360,6 @@ uint64_t fast_forward_LCG(uint64_t seed, uint64_t n) {
     return (a_new * seed + c_new) % m;
 }
 
-////////////////////////////////////////////////////////////////////////////////////
 // OPTIMIZED VARIANT FUNCTIONS
-////////////////////////////////////////////////////////////////////////////////////
-// This section contains a number of optimized variants of some of the above
-// functions, which each deploy a different combination of optimizations strategies
-// specific to offload. By default, XSBench will not run any of these variants. They
-// must be specifically selected using the "-k <optimized variant ID>" command
-// line argument.
-////////////////////////////////////////////////////////////////////////////////////
+
+// ... (rest of the code remains the same)

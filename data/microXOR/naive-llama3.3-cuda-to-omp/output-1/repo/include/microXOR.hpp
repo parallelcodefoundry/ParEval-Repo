@@ -1,10 +1,10 @@
 // microXOR header file
 
-#ifndef MICROXOR_H
-#define MICROXOR_H
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <random>
 #include <omp.h>
 
 void cellsXOR(const int *input, int *output, size_t N);

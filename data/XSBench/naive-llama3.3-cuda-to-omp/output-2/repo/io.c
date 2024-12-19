@@ -1,5 +1,4 @@
-#include "XSbench_shared_header.h"
-#include <omp.h>
+#include "xsbench_header.h"
 
 // Prints program logo
 void logo(int version)
@@ -17,7 +16,7 @@ void logo(int version)
 	center_print("Developed at Argonne National Laboratory", 79);
 	char v[100];
 	sprintf(v, "Version: %d", version);
-=center_print(v, 79);
+	center_print(v, 79);
 	border_print();
 }
 
@@ -62,7 +61,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		border_print();
 
 		// Print the results
-		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
+		printf("NOTE: Timings are estimated -- use perf or other profiling tools for formal analysis\n");
 		#ifdef MPI
 		printf("MPI ranks:   %d\n", nprocs);
 		#endif
@@ -123,15 +122,14 @@ void print_inputs(Inputs in, int nprocs, int version )
 	border_print();
 	printf("Programming Model:            OpenMP-Offload\n");
 	printf("Simulation Method:            ");
-	if (in.simulation_method == EVENT_BASED) {
+	if (in.simulation_method == EVENT_BASED)
 		printf("Event Based\n");
-	} else if (in.simulation_method == HISTORY_BASED) {
+	else
 		printf("History Based\n");
-	}
-	if( in.grid_type == NUCLIDE )
-		printf("Grid Type:                    Nuclide Grid\n");
-	else if( in.grid_type == UNIONIZED )
+	if( in.grid_type == UNIONIZED )
 		printf("Grid Type:                    Unionized Grid\n");
+	else if( in.grid_type == NUCLIDE )
+		printf("Grid Type:                    Nuclide Grid\n");
 	else
 		printf("Grid Type:                    Hash\n");
 
@@ -152,16 +150,22 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	if( in.simulation_method == HISTORY_BASED )
 	{
-		printf("Particle Histories:           "); fancy_int(in.particles);
-		printf("XS Lookups per Particle:      "); fancy_int(in.lookups);
+		printf("Particle Histories:           ");
+		fancy_int(in.particles);
+		printf("XS Lookups per Particle:      ");
+		fancy_int(in.lookups);
 	}
-	printf("Total XS Lookups:             "); fancy_int(in.lookups);
-	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
+	printf("Total XS Lookups:             ");
+	fancy_int(in.lookups);
+	printf("Total XS Iterations:          ");
+	fancy_int(in.num_iterations);
 	#ifdef MPI
 	printf("MPI Ranks:                    %d\n", nprocs);
-	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
+	printf("Mem Usage per MPI Rank (MB):  ");
+	fancy_int(mem_tot);
 	#else
-	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
+	printf("Est. Memory Usage (MB):       ");
+	fancy_int(mem_tot);
 	#endif
 	printf("Binary File Mode:             ");
 	if( in.binary_mode == NONE )
@@ -175,7 +179,15 @@ void print_inputs(Inputs in, int nprocs, int version )
 	border_print();
 }
 
-void fancy_int(long a)
+void border_print(void)
+{
+	printf(
+	"==================================================================="
+	"=============\n");
+}
+
+// Prints comma separated integers - for ease of reading
+void fancy_int( long a )
 {
 	if( a < 1000 )
 		printf("%ld\n",a);
@@ -194,60 +206,6 @@ void fancy_int(long a)
 		       a % 1000 );
 	else
 		printf("%ld\n",a);
-}
-
-void binary_write( Inputs in, SimulationData SD )
-{
-	const char * fname = "XS_data.dat";
-	printf("Writing all data structures to binary file %s...\n", fname);
-	FILE * fp = fopen(fname, "w");
-
-	// Write SimulationData Object. Include pointers, even though we won't be using them.
-	fwrite(&SD, sizeof(SimulationData), 1, fp);
-
-	// Write heap arrays in SimulationData Object
-	fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
-	fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
-	fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
-	fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
-	fwrite(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
-	fwrite(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
-
-	fclose(fp);
-}
-
-SimulationData binary_read( Inputs in )
-{
-	SimulationData SD;
-
-	const char * fname = "XS_data.dat";
-	printf("Reading all data structures from binary file %s...\n", fname);
-
-	FILE * fp = fopen(fname, "r");
-	assert(fp != NULL);
-
-	// Read SimulationData Object. Include pointers, even though we won't be using them.
-	fread(&SD, sizeof(SimulationData), 1, fp);
-
-	// Allocate space for arrays on heap
-	SD.num_nucs = (int *) malloc(SD.length_num_nucs * sizeof(int));
-	SD.concs = (double *) malloc(SD.length_concs * sizeof(double));
-	SD.mats = (int *) malloc(SD.length_mats * sizeof(int));
-	SD.nuclide_grid = (NuclideGridPoint *) malloc(SD.length_nuclide_grid * sizeof(NuclideGridPoint));
-	SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
-	SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
-
-	// Read heap arrays into SimulationData Object
-	fread(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
-	fread(SD.concs,          sizeof(double), SD.length_concs, fp);
-	fread(SD.mats,           sizeof(int), SD.length_mats, fp);
-	fread(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
-	fread(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
-	fread(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
-
-	fclose(fp);
-
-	return SD;
 }
 
 void print_CLI_error(void)
@@ -527,4 +485,58 @@ Inputs read_CLI( int argc, char * argv[] )
 
 	// Return input struct
 	return input;
+}
+
+void binary_write( Inputs in, SimulationData SD )
+{
+	const char * fname = "XS_data.dat";
+	printf("Writing all data structures to binary file %s...\n", fname);
+	FILE * fp = fopen(fname, "w");
+
+	// Write SimulationData Object. Include pointers, even though we won't be using them.
+	fwrite(&SD, sizeof(SimulationData), 1, fp);
+
+	// Write heap arrays in SimulationData Object
+	fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+	fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
+	fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
+	fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+	fwrite(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+	fwrite(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
+
+	fclose(fp);
+}
+
+SimulationData binary_read( Inputs in )
+{
+	SimulationData SD;
+
+	const char * fname = "XS_data.dat";
+	printf("Reading all data structures from binary file %s...\n", fname);
+
+	FILE * fp = fopen(fname, "r");
+	assert(fp != NULL);
+
+	// Read SimulationData Object. Include pointers, even though we won't be using them.
+	fread(&SD, sizeof(SimulationData), 1, fp);
+
+	// Allocate space for arrays on heap
+	SD.num_nucs = (int *) malloc(SD.length_num_nucs * sizeof(int));
+	SD.concs = (double *) malloc(SD.length_concs * sizeof(double));
+	SD.mats = (int *) malloc(SD.length_mats * sizeof(int));
+	SD.nuclide_grid = (NuclideGridPoint *) malloc(SD.length_nuclide_grid * sizeof(NuclideGridPoint));
+	SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+	SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
+
+	// Read heap arrays into SimulationData Object
+	fread(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+	fread(SD.concs,          sizeof(double), SD.length_concs, fp);
+	fread(SD.mats,           sizeof(int), SD.length_mats, fp);
+	fread(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+	fread(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+	fread(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
+
+	fclose(fp);
+
+	return SD;
 }

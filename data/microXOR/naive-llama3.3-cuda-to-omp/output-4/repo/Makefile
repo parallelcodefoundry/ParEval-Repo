@@ -1,21 +1,29 @@
 # Makefile for OpenMP-Offload microXOR
 
-ifndef CXX_COMPILER
-$(error CXX_COMPILER must be specified)
+CXX ?= $(CXX_COMPILER)
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target=nvptx64-nvidia-cuda -march=sm_$(SM_VERSION) -std=c++17
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
 endif
+LDFLAGS ?= -fopenmp
 
-ifndef SM_VERSION
-$(error SM_VERSION must be specified, e.g., 80 for NVIDIA GPU with compute capability 8.0)
-endif
+CPPFILES = src/microXOR.cpp src/main.cpp
+DEPS = include/microXOR.hpp
+OBJS = $(CPPFILES:src/%.cpp=obj/%.o)
+EXE = microXOR.exe
 
-CXX = $(CXX_COMPILER)
-CXXFLAGS = -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda --offload-arch=sm_$(SM_VERSION) -O3
-LDFLAGS = -fopenmp
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-microXOR: microXOR.cpp
-	$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS)
+obj/%.o: src/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+obj:
+	mkdir -p obj
 
 clean:
-	rm -rf microXOR *.o
+	rm -f $(OBJS) $(EXE)
 
 .PHONY: clean

@@ -55,10 +55,13 @@ typedef struct{
 
 // kernel.c
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );
+void setup_kernel(curandState *state, Input I);
+void init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state);
 Source * initialize_sources( Input I, Source_Arrays * SA );
 Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
 Table buildExponentialTable( void );
@@ -75,10 +78,3 @@ void print_CLI_error(void);
 
 #endif
 ```
-
-Note that I've made the following changes:
-1. Removed CUDA-specific includes and macros (`curand_kernel.h`, `cuda.h`, `CUDA_ERROR_CHECK`, `CudaCheckError()`, `CUDA_CALL(x)`).
-2. Replaced `__global__` with no keyword, since OpenMP-offload does not use this syntax.
-3. Changed the kernel function to a regular C function (`void run_kernel(...)`), and removed the `__device__` keyword from the `interpolateTable` function (not shown in this code snippet). 
-
-This translation is just an initial step and may require further modifications to work correctly with OpenMP-offload, especially when dealing with memory management and offloading computations to a device.

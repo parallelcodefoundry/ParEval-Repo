@@ -1,42 +1,34 @@
 ```makefile
 # Makefile for OpenMP-Offload microXOR
 
-SM_VERSION ?= 80
-CXX_COMPILER ?= g++
-
-# Set compiler flags based on CXX_COMPILER
-ifeq ($(CXX_COMPILER),clang++)
-  CXX_FLAGS = -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda --offload-arch=sm_$(SM_VERSION)
-else ifeq ($(CXX_COMPILER),gcc)
-  CXX_FLAGS = -fopenmp -foffload-nvptx=-misa=simd -foffload=nvptx-none
+CXX ?= $(CXX_COMPILER)
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64 -march=sm_$(SM_VERSION) -std=c++17
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
 endif
+LDFLAGS ?= -fopenmp
 
-# Set include and library paths for OpenMP-Offload
-INCLUDE_PATHS = 
-LIBRARY_PATHS = 
+SRC = src
+INC = include
+OBJ = obj
+CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CPPFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
 
-# Source files
-SRC_FILES = main.cpp microXOR.cpp
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-# Object files
-OBJ_FILES = $(SRC_FILES:.cpp=.o)
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Header files
-HDR_FILES = microXOR.hpp
+obj:
+	mkdir -p $(OBJ)
 
-# Build rules
-%.o: %.cpp $(HDR_FILES)
-	$(CXX_COMPILER) -c $< $(CXX_FLAGS) -o $@
-
-microXOR-offload: $(OBJ_FILES)
-	$(CXX_COMPILER) $(CXX_FLAGS) $(OBJ_FILES) -o $@ $(LIBRARY_PATHS)
-
-# Clean rule
 clean:
-	rm -f *.o microXOR-offload
+	rm -f $(OBJS) $(EXE)
 
-# Default target
-all: microXOR-offload
-
-.PHONY: clean all
+.PHONY: clean
 ```

@@ -13,164 +13,178 @@ int main(int argc, char *argv[]) {
 
     print_input_summary(I);
 
-    center_print("INITIALIZATION", 79);
-    border_print();
-
-    // Build Source Data
+    printf("INITIALIZATION\n");
     printf("Building Source Data Arrays...\n");
-    Source_Arrays SA_h;
+    Source_Arrays SA_h, SA_d;
     Source *sources_h = initialize_sources(I, &SA_h);
+    Source *sources_d = initialize_device_sources(I, &SA_h, &SA_d, sources_h);
 
-    // Build Exponential Table
     Table *table_d = NULL;
 #ifdef TABLE
     printf("Building Exponential Table...\n");
     Table table = buildExponentialTable();
+    table_d = (Table *)malloc(sizeof(Table));
+    *table_d = table;
 #endif
 
-    // Allocate Some Flux State vectors to randomly pick from
+    int n_blocks = sqrt(I.segments);
+    if (n_blocks * n_blocks < I.segments)
+        n_blocks++;
+
+    printf("Setting up RNG...\n");
+    curandState *RNG_states;
+    RNG_states = (curandState *)malloc(I.streams * sizeof(curandState));
+    setup_kernel(RNG_states, I);
+
     printf("Setting up Flux State Vectors...\n");
     float *flux_states;
     int N_flux_states = 10000;
     assert(I.segments >= N_flux_states);
-
-    // Setup OpenMP offload
-    #pragma omp target enter data map(to: I, sources_h[:I.source_3D_regions], SA_h.fine_source_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], \
-        SA_h.fine_flux_arr[:I.source_3D_regions * I.fine_axial_intervals * I.egroups], SA_h.sigT_arr[:I.source_3D_regions * I.egroups])
-    #pragma omp target enter data map(alloc: flux_states[N_flux_states * I.egroups])
-
-    // Initialize global flux states to random numbers
-    #pragma omp target teams distribute parallel for
-    for (int i = 0; i < N_flux_states * I.egroups; i++) {
-        flux_states[i] = (float)rand() / RAND_MAX;
-    }
+    flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
+    init_flux_states(flux_states, N_flux_states, I, RNG_states);
 
     printf("Initialization Complete.\n");
-    border_print();
-    center_print("SIMULATION", 79);
-    border_print();
+    printf("SIMULATION\n");
     printf("Attentuating fluxes across segments...\n");
 
-    // Setup kernel call block parameters
-    assert(I.segments % I.seg_per_thread == 0);
-
-    double start_time = omp_get_wtime();
-
-    // Run Simulation Kernel Loop
-    #pragma omp target teams distribute parallel for
+    double time = omp_get_wtime();
+#pragma omp target teams distribute parallel for
     for (int i = 0; i < I.segments / I.seg_per_thread; i++) {
         int blockId = i;
-        curandState localState;
-        curand_init(1234, blockId, 0, &localState);
+        int g = omp_get_thread_num();
+        // Assign RNG state
+        curandState *localState = &RNG_states[blockId % I.streams];
 
         // Thread Local (i.e., specific to E group) variables
         float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
 
-        for (int j = 0; j < I.seg_per_thread; j++) {
-            blockId++;
+        // Randomized variables (common accross all thread within block)
+        int state_flux_id, QSR_id, FAI_id;
+        if (g == 0) {
+            state_flux_id = curand(localState) % N_flux_states;
+            QSR_id = curand(localState) % I.source_3D_regions;
+            FAI_id = curand(localState) % I.fine_axial_intervals;
+        }
 
-            // Randomized variables (common accross all thread within block)
-            int state_flux_id = curand(&localState) % N_flux_states;
-            int QSR_id = curand(&localState) % I.source_3D_regions;
-            int FAI_id = curand(&localState) % I.fine_axial_intervals;
+        // Wait for all threads to finish random number generation
+#pragma omp barrier
 
-            float *state_flux = &flux_states[state_flux_id * I.egroups];
+        float *state_flux = &flux_states[state_flux_id * I.egroups];
 
-            // Attenuate Segment
-            float dz = 0.1f, zin = 0.3f, weight = 0.5f, mu = 0.9f, mu2 = 0.3f, ds = 0.7f;
-            const int egroups = I.egroups;
+        // Attenuate Segment
+        float dz = 0.1f;
+        float zin = 0.3f;
+        float weight = 0.5f;
+        float mu = 0.9f;
+        float mu2 = 0.3f;
+        float ds = 0.7f;
 
-            // load fine source region flux vector
-            float *FSR_flux = &SA_h.fine_flux_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
+        const int egroups = I.egroups;
 
-            if (FAI_id == 0) {
-                float y2 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
-                float y3 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id + 1) * I.egroups];
+        // load fine source region flux vector
+        float *FSR_flux = &SA_d.fine_flux_arr[sources_h[QSR_id].fine_flux_id + FAI_id * egroups];
 
-                // do linear "fitting"
-                float c0 = y2;
-                float c1 = (y3 - y2) / dz;
+        if (FAI_id == 0) {
+            float *f2 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id) * egroups];
+            float *f3 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id + 1) * egroups];
+            // cycle over energy groups
+            // load neighboring sources
+            float y2 = f2[g];
+            float y3 = f3[g];
 
-                // calculate q0, q1, q2
-                q0 = c0 + c1 * zin;
-                q1 = c1;
-                q2 = 0;
-            } else if (FAI_id == I.fine_axial_intervals - 1) {
-                float y1 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id - 1) * I.egroups];
-                float y2 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
+            // do linear "fitting"
+            float c0 = y2;
+            float c1 = (y3 - y2) / dz;
 
-                // do linear "fitting"
-                float c0 = y2;
-                float c1 = (y2 - y1) / dz;
+            // calculate q0, q1, q2
+            q0 = c0 + c1 * zin;
+            q1 = c1;
+            q2 = 0;
+        } else if (FAI_id == I.fine_axial_intervals - 1) {
+            float *f1 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id - 1) * egroups];
+            float *f2 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id) * egroups];
+            // cycle over energy groups
+            // load neighboring sources
+            float y1 = f1[g];
+            float y2 = f2[g];
 
-                // calculate q0, q1, q2
-                q0 = c0 + c1 * zin;
-                q1 = c1;
-                q2 = 0;
-            } else {
-                float y1 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id - 1) * I.egroups];
-                float y2 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + FAI_id * I.egroups];
-                float y3 = SA_h.fine_source_arr[QSR_id * I.fine_axial_intervals * I.egroups + (FAI_id + 1) * I.egroups];
+            // do linear "fitting"
+            float c0 = y2;
+            float c1 = (y2 - y1) / dz;
 
-                // do quadratic "fitting"
-                float c0 = y2;
-                float c1 = (y1 - y3) / (2 * dz);
-                float c2 = (y1 - 2 * y2 + y3) / (2 * dz * dz);
+            // calculate q0, q1, q2
+            q0 = c0 + c1 * zin;
+            q1 = c1;
+            q2 = 0;
+        } else {
+            float *f1 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id - 1) * egroups];
+            float *f2 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id) * egroups];
+            float *f3 = &SA_d.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id + 1) * egroups];
+            // cycle over energy groups
+            // load neighboring sources
+            float y1 = f1[g];
+            float y2 = f2[g];
+            float y3 = f3[g];
 
-                // calculate q0, q1, q2
-                q0 = c0 + c1 * zin + c2 * zin * zin;
-                q1 = c1 + 2 * c2 * zin;
-                q2 = c2;
-            }
+            // do quadratic "fitting"
+            float c0 = y2;
+            float c1 = (y1 - y3) / (2.0f * dz);
+            float c2 = (y1 - 2.0f * y2 + y3) / (2.0f * dz * dz);
 
-            sigT = SA_h.sigT_arr[QSR_id * I.egroups];
+            // calculate q0, q1, q2
+            q0 = c0 + c1 * zin + c2 * zin * zin;
+            q1 = c1 + 2.0f * c2 * zin;
+            q2 = c2;
+        }
 
-            tau = sigT * ds;
-            sigT2 = sigT * sigT;
+        // load total cross section
+        sigT = SA_d.sigT_arr[sources_h[QSR_id].sigT_id + g];
+
+        // calculate common values for efficiency
+        tau = sigT * ds;
+        sigT2 = sigT * sigT;
 
 #ifdef TABLE
-            // Interpolate table for exp(-x)
-            float slope, intercept;
-            int interval = (int)(tau / table.dx + 0.5 * table.dx);
-            interval *= 2;
-            slope = table.values[interval];
-            intercept = table.values[interval + 1];
-            expVal = slope * tau + intercept;
+        interpolateTable(table_d, tau, &expVal);
 #else
-            expVal = 1 - exp(-tau);
+        expVal = 1.0f - expf(-tau);
 #endif
 
-            // Flux Integral
-            reuse = tau * (tau - 2) + 2 * expVal / (sigT * sigT2);
+        // Flux Integral
 
-            flux_integral = (q0 * tau + (sigT * state_flux[0] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3) + 6) - 6 * expVal) / (3 * sigT2 * sigT2);
+        // Re-used Term
+        reuse = tau * (tau - 2.0f) + 2.0f * expVal / (sigT * sigT2);
 
-            // Prepare tally
-            tally = weight * flux_integral;
+        // add contribution to new source flux
+        flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.0f) + 6.0f) - 6.0f * expVal) / (3.0f * sigT2 * sigT2);
 
-            FSR_flux[0] += tally;
+        // Prepare tally
+        tally = weight * flux_integral;
 
-            t1 = q0 * expVal / sigT;
-            t2 = q1 * mu * (tau - expVal) / sigT2;
-            t3 = q2 * mu2 * reuse;
-            t4 = state_flux[0] * (1 - expVal);
+        // SHOULD BE ATOMIC HERE!
+        // FSR_flux[g] += tally;
+        FSR_flux[g] += (float)tally;
 
-            state_flux[0] = t1 + t2 + t3 + t4;
-        }
+        // Term 1
+        t1 = q0 * expVal / sigT;
+        // Term 2
+        t2 = q1 * mu * (tau - expVal) / sigT2;
+        // Term 3
+        t3 = q2 * mu2 * reuse;
+        // Term 4
+        t4 = state_flux[g] * (1.0f - expVal);
+        // Total psi
+        state_flux[g] = t1 + t2 + t3 + t4;
     }
 
-    double end_time = omp_get_wtime();
+    time = omp_get_wtime() - time;
 
     printf("Simulation Complete.\n");
 
-    border_print();
-    center_print("RESULTS SUMMARY", 79);
-    border_print();
-
-    double runtime = end_time - start_time;
-    printf("%-25s%.3f seconds\n", "Runtime:", runtime);
-
-    #pragma omp target exit data map(delete: flux_states[:N_flux_states * I.egroups])
+    printf("RESULTS SUMMARY\n");
+    double tpi = ((double)(time) / (double)I.segments / (double)I.egroups) * 1.0e9;
+    printf("Runtime: %.3f seconds\n", time);
+    printf("Time per Intersection: %.8lf ns\n", tpi);
 
     return 0;
 }

@@ -3,30 +3,31 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP for offloading computations to accelerators (e.g., GPUs).
+This version of microXOR is written in C++ for execution on a host with offloading to a target device using OpenMP.
 
 ## Prerequisites
 
-A C/C++ compiler supporting OpenMP and an accelerator device are required.
+A C++ compiler supporting OpenMP 4.5 or later, and a compatible target device, must be installed.
 
 ## Build
 
-To build microXOR, use your preferred C/C++ compiler with OpenMP support. For example:
+To build microXOR, use a C++ compiler that supports OpenMP, such as GCC or Clang. For example, the following will build microXOR:
+
 ```bash
-gcc -fopenmp microXOR.c -o microXOR
+g++ -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda microXOR.cpp main.cpp -o microXOR.exe
 ```
-Replace `microXOR.c` with the actual file name containing the source code.
+
+Replace `nvptx64-nvidia-cuda` with the target triple for your device.
 
 ## Run
 
-Run the executable on a system with an accelerator device. The program will automatically detect and utilize available accelerators.
+microXOR requires two command-line arguments, one for matrix size and one for block size. For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block:
+
 ```bash
-./microXOR N blockEdge
+./microXOR.exe 1024 32
 ```
-Replace `N` with the desired grid size and `blockEdge` with the preferred block edge length (between 2 and 32).
 
-## Notes
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the host.
 
-* Ensure your compiler supports OpenMP offloading to accelerators.
-* The program may require additional environment variables or configuration settings depending on the specific accelerator device and system architecture.
+Note: The actual command to run the executable may vary depending on your system configuration and the location of the executable file.
 ```

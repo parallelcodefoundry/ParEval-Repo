@@ -54,9 +54,8 @@ typedef struct{
 
 // kernel.c
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
-
-void interpolateTable(Table *  table, float x, float *  out);
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );

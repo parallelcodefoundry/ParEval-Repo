@@ -1,17 +1,14 @@
-```c
+```cpp
 // microXOR header file
 
-#ifndef MICROXOR_H
-#define MICROXOR_H
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
 
-#include <stdio.h>
-#include <stdint.h>
+#include <iostream>
+#include <random>
+#include <omp.h>
 
 void cellsXOR(const int *input, int *output, size_t N);
 
-#endif  // MICROXOR_H
+#endif
 ```
-
-Note: The translation removed the CUDA-specific headers (`<cuda_runtime.h>`, `__global__` keyword) and replaced them with standard C/C++ headers. The `cellsXOR` function declaration now uses a standard C/C++ function signature, without any OpenMP or offload-related keywords. This is because the actual offloading will be handled in the implementation file (e.g., `.c` file), not in this header file.
-
-Also note that you may need to include additional headers for OpenMP and/or offload-specific functionality, depending on your specific use case and compiler requirements. However, these should typically be included in the implementation file rather than in this header file.

@@ -1,11 +1,11 @@
-```c
-// microXOR kernel translated to OpenMP offload
+```cpp
+// microXOR kernel
 
 #include <omp.h>
-#include "microXOR.h"
+#include "microXOR.hpp"
 
 void cellsXOR(const int *input, int *output, size_t N) {
-  #pragma omp target teams distribute parallel for collapse(2)
+  #pragma omp target teams distribute parallel for
   for (size_t i = 0; i < N; i++) {
     for (size_t j = 0; j < N; j++) {
       int count = 0;
@@ -18,4 +18,3 @@ void cellsXOR(const int *input, int *output, size_t N) {
   }
 }
 ```
-Note that this translation assumes the presence of a `microXOR.h` header file containing function declarations and other necessary definitions, similar to how it was used in the original CUDA code. Also note that OpenMP offload does not require explicit memory allocation or data transfer between host and device, as these are handled automatically by the runtime environment.

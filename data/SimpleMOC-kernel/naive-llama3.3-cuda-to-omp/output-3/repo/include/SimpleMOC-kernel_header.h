@@ -1,6 +1,7 @@
 #ifndef __SimpleMOC_header
 #define __SimpleMOC_header
 
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -12,7 +13,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <omp.h>
+#include <assert.h>
 
 // User inputs
 typedef struct{
@@ -51,9 +52,10 @@ typedef struct{
     int N;
 } Table;
 
-// Function declarations
-void run_kernel( Input I, Source *  S, Source_Arrays SA, Table *  table, float *  state_fluxes, int N_state_fluxes);
-void interpolateTable(Table *  table, float x, float *  out);
+// kernel.c
+void run_kernel( Input I, Source *  S,
+        Source_Arrays SA, Table *  table,
+        float *  state_fluxes, int N_state_fluxes);
 
 // init.c
 double mem_estimate( Input I );

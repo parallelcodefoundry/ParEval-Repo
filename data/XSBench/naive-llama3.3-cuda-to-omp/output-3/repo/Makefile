@@ -2,7 +2,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= llvm
+COMPILER    ?= clang
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -24,15 +24,15 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda
+CFLAGS := -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp
 
 # Linker Flags
-LDFLAGS = -lm -fopenmp
+LDFLAGS = -lm -fopenmp-targets=nvptx64-nvidia-cuda -fopenmp
 
-# LLVM Compiler
-ifeq ($(COMPILER),llvm)
+# Compiler
+ifeq ($(COMPILER),clang)
   CC = clang
-  CFLAGS += -Wall -O3 -target nvptx64-nvidia-cuda$(CUDA_ARCH) -std=c11
+  CFLAGS += -Wall -O3 -std=c11 -target-cuda-arch=sm_$(CUDA_ARCH)
 endif
 
 # Debug Flags

@@ -1,5 +1,4 @@
 #include "SimpleMOC-kernel_header.h"
-#include <omp.h>
 
 int main(int argc, char *argv[]) {
     int version = 4;
@@ -13,8 +12,8 @@ int main(int argc, char *argv[]) {
 
     print_input_summary(I);
 
-    center_print("INITIALIZATION", 79);
-    border_print();
+    printf("INITIALIZATION\n");
+    printf("==============\n");
 
     // Build Source Data
     printf("Building Source Data Arrays...\n");
@@ -22,62 +21,71 @@ int main(int argc, char *argv[]) {
     Source *sources_h = initialize_sources(I, &SA_h);
 
     // Build Exponential Table
-    Table *table_d = NULL;
-#ifdef TABLE
+    Table *table_h = NULL;
+    #ifdef TABLE
     printf("Building Exponential Table...\n");
     Table table = buildExponentialTable();
-#endif
+    table_h = &table;
+    #endif
+
+    // Setup OpenMP offload
+    int n_blocks = sqrt(I.segments);
+    int block_size = I.seg_per_thread;
+    int num_threads = n_blocks * n_blocks;
+
+    printf("Initialization Complete.\n");
+    printf("SIMULATION\n");
+    printf("==========\n");
+
+    printf("Attentuating fluxes across segments...\n");
 
     // Allocate Some Flux State vectors to randomly pick from
     printf("Setting up Flux State Vectors...\n");
     float *flux_states;
     int N_flux_states = 10000;
     assert(I.segments >= N_flux_states);
+    flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
+    init_flux_states(flux_states, N_flux_states, I);
 
-    // Setup OpenMP offload target
-    #pragma omp target enter data map(to: SA_h, sources_h) \
-        map(alloc: flux_states[0:N_flux_states * I.egroups])
+    // Run Simulation Kernel Loop
+    #pragma omp target teams distribute map(to: I, sources_h[:I.source_3D_regions], SA_h, table_h[:1], flux_states[:N_flux_states*I.egroups]) map(from: flux_states[:N_flux_states*I.egroups])
+    for (int i = 0; i < num_threads; i++) {
+        int blockId = i;
+        int seg_per_thread = I.seg_per_thread;
+        int egroups = I.egroups;
 
-    printf("Initialization Complete.\n");
-    border_print();
-    center_print("SIMULATION", 79);
-    border_print();
-    printf("Attentuating fluxes across segments...\n");
+        // Assign RNG state
+        int threadId = omp_get_thread_num();
 
-    // OpenMP offload kernel call
-    double start_time = omp_get_wtime();
-    #pragma omp target teams distribute parallel for \
-        map(to: I, sources_h[0:I.source_3D_regions], SA_h) \
-        map(from: flux_states[0:N_flux_states * I.egroups])
-    for (int blockId = 0; blockId < I.segments / I.seg_per_thread; blockId++) {
-        int g = omp_get_thread_num(); // Each energy group (g) is one thread in a block
         // Thread Local (i.e., specific to E group) variables
-        float q0, q1, q2;
-        float sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
+        float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
 
-        for (int i = 0; i < I.seg_per_thread; i++) {
-            // Randomized variables (common accross all thread within block)
-            int state_flux_id = rand() % N_flux_states;
-            int QSR_id = rand() % I.source_3D_regions;
-            int FAI_id = rand() % I.fine_axial_intervals;
+        for (int j = 0; j < seg_per_thread; j++) {
+            blockId++;
 
-            float *state_flux = &flux_states[state_flux_id * I.egroups];
+            float *state_flux = &flux_states[(blockId % N_flux_states) * egroups];
 
-            // Attenuate Segment
-            float dz = 0.1f, zin = 0.3f, weight = 0.5f, mu = 0.9f, mu2 = 0.3f, ds = 0.7f;
-            const int egroups = I.egroups;
+            // Some placeholder constants - In the full app some of these are
+            // calculated based off position in geometry. This treatment
+            // shaves off a few FLOPS, but is not significant compared to the
+            // rest of the function.
+            float dz = 0.1f;
+            float zin = 0.3f;
+            float weight = 0.5f;
+            float mu = 0.9f;
+            float mu2 = 0.3f;
+            float ds = 0.7f;
 
             // load fine source region flux vector
-            float *FSR_flux = &SA_h.fine_flux_arr[sources_h[QSR_id].fine_flux_id + FAI_id * egroups];
+            float *FSR_flux = &SA_h.fine_flux_arr[sources_h[blockId % I.source_3D_regions].fine_flux_id + (blockId % I.fine_axial_intervals) * egroups];
 
-            if (FAI_id == 0) {
-                float *f2 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id) * egroups];
-                float *f3 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id + 1) * egroups];
-
+            if ((blockId % I.fine_axial_intervals) == 0) {
+                float *f2 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + (blockId % I.fine_axial_intervals) * egroups];
+                float *f3 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + ((blockId % I.fine_axial_intervals) + 1) * egroups];
                 // cycle over energy groups
                 // load neighboring sources
-                float y2 = f2[g];
-                float y3 = f3[g];
+                float y2 = f2[threadId % egroups];
+                float y3 = f3[threadId % egroups];
 
                 // do linear "fitting"
                 float c0 = y2;
@@ -87,14 +95,13 @@ int main(int argc, char *argv[]) {
                 q0 = c0 + c1 * zin;
                 q1 = c1;
                 q2 = 0;
-            } else if (FAI_id == I.fine_axial_intervals - 1) {
-                float *f1 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id - 1) * egroups];
-                float *f2 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id) * egroups];
-
+            } else if ((blockId % I.fine_axial_intervals) == I.fine_axial_intervals - 1) {
+                float *f1 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + ((blockId % I.fine_axial_intervals) - 1) * egroups];
+                float *f2 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + (blockId % I.fine_axial_intervals) * egroups];
                 // cycle over energy groups
                 // load neighboring sources
-                float y1 = f1[g];
-                float y2 = f2[g];
+                float y1 = f1[threadId % egroups];
+                float y2 = f2[threadId % egroups];
 
                 // do linear "fitting"
                 float c0 = y2;
@@ -105,54 +112,53 @@ int main(int argc, char *argv[]) {
                 q1 = c1;
                 q2 = 0;
             } else {
-                float *f1 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id - 1) * egroups];
-                float *f2 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id) * egroups];
-                float *f3 = &SA_h.fine_source_arr[sources_h[QSR_id].fine_source_id + (FAI_id + 1) * egroups];
-
+                float *f1 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + ((blockId % I.fine_axial_intervals) - 1) * egroups];
+                float *f2 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + (blockId % I.fine_axial_intervals) * egroups];
+                float *f3 = &SA_h.fine_source_arr[sources_h[blockId % I.source_3D_regions].fine_source_id + ((blockId % I.fine_axial_intervals) + 1) * egroups];
                 // cycle over energy groups
                 // load neighboring sources
-                float y1 = f1[g];
-                float y2 = f2[g];
-                float y3 = f3[g];
+                float y1 = f1[threadId % egroups];
+                float y2 = f2[threadId % egroups];
+                float y3 = f3[threadId % egroups];
 
                 // do quadratic "fitting"
                 float c0 = y2;
-                float c1 = (y1 - y3) / (2.f * dz);
-                float c2 = (y1 - 2.f * y2 + y3) / (2.f * dz * dz);
+                float c1 = (y1 - y3) / (2.0f * dz);
+                float c2 = (y1 - 2.0f * y2 + y3) / (2.0f * dz * dz);
 
                 // calculate q0, q1, q2
                 q0 = c0 + c1 * zin + c2 * zin * zin;
-                q1 = c1 + 2.f * c2 * zin;
+                q1 = c1 + 2.0f * c2 * zin;
                 q2 = c2;
             }
 
             // load total cross section
-            sigT = SA_h.sigT_arr[sources_h[QSR_id].sigT_id + g];
+            sigT = SA_h.sigT_arr[sources_h[blockId % I.source_3D_regions].sigT_id + threadId % egroups];
 
             // calculate common values for efficiency
             tau = sigT * ds;
             sigT2 = sigT * sigT;
 
-#ifdef TABLE
-            interpolateTable(&table, tau, &expVal);
-#else
-            expVal = 1.f - expf(-tau); // EXP function is fater than table lookup
-#endif
+            #ifdef TABLE
+            interpolateTable(table_h, tau, &expVal);
+            #else
+            expVal = 1.0f - expf(-tau); // EXP function is faster than table lookup
+            #endif
 
             // Flux Integral
-            reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
+
+            // Re-used Term
+            reuse = tau * (tau - 2.0f) + 2.0f * expVal / (sigT * sigT2);
 
             // add contribution to new source flux
-            flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 +
-                            q1 * mu * reuse + q2 * mu2 *
-                                    (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) /
-                                    (3.f * sigT2 * sigT2);
+            flux_integral = (q0 * tau + (sigT * state_flux[threadId % egroups] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.0f) + 6.0f) - 6.0f * expVal) / (3.0f * sigT2 * sigT2);
 
             // Prepare tally
             tally = weight * flux_integral;
 
             // SHOULD BE ATOMIC HERE!
-            FSR_flux[g] += tally;
+            // FSR_flux[g] += tally;
+            FSR_flux[threadId % egroups] += tally;
 
             // Term 1
             t1 = q0 * expVal / sigT;
@@ -161,26 +167,20 @@ int main(int argc, char *argv[]) {
             // Term 3
             t3 = q2 * mu2 * reuse;
             // Term 4
-            t4 = state_flux[g] * (1.f - expVal);
+            t4 = state_flux[threadId % egroups] * (1.0f - expVal);
             // Total psi
-            state_flux[g] = t1 + t2 + t3 + t4;
+            state_flux[threadId % egroups] = t1 + t2 + t3 + t4;
         }
     }
 
-    double end_time = omp_get_wtime();
-
     printf("Simulation Complete.\n");
 
-    border_print();
-    center_print("RESULTS SUMMARY", 79);
-    border_print();
+    printf("RESULTS SUMMARY\n");
+    printf("==============\n");
 
-    double tpi = (end_time - start_time) / I.segments / I.egroups * 1.0e9;
-    printf("%-25s%.3f seconds\n", "Runtime:", end_time - start_time);
+    double tpi = ((double)(omp_get_wtime() - omp_get_wtime()) / (double)I.segments / (double)I.egroups) * 1.0e9;
+    printf("%-25s%.3f seconds\n", "Runtime:", omp_get_wtime() - omp_get_wtime());
     printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
-    border_print();
-
-    #pragma omp target exit data map(delete: flux_states[0:N_flux_states * I.egroups])
 
     return 0;
 }

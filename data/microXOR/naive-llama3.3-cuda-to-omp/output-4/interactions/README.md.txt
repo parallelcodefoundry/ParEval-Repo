@@ -3,67 +3,29 @@
 
 This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
 
-This version of microXOR is written using OpenMP Offload for heterogeneous execution on CPUs and accelerators (e.g., GPUs).
+This version of microXOR is written in C++ for execution on a host with offloading to a target device using OpenMP.
 
 ## Prerequisites
 
-OpenMP and an accelerator card must be installed. For NVIDIA GPUs, the CUDA toolkit or compatible drivers are required. For other accelerators, check with your system administrator or vendor documentation.
+A C++ compiler with OpenMP support and a compatible target device are required.
 
-## Building
+## Build
 
-To build microXOR using OpenMP Offload, you'll need a compiler that supports OpenMP 4.5 or later. You can use the following command:
+To build microXOR, use a C++ compiler with OpenMP support, such as GCC or Clang. For example, the following will build microXOR:
+
 ```bash
-gcc -fopenmp -o microxorc microxorc.c
+g++ -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda microXOR.cpp -o microXOR.exe
 ```
-Replace `microxorc` with your source file name.
 
-## Running
+## Run
 
-Run microXOR using the following command:
+microXOR requires two command-line arguments, one for matrix size and one for block size. For example, the following will run microXOR with a 1024x1024 input matrix and 32x32 threads per block:
+
 ```bash
-./microxorc N blockEdge
+./microXOR.exe 1024 32
 ```
-Replace `N` and `blockEdge` with your desired problem size and block edge, respectively. For example:
-```bash
-./microxorc 1024 16
-```
-This will run the benchmark on a 1024x1024 grid with a block edge of 16.
 
-## Validating
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the host.
 
-The output is validated by comparing it to the expected result computed on the host CPU. If the validation passes, you should see "Validation passed." printed to the console.
-```markdown
-# microXOR: XOR stencil micro-benchmark
-
-This is microXOR, a stencil computation benchmark computing an XOR operation over a 2D grid of cells.
-
-This version of microXOR is written using OpenMP Offload for heterogeneous execution on CPUs and accelerators (e.g., GPUs).
-
-## Prerequisites
-
-OpenMP and an accelerator card must be installed. For NVIDIA GPUs, the CUDA toolkit or compatible drivers are required. For other accelerators, check with your system administrator or vendor documentation.
-
-## Building
-
-To build microXOR using OpenMP Offload, you'll need a compiler that supports OpenMP 4.5 or later. You can use the following command:
-```bash
-gcc -fopenmp -o microxorc microxorc.c
-```
-Replace `microxorc` with your source file name.
-
-## Running
-
-Run microXOR using the following command:
-```bash
-./microxorc N blockEdge
-```
-Replace `N` and `blockEdge` with your desired problem size and block edge, respectively. For example:
-```bash
-./microxorc 1024 16
-```
-This will run the benchmark on a 1024x1024 grid with a block edge of 16.
-
-## Validating
-
-The output is validated by comparing it to the expected result computed on the host CPU. If the validation passes, you should see "Validation passed." printed to the console.
+Note: The actual command to run the executable may vary depending on the system and the compiler used.
 ```

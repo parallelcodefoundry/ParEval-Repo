@@ -58,7 +58,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is an OpenMP-offload code and supports x86-64 CPU architecture with compatible OpenMP-offload implementations.
+SimpleMOC-kernel is an OpenMP-offload code and supports various architectures,
+including CPUs and accelerators.
 
 ==============================================================================
 Quick Start Guide
@@ -123,19 +124,16 @@ COMPILER    = gcc
 OPTIMIZE    = yes
 DEBUG       = no
 PROFILE     = no
-TARGET      = host
 
 Explanation of Flags:
 
-COMPILER <gcc> - This selects your compiler (GNU Compiler Collection is only one supported).
+COMPILER <gcc> - This selects your compiler.
 
 OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
 DEBUG - Adds the compiler flag "-g".
 
 PROFILE - Adds the compiler flag "-pg".
-
-TARGET - Specifies the target device for offloading. Options include "host" or a specific device ID.
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion
@@ -171,5 +169,4 @@ doi = "https://doi.org/10.1016/j.cpc.2016.01.007",
 url = "http://www.sciencedirect.com/science/article/pii/S0010465516000266",
 author = "John R. Tramm and Geoffrey Gunow and Tim He and Kord S. Smith and Benoit Forget and Andrew R. Siegel",
 }
-
 ```

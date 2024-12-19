@@ -1,5 +1,17 @@
 ```c
 #include "SimpleMOC-kernel_header.h"
+#include <omp.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+#include <time.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <assert.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <malloc.h>
 
 // Prints program logo
 void logo(int version)
@@ -91,6 +103,11 @@ void print_input_summary(Input I)
     printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
     printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
     printf("%-25s%d\n", "Segments per Thread:", I.seg_per_thread);
+    #ifdef TABLE
+    printf("%-25s%s\n", "Exponential Table:","ON");
+    #else
+    printf("%-25s%s\n", "Exponential Table:","OFF");
+    #endif
     border_print();
 }
 

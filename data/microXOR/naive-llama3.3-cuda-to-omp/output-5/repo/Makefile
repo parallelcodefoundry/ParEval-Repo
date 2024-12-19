@@ -1,33 +1,32 @@
 # Makefile for OpenMP-Offload microXOR
 
 CXX ?= $(CXX_COMPILER)
-SM_VERSION ?= $(SM_VERSION)
+CXXFLAGS ?= -fopenmp -fopenmp-targets=nvptx64 -march=sm_$(SM_VERSION) -std=c++17
+ifneq ($(DEBUG), yes)
+	CXXFLAGS += -O3
+else
+	CXXFLAGS += -g
+endif
+LDFLAGS ?= -fopenmp
 
-# C++ compiler flags
-CXXFLAGS = -std=c++14 -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda --offload-arch=sm_$(SM_VERSION) -O3
+SRC = src
+INC = include
+OBJ = obj
+CPPFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
+DEPS = $(INC)/microXOR.hpp
+OBJS = $(CPPFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
+EXE = microXOR.exe
 
-# Linker flags
-LDFLAGS = -fopenmp
+$(EXE): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE) $(LDFLAGS)
 
-# Source and object files
-SRCS = main.cpp microXOR.cpp
-OBJS = $(SRCS:.cpp=.o)
+$(OBJ)/%.o: $(SRC)/%.cpp $(DEPS) | obj
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Header files
-HDRS = microXOR.hpp
+obj:
+	mkdir -p $(OBJ)
 
-# Build rule for the executable
-microXOR: $(OBJS)
-	$(CXX) $(LDFLAGS) -o $@ $^
-
-# Build rule for object files
-%.o: %.cpp $(HDRS)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-# Clean target
 clean:
-	rm -f *.o microXOR
+	rm -f $(OBJS) $(EXE)
 
-# Run target
-run: microXOR
-	./microXOR
+.PHONY: clean

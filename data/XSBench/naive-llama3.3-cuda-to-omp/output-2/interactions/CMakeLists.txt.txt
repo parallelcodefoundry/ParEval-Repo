@@ -4,32 +4,20 @@ cmake_minimum_required(VERSION 3.21)
 project(
     XSBench_OpenMP_Offload
     VERSION 1.0
-    LANGUAGES CXX
+    LANGUAGES C
 )
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS "-Wall -Wextra -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda")
+set(CMAKE_C_FLAGS_DEBUG "-g")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
 
-# OpenMP Offload Flags
-set(OPENMP_OFFLOAD_FLAGS "-fopenmp -foffload=nvptx64-nvidia-cuda")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPENMP_OFFLOAD_FLAGS}")
+set(SOURCE main.c io.c simulation.c gridinit.c xsutils.c materials.c)
 
-set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+add_executable(XSBench ${SOURCE})
 
-add_executable(XSBench_OpenMP_Offload ${SOURCE})
-
-install(TARGETS XSBench_OpenMP_Offload DESTINATION bin)
+install(TARGETS XSBench DESTINATION bin)
 ```
-
-Note: In OpenMP Offload, the `nvptx64-nvidia-cuda` flag is used to specify the target architecture for offloading. Also note that this example assumes you have a CUDA-compatible NVIDIA GPU and the necessary drivers installed.
-
-Please make sure to replace `.cu` files with `.cpp` as OpenMP Offload does not support `.cu` files directly. You may need to modify your code to use OpenMP directives instead of CUDA kernels. 
-
-Additionally, ensure that the compiler being used supports OpenMP Offload. GCC and Clang are known to support it. If using another compiler, you might need to adjust the flags accordingly.
-
-Also note that the translated file assumes that all necessary dependencies (e.g., OpenMP library) are installed and configured properly on your system. If not, you may need to add additional flags or configure your environment accordingly.

@@ -12,7 +12,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [OpenMP Support](#OpenMP-Support)
+	* [MPI Support](#MPI-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -27,14 +27,14 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in C++ for use with OpenMP-offload on x86 architectures. 
+XSBench has been implemented in OpenMP-offload for use with various architectures. 
 
 ## Compilation
 
 To compile XSBench with default settings, navigate to your selected source directory and use the following command:
 
 ```bash
-make
+gcc -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda XSBench.c -o XSBench
 ```
  
  You can alter compiler settings in the included Makefile.
@@ -47,14 +47,14 @@ There are also a number of switches that can be set in the makefile. Here is a s
 OPTIMIZE = yes
 DEBUG    = no
 PROFILE  = no
-OPENMP  = yes
+MPI      = no
 ```
 - Optimization enables the -O3 optimization flag.
 - Debugging enables the -g flag.
 - Profiling enables the -pg flag. When profiling the code, you may
 wish to significantly increase the number of lookups (with the -l
 flag) in order to wash out the initialization phase of the code.
-- OpenMP enables OpenMP support in the code.
+- MPI enables MPI support in the code.
 
 ## Running XSBench
 
@@ -105,17 +105,18 @@ There are several optimized variants of the main kernel. All source bases run ba
 
 ## Feature Discussion
 
-### OpenMP Support
+### MPI Support
 
-While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an OpenMP mode which runs the code on all OpenMP threads simultaneously. There is no decomposition across threads of any kind, and all threads accomplish the same work.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the makefile flag "MPI". If you are not using the mpicc wrapper on your system, you may need to alter the makefile to make use of your desired compiler.
 
 ### Verification Support
 
-Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate.
+Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on GPU vs CPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc, will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
 
 ### Binary File Support
 
-Instead of initializing the randomized synthetic cross section data structres in XSBench everytime it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization. This process is controlled with the "-b (read, write)" command line argument.
+Instead of initializing the randomized synthetic cross section data structres in XSBench everytime it is run, you may optionally have XSBench generate a data set and write it to file. It can then be read on subsequent runs to speed up initialization. This process is controlled with the "-b (read, write)" command line argument. This feature may be extremely useful for users running on simulators where walltime minimization is critical for logistical purposes, or for users who are doing many sequential runs. Note that identical input parameters (problem size, solution method etc) must be used when reading and writing a binary file. No runtime checks are made to validate that the file correctly corresponds to the selected input parameters.
+
 
 ## Algorithms
 
@@ -147,7 +148,7 @@ while any particles are alive do	     // Dependent
 		Process particle collision
 	Sort/consolidate surviving particles
 ```
-This method of parallelism is requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels. The benefit of this model is that kernels can potentially be execute in a SIMD manner and with higher cache efficiency due to the potential to sort particles by material and energy.
+This method of parallelism is requires more memory and requires an extra stream compaction kernel to sort and organize the particles periodically to ready them for the different event kernels. The benefit of this model is that kernels can potentially be execute in a SIMD manner and with higher cache efficiency due to the potential to sort particles by material and energy. On CPU architectures, the costs of sorting and buffering particles typically outweigh the benefits of the event-based model, but on accelerator architectures the tradeoff has been found to usually be more favorable.
 
 ### Cross Section (XS) Lookup Methods
 
@@ -159,19 +160,71 @@ Macroscopic cross section data is typically required for multiple reaction chann
 
 #### Nuclide Grid
 
-This is the default "naive" method of performing macroscopic XS lookups. XS data is stored for a number of energy levels for each nuclide in the simulation problem. Different nuclides can have a different number of energy levels. For instance, U-238 usually has over 100k energy levels, whereas some other nuclides may only have a few thousand.
+This is the default "naive" method of performing macroscopic XS lookups. XS data is stored for a number of energy levels for each nuclide in the simulation problem. Different nuclides can have a different number of energy levels. For instance, U-238 usually has over 100k energy levels, whereas some other nuclides may only have a few thousand. The "Nuclide Grid" is composed of all nuclides in the problem, with a variable number of data points for each nuclide. Each data point is composed of the energy level and accompanying cross section data for multiple different reaction channels:
+
+<p align="center"> <img src="docs/img/xs_point.png" alt="xs_point" width="300"/> </p>
+
+These XS data points are arranged into the nuclide grid:
+
+<p align="center"> <img src="docs/img/nuclide_grid.png" alt="nuclide_grid" width="350"/> </p>
+
+When assembling a macroscopic cross section data point, we will be accessing and interpolating data from the nuclide grid for a neutron travelling through a given material (composed of some number of nuclides) and at a given energy level. This will involve performing a binary search for each nuclide:
+
+```
+Nuclide_Grid_Search( Energy E, Material M ):
+	macroscopic XS = 0
+	for each nuclide in M do:
+		index = binary search to find E in nuclide grid
+		interpolate data from grid[nuclide, index]
+		macroscopic XS += data
+```
+
+This algorithm requires no extra memory usage beyond the minimum to represent the pointwise cross section data, but also requires that a binary search be run for each nuclide in the material the neutron is travelling through. In the case of depleted fuel, there can be 300+ nuclides, making this option computationally expensive.
 
 #### Unionized Energy Grid
 
-One way of speeding up the nuclide grid search is to form a separate acceleration structure to reduce the number of binary searches that need to be performed.
+One way of speeding up the nuclide grid search is to form a separate acceleration structure to reduce the number of binary searches that need to be performed. In the Unionized Energy Grid (EUG) method, a second grid is created with columns corresponding to the **union** of all energy levels from the nuclide grid. For each energy level (column) in the unionized grid, each row stores an index corresponding to the closest location in the nuclide grid for each nuclide corresponding that energy level:
+
+<p align="center"> <img src="docs/img/UEG.png" alt="UEG" width="500"/> </p>
+
+A lookup using the UEG therefore requires only one single binary search on the unionized grid, allowing then for fast accesses using the indices stored at that energy level:
+
+```
+Unionized_Grid_Search( Energy E, Material M ):
+	macroscopic XS = 0
+	UEG_index = binary search to find E in unionized grid
+	for each nuclide in M do:
+		index = unionized_grid[nuclide, UEG_index]
+		interpolate data from grid[nuclide, index]
+		macroscopic XS += data
+```
 
 #### Logarithmic Hash Grid
 
-An alternative to the unionized energy grid is the logarithmic hash grid. This method takes in account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform maner in log space .
+An alternative to the unionized energy grid is the logarithmic hash grid. This method takes in account the fact that while nuclides will be tabulated on grids containing different numbers of energy points, the points within each nuclide's grid will in general be spaced in (roughly) uniform maner in log space . Therefore, the nuclide grid is augmented with a separate acceleration structure similar to the unionized grid. However, the number of columns is capped at some number of bins spaced evenly in log space, with each row therefore corresponding to an approximate location within each nuclide's grid for that energy level. While the unionized grid points exactly to the correct index in the nuclide grid, the logarithmic hash grid points to only an approximate location below the true point -- meaning that a fast binary or iterative search must still be performed over the constrained area (typically only 10 or so elements in size):
+
+```
+Logarithmic_Hash_Grid_Search( Energy E, Material M ):
+	macroscopic XS = 0
+	hash_index = grid_delta * (ln(E) - grid_minimum_energy)
+	for each nuclide in M do:
+		i_low  = unionized_grid[nuclide, hash_index]
+		i_high = unionized_grid[nuclide, hash_index+1]
+		index = binary search in range(i_low, i_high) to find E in nuclide grid
+		interpolate data from grid[nuclide, index]
+		macroscopic XS += data
+```
+
+Compared to the unionized energy grid method, the logarithmic hash method uses far less memory but typically results in competitive performance. More details on this method can be found in the following publication:
+   
+>Forrest B Brown. New hash-based energy lookup algorithm for monte carlo codes. Trans. Am. Nucl. Soc., 111:659���662, 2014. http://permalink.lanl.gov/object/tr?what=info:lanl-repo/lareport/LA-UR-14-27037
+
 
 ## Optimized Kernels
 
-If using the event-based model, we will be executing the lookup kernel in XSBench across all particles at once. While SIMD execution is possible using this method, typically issues can arrise that greatly reduce SIMD efficiency.
+If using the event-based model, we will be executing the lookup kernel in XSBench across all particles at once. While SIMD execution is possible using this method, typically issues can arrise that greatly reduce SIMD efficiency. In particular, different materials in the simulation have very different numbers of nuclides in them. For instance, spent fuel has 300+ nuclides, while moderator regions only have 10 or so nuclides. This creates a significant load imbalance across lanes in a SIMD vector, as some particles may only need a few iterations to complete all nuclides while others would need hundreds. Furthermore, due to the random memory accesses involved in the binary search process, efficient SIMD execution of the event-based model is not possible without some optimizations.
+
+One promising optimization for the event-based model is to perform a key-value sort of particles: first by material, and then by energy within each material. The first sort by material allows for adjacent particles in the vector to typically reside in the same type of material -- meaning that they will require the same number of nuclide lookup iterations. Then, the energy sort means that adjacent particles in the vector will be located close in energy space -- potentially allowing for many adjacent particles to access the same energy indices in each nuclide and therefore perform many or all of the same branching operations and read the same cache lines into memory at the same time. Once sorted, separate event kernels are then called for each material in the simulation. These two sorts can potentially boost both SIMD efficieny and cache efficiency, with effects being amplified as more particles are simulated at each event stage. The downside to this optimization is the introduction of the key-value particle sorting operations, which can be costly and potentially outweight any gains due to improved SIMD efficiency and cache performance.
 
 ## Citing XSBench
 
