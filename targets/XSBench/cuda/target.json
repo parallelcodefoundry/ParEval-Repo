@@ -26,6 +26,7 @@
     "ex_build_cmd": "make SM_VERSION=80",
     "ex_build_desc": "a system with an NVIDIA GPU with compute capability 80",
     "build_filename": "Makefile",
+    "extra_build_files": ["CMakeLists.txt"],
     "ex_run_cmd": "./XSBench -m event -s large",
     "ex_run_desc": "an event-based simulation with the large input size",
     "main_filename": "Main.cu",

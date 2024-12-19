@@ -1,7 +1,10 @@
 *.o
 microXOR.exe
 a.out
+*.bin
 
 .ipynb_checkpoints
 __pycache__
 *.pyc
+
+tmp*

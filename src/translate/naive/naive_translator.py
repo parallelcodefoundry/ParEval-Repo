@@ -37,7 +37,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
 """
 
-    MAKEFILE_ADDENDUM: str = """This file is a Makefile. Please output a Makfile converted to compile this code as a {dst_model} code. Assume {exts} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
+    BUILD_ADDENDUM: str = """This file is a Makefile. Please output a {new_build_file} to compile this code as a {dst_model} code. Assume {exts} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}.
 """
 
     # Dicts of file extension mappings
@@ -92,8 +92,19 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 ex_run_cmd=prompt_config_dst["ex_run_cmd"],
                 ex_run_desc=prompt_config_dst["ex_run_desc"]))
 
-        if fname == prompt_config_src["build_filename"]:
-            base_prompt += ("\n" + self.MAKEFILE_ADDENDUM.format(
+        # If the repo being translated already has the build file that we want
+        # to use, but it's not the default build file, then we should trigger
+        # the build addendum for that extra build file rather than the default.
+        if ("extra_build_files" in prompt_config_src
+            and prompt_config_dst["build_filename"] != prompt_config_src["build_filename"]
+            and prompt_config_dst["build_filename"] in prompt_config_src["extra_build_files"]):
+            key_filename = prompt_config_dst["build_filename"]
+        else:
+            key_filename = prompt_config_src["build_filename"]
+
+        if fname == key_filename:
+            base_prompt += ("\n" + self.BUILD_ADDENDUM.format(
+                new_build_file=prompt_config_dst["build_filename"],
                 dst_model=self._dst_model,
                 exts=exts_str,
                 filename_desc=prompt_config_dst["filename_desc"],
