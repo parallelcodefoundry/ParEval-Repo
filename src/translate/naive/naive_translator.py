@@ -92,15 +92,17 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 ex_run_cmd=prompt_config_dst["ex_run_cmd"],
                 ex_run_desc=prompt_config_dst["ex_run_desc"]))
 
-        # If the repo being translated already has the build file that we want
-        # to use, but it's not the default build file, then we should trigger
-        # the build addendum for that extra build file rather than the default.
-        if ("extra_build_files" in prompt_config_src
-            and prompt_config_dst["build_filename"] != prompt_config_src["build_filename"]
-            and prompt_config_dst["build_filename"] in prompt_config_src["extra_build_files"]):
-            key_filename = prompt_config_dst["build_filename"]
-        else:
-            key_filename = prompt_config_src["build_filename"]
+        trigger_rename = None
+        key_filename = prompt_config_src["build_filename"]
+        if prompt_config_dst["build_filename"] != prompt_config_src["build_filename"]:
+            trigger_rename = prompt_config_dst["build_filename"]
+
+            # If the repo being translated already has the build file that we want
+            # to use, but it's not the default build file, then we should trigger
+            # the build addendum for that extra build file rather than the default.
+            if ("extra_build_files" in prompt_config_src
+                and prompt_config_dst["build_filename"] in prompt_config_src["extra_build_files"]):
+                key_filename = prompt_config_dst["build_filename"]
 
         if fname == key_filename:
             base_prompt += ("\n" + self.BUILD_ADDENDUM.format(
@@ -110,8 +112,10 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 filename_desc=prompt_config_dst["filename_desc"],
                 ex_build_cmd=prompt_config_dst["ex_build_cmd"],
                 ex_build_desc=prompt_config_dst["ex_build_desc"]))
+        else:
+            trigger_rename = None
 
-        return base_prompt
+        return (base_prompt, trigger_rename)
 
     CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
 
@@ -122,8 +126,11 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             raise ValueError("No code block found in output.")
         return match.group(1)
 
-    def update_output_file_extension(self, fname: str) -> str:
+    def update_output_file_extension(self, fname: str, trigger_rename: str = None) -> str:
         """ Return the filename with updated extension based on the destination model """
+
+        if trigger_rename:
+            fname = trigger_rename
 
         # Check if file has an extension
         if "." in fname:
@@ -136,6 +143,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 else:
                     ext_category = self._input_repo.get_meta_dict()["filename_desc"]
                 return name + self._type_to_ext[ext_category.lower()][self._ext_to_type[current_ext]]
+
         return fname
 
     @abstractmethod
@@ -155,9 +163,9 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             else:
                 raise error
         for fpath in alive_it(all_files, title="Translating files", max_cols=max_cols, disable=hide_progress):
-            prompt = self.get_prompt(fpath)
+            prompt, trigger_rename = self.get_prompt(fpath)
 
-            output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath))
+            output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath, trigger_rename=trigger_rename))
 
             if dry:
                 print(prompt)
