@@ -3,24 +3,19 @@ cmake_minimum_required(VERSION 3.21)
 project(
     XSBench_OpenMP_Offload
     VERSION 1.0
-    LANGUAGES CXX
+    LANGUAGES C
 )
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS "-Wall -Wextra -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda")
+set(CMAKE_C_FLAGS_DEBUG "-g")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
 
-# Enable OpenMP Offload
-set(CMAKE_CXX_COMPILER "g++")
-set(OPENMP_OFFLOAD_FLAGS "-fopenmp -fopenmp-targets=nvptx64-nvidia-cuda")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OPENMP_OFFLOAD_FLAGS}")
+set(SOURCE main.c io.c simulation.c gridinit.c xsutils.c materials.c)
 
-set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+add_executable(XSBench ${SOURCE})
 
-add_executable(XSBench_OpenMP_Offload ${SOURCE})
-
-install(TARGETS XSBench_OpenMP_Offload DESTINATION bin)
+install(TARGETS XSBench DESTINATION bin)

@@ -1,77 +1,12 @@
-#include "XSbench_shared_header.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
 #include <omp.h>
-#include <stdint.h>
+#include "XSbench_shared_header.h"
+#include "XSbench_header.h"
 
-// Grid types
-#define UNIONIZED 0
-#define NUCLIDE 1
-#define HASH 2
-
-// Simulation types
-#define HISTORY_BASED 1
-#define EVENT_BASED 2
-
-// Binary Mode Type
-#define NONE 0
-#define READ 1
-#define WRITE 2
-
-// Starting Seed
-#define STARTING_SEED 1070
-
-// RNG Used for Verification Option.
-// This one has a static seed (must be set manually in source).
-// Park & Miller Multiplicative Conguential Algorithm
-// From "Numerical Recipes" Second Edition
-double rn_v(void) {
-    static unsigned long seed = 1337;
-    double ret;
-    unsigned long n1;
-    unsigned long a = 16807;
-    unsigned long m = 2147483647;
-    n1 = (a * (seed)) % m;
-    seed = n1;
-    ret = (double) n1 / m;
-    return ret;
-}
-
-// Structures
-typedef struct {
-    double energy;
-    double total_xs;
-    double elastic_xs;
-    double absorbtion_xs;
-    double fission_xs;
-    double nu_fission_xs;
-} NuclideGridPoint;
-
-typedef struct {
-    int* num_nucs;
-    double* concs;
-    int* mats;
-    double* unionized_energy_array;
-    int* index_grid;
-    NuclideGridPoint* nuclide_grid;
-    int length_num_nucs;
-    int length_concs;
-    int length_mats;
-    int length_unionized_energy_array;
-    long length_index_grid;
-    int length_nuclide_grid;
-    int max_num_nucs;
-    unsigned long* verification;
-    int length_verification;
-    double* p_energy_samples;
-    int length_p_energy_samples;
-    int* mat_samples;
-    int length_mat_samples;
-} SimulationData;
-
-// Function to print logo
+// Function to print program logo
 void logo(int version) {
     printf(
         "                   __   __ ___________                 _                        \n"
@@ -79,7 +14,8 @@ void logo(int version) {
         "                    \\ V / \\ `--.| |_/ / ___ _ __   ___| |__                     \n"
         "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
         "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
-        "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n");
+        "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
+    );
     printf("Developed at Argonne National Laboratory\n");
     char v[100];
     sprintf(v, "Version: %d", version);
@@ -87,35 +23,28 @@ void logo(int version) {
 }
 
 // Function to print section titles in center of 80 char terminal
-void center_print(const char* s, int width) {
+void center_print(const char *s, int width) {
     int length = strlen(s);
     int i;
     for (i = 0; i <= (width - length) / 2; i++) {
-        fputs(" ", stdout);
+        printf(" ");
     }
-    fputs(s, stdout);
-    fputs("\n", stdout);
+    printf("%s\n", s);
 }
 
 // Function to print comma separated integers
 void fancy_int(long a) {
-    if (a < 1000)
+    if (a < 1000) {
         printf("%ld\n", a);
-
-    else if (a >= 1000 && a < 1000000)
+    } else if (a >= 1000 && a < 1000000) {
         printf("%ld,%03ld\n", a / 1000, a % 1000);
-
-    else if (a >= 1000000 && a < 1000000000)
+    } else if (a >= 1000000 && a < 1000000000) {
         printf("%ld,%03ld,%03ld\n", a / 1000000, (a % 1000000) / 1000, a % 1000);
-
-    else if (a >= 1000000000)
-        printf("%ld,%03ld,%03ld,%03ld\n",
-               a / 1000000000,
-               (a % 1000000000) / 1000000,
-               (a % 1000000) / 1000,
-               a % 1000);
-    else
+    } else if (a >= 1000000000) {
+        printf("%ld,%03ld,%03ld,%03ld\n", a / 1000000000, (a % 1000000000) / 1000000, (a % 1000000) / 1000, a % 1000);
+    } else {
         printf("%ld\n", a);
+    }
 }
 
 // Function to print CLI error
@@ -133,11 +62,12 @@ void print_CLI_error(void) {
     printf("  -k <kernel ID>           Specifies which kernel to run. 0 is baseline, 1, 2, etc are optimized variants. (0 is default.)\n");
     printf("  -n <num iterations>      Specifies how many kernel iterations to run. (1 is default.)\n");
     printf("  -w <num warmups>         Specifies how many warmup iterations to run. (0 is default.)\n");
+    printf("  --csv <file path>        Save output to csv file. (Default is stdout)\n");
     exit(4);
 }
 
 // Function to read CLI
-Inputs read_CLI(int argc, char* argv[]) {
+Inputs read_CLI(int argc, char *argv[]) {
     Inputs input;
 
     // defaults to the history based simulation method
@@ -187,20 +117,19 @@ Inputs read_CLI(int argc, char* argv[]) {
 
     // Collect Raw Input
     for (int i = 1; i < argc; i++) {
-        char* arg = argv[i];
+        char *arg = argv[i];
 
         // n_gridpoints (-g)
         if (strcmp(arg, "-g") == 0) {
             if (++i < argc) {
                 user_g = 1;
                 input.n_gridpoints = atol(argv[i]);
-            }
-            else
+            } else
                 print_CLI_error();
         }
         // Simulation Method (-m)
         else if (strcmp(arg, "-m") == 0) {
-            char* sim_type;
+            char *sim_type;
             if (++i < argc)
                 sim_type = argv[i];
             else
@@ -215,8 +144,7 @@ Inputs read_CLI(int argc, char* argv[]) {
                     input.lookups = input.lookups * input.particles;
                     input.particles = 0;
                 }
-            }
-            else
+            } else
                 print_CLI_error();
         }
         // lookups (-l)
@@ -224,8 +152,7 @@ Inputs read_CLI(int argc, char* argv[]) {
             if (++i < argc) {
                 input.lookups = atoi(argv[i]);
                 default_lookups = 0;
-            }
-            else
+            } else
                 print_CLI_error();
         }
         // hash bins (-h)
@@ -240,8 +167,7 @@ Inputs read_CLI(int argc, char* argv[]) {
             if (++i < argc) {
                 input.particles = atoi(argv[i]);
                 default_particles = 0;
-            }
-            else
+            } else
                 print_CLI_error();
         }
         // HM (-s)
@@ -253,7 +179,7 @@ Inputs read_CLI(int argc, char* argv[]) {
         }
         // grid type (-G)
         else if (strcmp(arg, "-G") == 0) {
-            char* grid_type;
+            char *grid_type;
             if (++i < argc)
                 grid_type = argv[i];
             else
@@ -270,7 +196,7 @@ Inputs read_CLI(int argc, char* argv[]) {
         }
         // binary mode (-b)
         else if (strcmp(arg, "-b") == 0) {
-            char* binary_mode;
+            char *binary_mode;
             if (++i < argc)
                 binary_mode = argv[i];
             else
@@ -287,8 +213,7 @@ Inputs read_CLI(int argc, char* argv[]) {
         else if (strcmp(arg, "-k") == 0) {
             if (++i < argc) {
                 input.kernel_id = atoi(argv[i]);
-            }
-            else
+            } else
                 print_CLI_error();
         }
         // number of kernel iterations (-n)
@@ -300,16 +225,14 @@ Inputs read_CLI(int argc, char* argv[]) {
         }
         else if (strcmp(arg, "--csv") == 0) {
             if (++i < argc) {
-                input.filename = (char*)malloc(strlen(argv[i]) + 1);
+                input.filename = (char *)malloc(strlen(argv[i]) + 1);
                 strcpy(input.filename, argv[i]);
-            }
-            else
+            } else
                 print_CLI_error();
         }
         else if (strcmp(arg, "-w") == 0) {
-            if (++i < argc) {
+            if (++i < argc)
                 input.num_warmups = atoi(argv[i]);
-            }
             else
                 print_CLI_error();
         }
@@ -365,22 +288,23 @@ Inputs read_CLI(int argc, char* argv[]) {
 
 // Function to print inputs
 void print_inputs(Inputs in, int nprocs, int version) {
+    // Calculate Estimate of Memory Usage
+    int mem_tot = estimate_mem_usage(in);
     logo(version);
     center_print("INPUT SUMMARY", 79);
     printf("Programming Model:            OpenMP-Offload\n");
     printf("Simulation Method:            ");
-    if (in.simulation_method == HISTORY_BASED)
-        printf("History Based\n");
-    else
+    if (in.simulation_method == EVENT_BASED)
         printf("Event Based\n");
-    printf("Grid Type:                    ");
-    if (in.grid_type == UNIONIZED)
-        printf("Unionized Grid\n");
-    else if (in.grid_type == NUCLIDE)
-        printf("Nuclide Grid\n");
     else
-        printf("Hash Grid\n");
-
+        printf("History Based\n");
+    printf("Grid Type:                    ");
+    if (in.grid_type == NUCLIDE)
+        printf("Nuclide Grid\n");
+    else if (in.grid_type == UNIONIZED)
+        printf("Unionized Grid\n");
+    else
+        printf("Hash\n");
     printf("Materials:                    12\n");
     printf("H-M Benchmark Size:           %s\n", in.HM);
     printf("Total Nuclides:               %ld\n", in.n_isotopes);
@@ -411,6 +335,9 @@ void print_inputs(Inputs in, int nprocs, int version) {
         printf("Read\n");
     else
         printf("Write\n");
+    printf("Mem Usage per MPI Rank (MB):  ");
+    fancy_int(mem_tot);
+    printf("\n");
 }
 
 // Function to print results
@@ -425,36 +352,48 @@ int print_results(Inputs in, int mype, double runtime, int nprocs, unsigned long
 
     // If running in MPI, reduce timing statistics and calculate average
     int total_lookups = 0;
+    #ifdef MPI
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    #endif
+
+    int is_invalid_result = 1;
 
     // Print output
     if (mype == 0) {
         printf("\n");
         center_print("RESULTS", 79);
         printf("\n");
-        printf("NOTE: Timings are estimated -- use profiling tools for formal analysis\n");
+        // Print the results
+        printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
+        #ifdef MPI
+        printf("MPI ranks:   %d\n", nprocs);
         printf("Total Lookups/s:            ");
-        fancy_int(lookups_per_sec);
+        fancy_int(total_lookups);
+        printf("Avg Lookups/s per MPI rank: ");
+        fancy_int(total_lookups / nprocs);
+        #else
         printf("Runtime:     %.3lf seconds\n", runtime);
         printf("Lookups:     ");
         fancy_int(lookups);
+        printf("Lookups/s:   ");
+        fancy_int(lookups_per_sec);
+        #endif
     }
 
-    unsigned long large = 0;
-    unsigned long small = 0;
+    unsigned long long large = 0;
+    unsigned long long small = 0;
     if (in.simulation_method == EVENT_BASED) {
         small = 945990;
         large = 952131;
-    }
-    else if (in.simulation_method == HISTORY_BASED) {
+    } else if (in.simulation_method == HISTORY_BASED) {
         small = 941535;
         large = 954318;
     }
-    int is_invalid_result = 1;
-    if (strcasecmp(in.HM, "large") == 0) {
+    if (strcmp(in.HM, "large") == 0) {
         if (vhash == large)
             is_invalid_result = 0;
-    }
-    else if (strcasecmp(in.HM, "small") == 0) {
+    } else if (strcmp(in.HM, "small") == 0) {
         if (vhash == small)
             is_invalid_result = 0;
     }
@@ -472,7 +411,7 @@ int print_results(Inputs in, int mype, double runtime, int nprocs, unsigned long
 // Function to print profile
 void print_profile(Profile profile, Inputs in) {
     if (in.filename) {
-        FILE* output = fopen(in.filename, "w");
+        FILE *output = fopen(in.filename, "w");
         fprintf(output, "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
         fprintf(output, "%f,%f,%f,%d,%d\n",
                 profile.host_to_device_time * 1000,
@@ -481,8 +420,7 @@ void print_profile(Profile profile, Inputs in) {
                 in.num_iterations,
                 in.num_warmups);
         fclose(output);
-    }
-    else {
+    } else {
         printf("host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n");
         printf("%f,%f,%f,%d,%d\n",
                profile.host_to_device_time * 1000,
@@ -493,7 +431,7 @@ void print_profile(Profile profile, Inputs in) {
     }
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     // =====================================================================
     // Initialization & Command Line Read-In
     // =====================================================================
@@ -545,18 +483,32 @@ int main(int argc, char* argv[]) {
     }
 
     // Start Simulation Timer
-    omp_start = omp_get_wtime();
+    omp_start = get_time();
 
     // Run simulation
     if (in.simulation_method == EVENT_BASED) {
-        #pragma omp target enter data map(to: SD)
-        verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
-        #pragma omp target exit data map(from: SD)
-    }
-    else {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, mype);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, mype);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, mype);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, mype);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, mype);
+        else {
+            printf("Error: No kernel ID %d found!\n", in.kernel_id);
+            exit(1);
+        }
+    } else {
         printf(
-            "History-based simulation not implemented in OpenMP-Offload code. Instead,\n"
-            "use the event-based method with \"-m event\" argument.\n");
+            "History-based simulation not implemented in OpenMP-Offload code. Instead,\nuse "
+            "the event-based method with \"-m event\" argument.\n");
         exit(1);
     }
 
@@ -566,7 +518,7 @@ int main(int argc, char* argv[]) {
     }
 
     // End Simulation Timer
-    omp_end = omp_get_wtime();
+    omp_end = get_time();
 
     // Release device memory
     release_memory(SD);

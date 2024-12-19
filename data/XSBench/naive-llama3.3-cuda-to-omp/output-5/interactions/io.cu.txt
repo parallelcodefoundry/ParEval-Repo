@@ -79,8 +79,8 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		#endif
 	}
 
-	unsigned long long large = 0;
-	unsigned long long small = 0;
+	unsigned long large = 0;
+	unsigned long small = 0;
 	if( in.simulation_method == EVENT_BASED )
 	{
 		small = 945990;

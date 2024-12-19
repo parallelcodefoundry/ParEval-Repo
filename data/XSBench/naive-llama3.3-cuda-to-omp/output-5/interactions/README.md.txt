@@ -12,7 +12,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 1. [Compilation](#Compilation)
 2. [Running XSBench / Command Line Interface](#Running-XSBench)
 3. [Feature Discussion](#Feature-Discussion)
-	* [MPI Support](#MPI-Support)
+	* [OpenMP Support](#OpenMP-Support)
 	* [Verification Support](#Verification-Support)
 	* [Binary File Support](#Binary-File-Support)
 4. [Theory & Algorithms](#Algorithms)
@@ -27,14 +27,14 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in OpenMP for use with x86 architectures. 
+XSBench has been implemented in OpenMP for use with CPU architectures. 
 
 ## Compilation
 
 To compile XSBench with default settings, navigate to your selected source directory and use the following command:
 
 ```bash
-make
+gcc -fopenmp xsbench.c -o xsbench
 ```
  
  You can alter compiler settings in the included Makefile.
@@ -47,20 +47,20 @@ There are also a number of switches that can be set in the makefile. Here is a s
 OPTIMIZE = yes
 DEBUG    = no
 PROFILE  = no
-MPI      = no
+OPENMP  = yes
 ```
 - Optimization enables the -O3 optimization flag.
 - Debugging enables the -g flag.
 - Profiling enables the -pg flag. When profiling the code, you may
 wish to significantly increase the number of lookups (with the -l
 flag) in order to wash out the initialization phase of the code.
-- MPI enables MPI support in the code.
+- OpenMP enables OpenMP support in the code.
 
 ## Running XSBench
 
 To run XSBench with default settings, use the following command:
 ```bash
-./XSBench
+./xsbench
 ```
 For non-default settings, XSBench supports the following command line options:
 
@@ -101,17 +101,17 @@ Sets the number of hash bins (only relevant when using the hash lookup algorithm
 This optional mode can read or write the simulation data structures to disk. Options are ("read" or "write"). This may be useful if it is necessary to minimize the initialization phase of the program, which has a non-trivial runtime. The generated file is named "XS_data.dat" and will be located in the current working directory. The same file name and location will be used when reading. Note that as the file is binary, it may not be portable between compilers and computer systems. NOTE: When running in the "read" mode, you must be running with an identical program configuration as when the file was generated. E.g., if the file was generated with the "-G nuclide" argument, subsequent runs reading from that file must use the same configuration flags.
 
 - **-k [kernel]**
-There are several optimized variants of the main kernel. All source bases run basically the same "baseline" kernel as default. Optimized kernels can be selected at runtime with this argument. Default is "0" for the baseline, other variants are numbered 1, 2, ... etc. People interested in implementing their own optimized variants are encouraged to use this interface for convenience rather than writing over the main kernel. The baseline kernel is defined at the top of the "Simulation.c" source file, with the other variants being defined towards the end of the file after a large comment block delineation. The optimized variants are related to different ways of sorting the sampled values such that there is less thread divergence and much better cache re-usage when executing the lookup kernel on contiguous sorted elements. More details can be found in the [Optimized Kernels](#Optimized-Kernels) section.
+There are several optimized variants of the main kernel. All source bases run basically the same "baseline" kernel as default. Optimized kernels can be selected at runtime with this argument. Default is "0" for the baseline, other variants are numbered 1, 2, ... etc. People interested in implementing their own optimized variants are encouraged to use this interface for convenience rather than writing over the main kernel. The baseline kernel is defined at the top of the "simulation.c" source file, with the other variants being defined towards the end of the file after a large comment block delineation. The optimized variants are related to different ways of sorting the sampled values such that there is less thread divergence and much better cache re-usage when executing the lookup kernel on contiguous sorted elements. More details can be found in the [Optimized Kernels](#Optimized-Kernels) section.
 
 ## Feature Discussion
 
-### MPI Support
+### OpenMP Support
 
-While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the makefile flag "MPI". If you are not using the mpicc wrapper on your system, you may need to alter the makefile to make use of your desired compiler.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an OpenMP mode which runs the code on all OpenMP threads simultaneously. There is no decomposition across threads of any kind, and all threads accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all OpenMP threads will execute 17,000,000 cross section lookups regardless of how many threads are used. There is only one point of OpenMP synchronization (a barrier) at the end, which aggregates the timing statistics and averages them across OpenMP threads before printing them out. OpenMP support can be enabled with the makefile flag "OPENMP". If you are not using the gcc compiler on your system, you may need to alter the makefile to make use of your desired compiler.
 
 ### Verification Support
 
-Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on GPU vs CPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc, will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
+Legacy versions of XSBench had a special "Verification" compiler flag option to enable verification of the results. However, a much more performant and portable verification scheme was developed and is now used for all configurations -- therefore, it is not necessary to compile with or without the verification mode as it is always enabled by default. XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing. This hash can then be verified against hashes that other versions or configurations of the code generate. For instance, running XSBench with 4 threads vs 8 threads (on a machine that supports that configuration) should generate the same hash number. Running on CPU vs GPU should not change the hash number. However, changing the model / run parameters is expected to generate a totally different hash number (i.e., increasing the number of particles, number of gridpoints, etc, will result in different hashes). However, changing the type of lookup performed (e.g., nuclide, unionized, or hash) should result in the same hash being generated. Changing the simulation mode (history or event) will generate different hashes.
 
 ### Binary File Support
 
