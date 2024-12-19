@@ -24,16 +24,10 @@ obj = $(source:.c=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := 
+CFLAGS := -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH)
 
 # Linker Flags
-LDFLAGS = -lm
-
-# LLVM Compiler with OpenMP Offload
-ifeq ($(COMPILER),clang)
-  CC = clang
-  CFLAGS += -fopenmp-targets=nvptx64-nvidia-cuda -Xopenmp-target=nvptx64-nvidia-cuda --cuda-path=/usr/local/cuda-$(CUDA_ARCH) -march=sm_$(CUDA_ARCH) -std=c11
-endif
+LDFLAGS = -fopenmp -fopenmp-targets=nvptx64-nvidia-cuda -march=sm_$(CUDA_ARCH) -lm
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -57,10 +51,10 @@ endif
 #===============================================================================
 
 $(program): $(obj) XSbench_header.h Makefile
-	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.c XSbench_header.h Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

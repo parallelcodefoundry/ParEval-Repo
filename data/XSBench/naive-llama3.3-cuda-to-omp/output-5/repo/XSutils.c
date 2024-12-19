@@ -1,22 +1,22 @@
-#include "XSbench_shared_header.h"
-#include <omp.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "XSutils.h"
 
-// Comparison function for sorting NuclideGridPoint structures
-int NGP_compare(const void *a, const void *b) {
-    NuclideGridPoint A = *((NuclideGridPoint *)a);
-    NuclideGridPoint B = *((NuclideGridPoint *)b);
-
-    if (A.energy > B.energy)
-        return 1;
-    else if (A.energy < B.energy)
-        return -1;
-    else
-        return 0;
+// RNG Used for Verification Option.
+// This one has a static seed (must be set manually in source).
+// Park & Miller Multiplicative Conguential Algorithm
+// From "Numerical Recipes" Second Edition
+double rn_v(void) {
+    static unsigned long seed = 1337;
+    double ret;
+    unsigned long n1;
+    unsigned long a = 16807;
+    unsigned long m = 2147483647;
+    n1 = (a * (seed)) % m;
+    seed = n1;
+    ret = (double)n1 / m;
+    return ret;
 }
 
-// Comparison function for sorting double values
+// Comparison function for qsort
 int double_compare(const void *a, const void *b) {
     double A = *((double *)a);
     double B = *((double *)b);
@@ -29,17 +29,17 @@ int double_compare(const void *a, const void *b) {
         return 0;
 }
 
-// RNG used for verification option
-double rn_v() {
-    static unsigned long seed = 1337;
-    double ret;
-    unsigned long n1;
-    unsigned long a = 16807;
-    unsigned long m = 2147483647;
-    n1 = (a * (seed)) % m;
-    seed = n1;
-    ret = (double)n1 / m;
-    return ret;
+// Comparison function for qsort
+int NGP_compare(const void *a, const void *b) {
+    NuclideGridPoint A = *((NuclideGridPoint *)a);
+    NuclideGridPoint B = *((NuclideGridPoint *)b);
+
+    if (A.energy > B.energy)
+        return 1;
+    else if (A.energy < B.energy)
+        return -1;
+    else
+        return 0;
 }
 
 // Estimates memory usage
@@ -62,16 +62,7 @@ size_t estimate_mem_usage(Inputs in) {
 }
 
 // Gets the current time
-double get_time() {
-#ifdef _OPENMP
-    return omp_get_wtime();
-#endif
-
-#ifdef __cplusplus
-    // If using C++, we can do this:
-    unsigned long us_since_epoch = std::chrono::high_resolution_clock::now().time_since_epoch() / std::chrono::microseconds(1);
-    return (double)us_since_epoch / 1.0e6;
-#else
+double get_time(void) {
     struct timeval timecheck;
 
     gettimeofday(&timecheck, NULL);
@@ -80,5 +71,4 @@ double get_time() {
     double time = (double)ms / 1000.0;
 
     return time;
-#endif
 }
