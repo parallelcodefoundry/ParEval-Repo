@@ -33,7 +33,7 @@ def run_bash(cmds, cwd=None, timeout=None, dry=False, name=None):
     script_name = f"{name}.sh" if name is not None else "temp.sh"
     script_path = os.path.join(cwd, script_name)
     with open(script_path, "w") as f:
-        f.write("\n".join(cmds))
+        f.write("\n".join(cmds) + "\n")
     os.chmod(script_path, 0o755)
     logging.debug(f"Running commands: {cmds}")
     logging.debug(f"Running commands in directory: {cwd}")
