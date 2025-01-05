@@ -1,0 +1,77 @@
+```cpp
+#ifndef __SimpleMOC_HEADER
+#define __SimpleMOC_HEADER
+
+#include <Kokkos_Core.hpp>
+#include <random>
+#include <stdio.h>
+#include <stdlib.h>
+#include <cmath>
+#include <string>
+#include <ctime>
+#include <limits>
+#include <cassert>
+#include <iostream>
+
+
+// User inputs
+struct Input {
+    int source_2D_regions;
+    int source_3D_regions;
+    int coarse_axial_intervals;
+    int fine_axial_intervals;
+    int decomp_assemblies_ax; // Number of subdomains per assembly axially
+    long segments;
+    int egroups;
+    int nthreads; //This will be handled by Kokkos
+    int streams; //This will be handled by Kokkos
+    int seg_per_thread;
+    size_t nbytes;
+};
+
+// Source Region Structure
+struct Source {
+    long fine_flux_id;
+    long fine_source_id;
+    long sigT_id;
+};
+
+// Source Arrays
+struct Source_Arrays {
+    Kokkos::View<float*> fine_flux_arr;
+    Kokkos::View<float*> fine_source_arr;
+    Kokkos::View<float*> sigT_arr;
+};
+
+// Table structure for computing exponential
+struct Table {
+    Kokkos::View<float*> values;
+    float dx;
+    float maxVal;
+    int N;
+};
+
+
+// Function declarations (replace .cu with .hpp/.cpp)
+Kokkos::View<float*, Kokkos::DefaultExecutionSpace> run_kernel(const Input& I, 
+                                                       Kokkos::View<Source*, Kokkos::DefaultExecutionSpace> S,
+                                                       Source_Arrays& SA, 
+                                                       const Table& table, 
+                                                       Kokkos::View<float*, Kokkos::DefaultExecutionSpace> state_fluxes, 
+                                                       int N_state_fluxes);
+
+void interpolateTable(const Table& table, float x, float* out);
+
+
+double mem_estimate(const Input& I);
+void setup_kernel(Kokkos::View<float*, Kokkos::DefaultExecutionSpace> state, const Input& I);
+void init_flux_states(Kokkos::View<float*, Kokkos::DefaultExecutionSpace> flux_states, int N_flux_states, const Input& I, Kokkos::View<float*, Kokkos::DefaultExecutionSpace> state);
+Kokkos::View<Source*, Kokkos::DefaultExecutionSpace> initialize_sources(const Input& I, Source_Arrays* SA);
+Kokkos::View<Source*, Kokkos::DefaultExecutionSpace> initialize_device_sources(const Input& I, Source_Arrays* SA_h, Source_Arrays* SA_d, Kokkos::View<Source*, Kokkos::DefaultExecutionSpace> sources_h);
+Table buildExponentialTable();
+Input set_default_input();
+void __cudaCheckError(const char* file, const int line); //This might need to be removed or adapted
+
+
+#endif
+```

@@ -1,0 +1,74 @@
+```makefile
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= gcc # Changed to a standard C++ compiler
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.cpp \
+io.cpp \
+Simulation.cpp \
+GridInit.cpp \
+XSutils.cpp \
+Materials.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 #Added C++17 standard
+# Kokkos Flags
+KOKKOS_FLAGS := -I$(KOKKOS_ROOT)
+
+# Linker Flags
+LDFLAGS = -lm -lkokkos_core -lkokkos_kernels # Added Kokkos libraries
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+  LDFLAGS  += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) XSbench_header.hpp Makefile
+	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp XSbench_header.hpp Makefile
+	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.hpp
+
+run:
+	./$(program)
+```

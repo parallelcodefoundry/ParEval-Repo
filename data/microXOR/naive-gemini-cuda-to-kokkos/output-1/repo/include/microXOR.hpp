@@ -1,0 +1,39 @@
+// microXOR header file
+
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
+
+#include <iostream>
+#include <random>
+#include <Kokkos_Core.hpp>
+
+namespace microXOR {
+
+template <typename ExecutionSpace>
+class CellsXORFunctor {
+public:
+  CellsXORFunctor(const int* input, int* output, size_t N) : input_(input), output_(output), N_(N) {}
+
+  KOKKOS_INLINE_FUNCTION
+  void operator()(int i, int j) const {
+    int count = 0;
+    if (i > 0 && input_[(i - 1) * N_ + j] == 1) count++;
+    if (i < N_ - 1 && input_[(i + 1) * N_ + j] == 1) count++;
+    if (j > 0 && input_[i * N_ + (j - 1)] == 1) count++;
+    if (j < N_ - 1 && input_[i * N_ + (j + 1)] == 1) count++;
+    output_[i * N_ + j] = (count == 1) ? 1 : 0;
+  }
+
+private:
+  const int* input_;
+  int* output_;
+  size_t N_;
+};
+
+
+template <typename ExecutionSpace>
+void cellsXOR(const Kokkos::View<int*, ExecutionSpace> &input, Kokkos::View<int*, ExecutionSpace> &output, size_t N);
+
+} // namespace microXOR
+
+#endif

@@ -1,0 +1,40 @@
+cmake_minimum_required(VERSION 3.10)
+project(SimpleMOC-kernel)
+
+# Add Kokkos dependency
+find_package(Kokkos REQUIRED)
+
+# Set compiler and other flags
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 --use_fast_math") # Optimization flags
+
+#Check for CUDA support if Kokkos backend is CUDA
+if("${KOKKOS_BACKEND}" STREQUAL "CUDA")
+  find_package(CUDA REQUIRED)
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch sm_35") # Adjust SM version as needed
+  add_definitions(-DKOKKOS_ENABLE_CUDA)
+  add_definitions(-DTABLE) # Enable/Disable TABLE as needed. Default is ON.
+endif
+
+
+# Source files
+set(SOURCES
+  main.cpp
+  kernel.cpp
+  init.cpp
+  io.cpp
+)
+
+
+# Include directories
+include_directories(include)
+
+
+# Add executable
+add_executable(SimpleMOC-kernel ${SOURCES})
+
+# Link against Kokkos and CUDA libraries (if using CUDA backend)
+target_link_libraries(SimpleMOC-kernel Kokkos::Kokkos ${KOKKOS_LIBS})
+if("${KOKKOS_BACKEND}" STREQUAL "CUDA")
+  target_link_libraries(SimpleMOC-kernel CUDA::cuda)
+endif

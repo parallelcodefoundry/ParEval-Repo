@@ -1,0 +1,114 @@
+#include "SimpleMOC-kernel_header.hpp"
+#include <Kokkos_Core.hpp>
+
+//using namespace Kokkos;
+
+int main( int argc, char * argv[] )
+{
+	int version = 4;
+
+	srand(time(NULL));
+
+	Input I = set_default_input();
+	read_CLI( argc, argv, &I );
+	
+	// Calculate Number of 3D Source Regions
+	I.source_3D_regions = (int) ceil((double)I.source_2D_regions *
+		I.coarse_axial_intervals / I.decomp_assemblies_ax);
+
+	logo(version);
+
+	print_input_summary(I);
+	
+	center_print("INITIALIZATION", 79);
+	border_print();
+
+	// Build Source Data
+	printf("Building Source Data Arrays...\n");
+	Source_Arrays SA_h, SA_d;
+	Source * sources_h = initialize_sources(I, &SA_h); 
+        //Note:  No direct equivalent to cudaMalloc and cudaMemcpy in Kokkos.  Kokkos::View handles memory allocation and transfer.
+        Kokkos::View<Source*, Kokkos::DefaultExecutionSpace> sources_d("sources_d", I.source_3D_regions);
+        Kokkos::deep_copy(sources_d, sources_h);
+
+
+	// Build Exponential Table
+	Kokkos::View<Table*, Kokkos::DefaultExecutionSpace> table_d("table_d",1);
+	#ifdef TABLE
+	printf("Building Exponential Table...\n");
+	Table table = buildExponentialTable();
+        Kokkos::deep_copy(table_d, &table);
+	#endif
+
+	// Setup Kokkos execution space (assuming you have a Kokkos::CudaSpace)
+        Kokkos::CudaSpace exec_space;
+
+	// Setup Kokkos blocks/teams and Kokkos::parallel_for
+	int n_teams = sqrt(I.segments);
+	if( n_teams * n_teams < I.segments )
+		n_teams++;
+        assert( n_teams * n_teams >= I.segments );
+
+	// Setup Kokkos RNG on Device (requires a Kokkos RNG implementation)
+	printf("Setting up Kokkos RNG...\n");
+        Kokkos::View<curandState*, Kokkos::CudaSpace> RNG_states("RNG_states", I.streams);
+        Kokkos::parallel_for( I.streams, [&](int i){
+            curand_init(1234, i, 0, &RNG_states[i]); // Replace with your Kokkos RNG initialization
+        });
+	//CudaCheckError(); //Not needed in Kokkos
+	exec_space.fence();
+
+	// Allocate Some Flux State vectors to randomly pick from
+	printf("Setting up Flux State Vectors...\n");
+        Kokkos::View<float*, Kokkos::CudaSpace> flux_states("flux_states", N_flux_states * I.egroups);
+	int N_flux_states = 10000;
+	assert( I.segments >= N_flux_states );
+
+        Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::CudaSpace>(exec_space, 0, N_flux_states * I.egroups), [&](int i){
+           flux_states[i] = (float) rand() / RAND_MAX; // Initialize randomly; replace with Kokkos RNG if needed.
+        });
+
+	printf("Initialization Complete.\n");
+	border_print();
+	center_print("SIMULATION", 79);
+	border_print();
+	exec_space.fence();
+	printf("Attentuating fluxes across segments...\n");
+
+	// Kokkos timer (replace with Kokkos::Timer if available)
+	Kokkos::Timer timer;
+
+
+	// Setup kernel call team parameters
+	assert( I.segments % I.seg_per_thread == 0 );
+	n_teams = sqrt(I.segments / I.seg_per_thread);
+	if( n_teams * n_teams < I.segments / I.seg_per_thread )
+		n_teams++;
+	assert( n_teams * n_teams >= I.segments / I.seg_per_thread );
+
+	// Run Simulation Kernel Loop using Kokkos::parallel_for
+        timer.start();
+	Kokkos::parallel_for(Kokkos::TeamPolicy<Kokkos::CudaSpace>(n_teams,Kokkos::AUTO),[&](const Kokkos::TeamPolicy<Kokkos::CudaSpace>::member_type &team){
+            run_kernel(team, I, sources_d, table_d, RNG_states, flux_states, N_flux_states);
+        });
+	exec_space.fence();
+	timer.stop();
+
+        Kokkos::View<float*, Kokkos::HostSpace> host_flux_states("host_flux_states", N_flux_states * I.egroups);
+        Kokkos::deep_copy(host_flux_states, flux_states);
+
+	printf("Simulation Complete.\n");
+
+	border_print();
+	center_print("RESULTS SUMMARY", 79);
+	border_print();
+
+	double time = timer.seconds();
+	double tpi = ((double) (time) /
+			(double)I.segments / (double) I.egroups) * 1.0e9;
+	printf("%-25s%.3f seconds\n", "Runtime:", time);
+	printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
+	border_print();
+
+	return 0;
+}

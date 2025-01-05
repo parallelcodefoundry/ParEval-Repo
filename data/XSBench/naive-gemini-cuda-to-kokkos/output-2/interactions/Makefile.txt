@@ -1,0 +1,74 @@
+```makefile
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= clang++
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.cpp \
+io.cpp \
+Simulation.cpp \
+GridInit.cpp \
+XSutils.cpp \
+Materials.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := -std=c++17 -I/path/to/Kokkos
+
+# Linker Flags
+LDFLAGS = -lm -L/path/to/Kokkos -lkokkos
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g -O0
+  LDFLAGS  += -g -O0
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+  LDFLAGS  += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) XSbench_header.hpp Makefile
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp XSbench_header.hpp Makefile
+	$(COMPILER) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.hpp
+
+run:
+	./$(program)
+```
+
+**Note:**  This Makefile assumes you have Kokkos installed and that `/path/to/Kokkos` is replaced with the actual path to your Kokkos installation.  You'll need to adjust the `-I` (include directory) and `-L` (library directory) flags accordingly.  The `-lkokkos` flag links the Kokkos library.  You might need additional libraries depending on how you configured Kokkos (e.g., for MPI support).  Also, the CUDA specific includes and libraries are removed, and the `.cu` files are changed to `.cpp`.  The compiler is changed to `clang++`, a common C++ compiler. You can change it to `g++` if preferred.  The `-std=c++17` flag ensures C++17 compatibility, which is needed for many Kokkos features. Remember to create the corresponding `.cpp` and `.hpp` files from the original CUDA code, adapting it to use Kokkos::parallel_for and other Kokkos constructs.  The exact translation of the CUDA kernels to Kokkos will require significant code changes beyond simply replacing `__global__` and `__device__` keywords.  You will need to replace CUDA specific functions and memory management with Kokkos equivalents.

@@ -1,0 +1,9 @@
+{
+    "app": "SimpleMOC-kernel",
+    "prompt_strategy": "naive",
+    "llm_name": "gemini",
+    "source_model": "cuda",
+    "dest_model": "kokkos",
+    "output_number": 5,
+    "path": "../../../data/SimpleMOC-kernel/naive-gemini-cuda-to-kokkos/output-5/repo"
+}

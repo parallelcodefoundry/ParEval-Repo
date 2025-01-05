@@ -1,0 +1,188 @@
+#include "SimpleMOC-kernel_header.hpp"
+
+// Kokkos kernels require separate function definitions for the execution space
+// We'll use Kokkos::Threads for similar behavior to CUDA threads.  Other spaces
+// like Kokkos::OpenMP or Kokkos::Cuda could also be used depending on your target
+// architecture.
+
+// Kokkos::parallel_for requires a functor. We define it as a lambda here.
+KOKKOS_INLINE_FUNCTION void setup_kernel_lambda(int threadId, curandState* state, const Input& I) {
+    if (threadId >= I.streams) return;
+    curand_init(1234, threadId, 0, &state[threadId]);
+}
+
+// Kokkos version of setup_kernel
+void setup_kernel(curandState* state, const Input& I) {
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::Threads>(0, I.streams),
+                         KOKKOS_LAMBDA(int i) {
+                             setup_kernel_lambda(i, state, I);
+                         });
+    Kokkos::fence(); // Ensure all threads have completed
+}
+
+
+// Kokkos::parallel_for requires a functor. We define it as a lambda here.
+KOKKOS_INLINE_FUNCTION void init_flux_states_lambda(int i, float* flux_states, int N_flux_states, const Input& I, curandState* state) {
+    if (i >= N_flux_states) return;
+
+    curandState* localState = &state[i % I.streams];
+
+    for (int j = 0; j < I.egroups; ++j) {
+        flux_states[i * I.egroups + j] = curand_uniform(localState);
+    }
+}
+
+// Kokkos version of init_flux_states
+void init_flux_states(float* flux_states, int N_flux_states, const Input& I, curandState* state) {
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::Threads>(0, N_flux_states),
+                         KOKKOS_LAMBDA(int i) {
+                             init_flux_states_lambda(i, flux_states, N_flux_states, I, state);
+                         });
+    Kokkos::fence();
+}
+
+
+// Gets I from user and sets defaults
+Input set_default_input(void) {
+    Input I;
+
+    I.source_2D_regions = 5000;
+    I.coarse_axial_intervals = 27;
+    I.fine_axial_intervals = 5;
+    I.decomp_assemblies_ax = 20; // Number of subdomains per assembly axially
+    I.segments = 50000000;
+    I.egroups = 128;
+    I.streams = 10000;
+    I.seg_per_thread = 100;
+
+    return I;
+}
+
+// Returns a memory estimate (in MB) for the program's primary data structures
+double mem_estimate(const Input& I) {
+    size_t nbytes = 0;
+
+    // Sources Array
+    nbytes += I.source_3D_regions * sizeof(Source);
+
+    // Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    nbytes += N_fine * sizeof(float);
+
+    // Fine Flux Data
+    nbytes += N_fine * sizeof(float);
+
+    // SigT Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    nbytes += N_sigT * sizeof(float);
+
+    // Return MB
+    return (double)nbytes / 1024.0 / 1024.0;
+}
+
+Source* initialize_sources(const Input& I, Source_Arrays* SA) {
+    // Source Data Structure Allocation
+    Source* sources = (Source*)malloc(I.source_3D_regions * sizeof(Source));
+
+    // Allocate Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    SA->fine_source_arr = (float*)malloc(N_fine * sizeof(float));
+    for (int i = 0; i < I.source_3D_regions; i++)
+        sources[i].fine_source_id = i * I.fine_axial_intervals * I.egroups;
+
+    // Allocate Fine Flux Data
+    SA->fine_flux_arr = (float*)malloc(N_fine * sizeof(float));
+    for (int i = 0; i < I.source_3D_regions; i++)
+        sources[i].fine_flux_id = i * I.fine_axial_intervals * I.egroups;
+
+    // Allocate SigT Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    SA->sigT_arr = (float*)malloc(N_sigT * sizeof(float));
+    for (int i = 0; i < I.source_3D_regions; i++)
+        sources[i].sigT_id = i * I.egroups;
+
+    // Initialize fine source and flux to random numbers
+    for (long i = 0; i < N_fine; i++) {
+        SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
+        SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
+    }
+
+    // Initialize SigT Values
+    for (int i = 0; i < N_sigT; i++)
+        SA->sigT_arr[i] = (float)rand() / RAND_MAX;
+
+    return sources;
+}
+
+Source* initialize_device_sources(const Input& I, Source_Arrays* SA_h, Source_Arrays* SA_d, Source* sources_h) {
+    // Allocate & Copy Fine Source Data
+    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+    // Kokkos memory allocation would be used here instead of cudaMalloc
+    SA_d->fine_source_arr = (float*)malloc(N_fine * sizeof(float));
+    memcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float));
+
+    // Allocate & Copy Fine Flux Data
+    SA_d->fine_flux_arr = (float*)malloc(N_fine * sizeof(float));
+    memcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float));
+
+    // Allocate & Copy SigT Data
+    long N_sigT = I.source_3D_regions * I.egroups;
+    SA_d->sigT_arr = (float*)malloc(N_sigT * sizeof(float));
+    memcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float));
+
+    // Allocate & Copy Source Array Data
+    SA_d->sources = (Source*)malloc(I.source_3D_regions * sizeof(Source));
+    memcpy(SA_d->sources, sources_h, I.source_3D_regions * sizeof(Source));
+
+    return SA_d->sources;
+}
+
+// Builds a table of exponential values for linear interpolation
+Table buildExponentialTable(void) {
+    // define table
+    Table table;
+
+    float maxVal = 10.0;
+
+    int N = 353;
+
+    // compute spacing
+    float dx = maxVal / (float)N;
+
+    // store linear segment information (slope and y-intercept)
+    for (int n = 0; n < N; n++) {
+        // compute slope and y-intercept for ( 1 - exp(-x) )
+        float exponential = exp(-n * dx);
+        table.values[2 * n] = -exponential;
+        table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;
+    }
+
+    // assign data to table
+    table.dx = dx;
+    table.maxVal = maxVal - table.dx;
+    table.N = N;
+
+    return table;
+}
+
+// Error handling remains largely the same, but you might want to integrate it
+// more tightly with Kokkos' error handling mechanisms if available.
+void __cudaCheckError(const char* file, const int line) {
+#ifdef CUDA_ERROR_CHECK
+    cudaError err = cudaGetLastError();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "cudaCheckError() failed at %s:%i : %s\n",
+                file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+
+    err = cudaDeviceSynchronize();
+    if (cudaSuccess != err) {
+        fprintf(stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
+                file, line, cudaGetErrorString(err));
+        exit(-1);
+    }
+#endif
+
+    return;
+}

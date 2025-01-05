@@ -1,0 +1,33 @@
+```cmake
+cmake_minimum_required(VERSION 3.21)
+
+project(
+    XSBench_Kokkos
+    VERSION 1.0
+    LANGUAGES CXX
+)
+
+# Find Kokkos
+find_package(Kokkos REQUIRED)
+
+# Set compiler flags (adjust as needed)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
+
+
+# Kokkos specific flags
+target_compile_options(XSBench PRIVATE $<$<CONFIG:Debug>:${KOKKOS_CXX_FLAGS_DEBUG} >$<$<CONFIG:Release>:${KOKKOS_CXX_FLAGS_RELEASE}>)
+target_link_libraries(XSBench ${KOKKOS_LIBS})
+
+
+set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+add_executable(XSBench ${SOURCE} XSbench_header.hpp XSbench_shared_header.h)
+
+
+install(TARGETS XSBench DESTINATION bin)
+
+```

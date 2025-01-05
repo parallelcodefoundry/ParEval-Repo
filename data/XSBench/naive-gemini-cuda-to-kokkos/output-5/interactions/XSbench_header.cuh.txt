@@ -1,0 +1,92 @@
+```cpp
+#ifndef __XSBENCH_HEADER_HPP__
+#define __XSBENCH_HEADER_HPP__
+
+#include <iostream>
+#include <cstdlib>
+#include <cmath>
+#include <cassert>
+#include <Kokkos_Core.hpp>
+#include <stdint.h>
+#include <chrono>
+#include "XSbench_shared_header.h"
+
+// Grid types
+enum GridType { UNIONIZED, NUCLIDE, HASH };
+
+// Simulation types
+enum SimulationMethod { HISTORY_BASED, EVENT_BASED };
+
+// Binary Mode Type
+enum BinaryMode { NONE, READ, WRITE };
+
+// Starting Seed
+constexpr uint64_t STARTING_SEED = 1070;
+
+
+// Structures
+struct NuclideGridPoint {
+        double energy;
+        double total_xs;
+        double elastic_xs;
+        double absorbtion_xs;
+        double fission_xs;
+        double nu_fission_xs;
+};
+
+struct SimulationData {
+        Kokkos::View<int*> num_nucs;                     
+        Kokkos::View<double*> concs;                     
+        Kokkos::View<int*> mats;                         
+        Kokkos::View<double*> unionized_energy_array;    
+        Kokkos::View<int*> index_grid;                   
+        Kokkos::View<NuclideGridPoint*> nuclide_grid;    
+        unsigned long* verification; // Note: This is now a host-side array for reduction simplicity.  Consider device-side reduction for larger problems
+        int length_num_nucs;
+        int length_concs;
+        int length_mats;
+        int length_unionized_energy_array;
+        long length_index_grid;
+        int length_nuclide_grid;
+        int max_num_nucs;
+        Kokkos::View<double*> p_energy_samples;
+        Kokkos::View<int*> mat_samples;
+};
+
+// Function declarations (io.cpp)
+void logo(int version);
+void center_print(const char *s, int width);
+void border_print(void);
+void fancy_int(long a);
+Inputs read_CLI(int argc, char *argv[]);
+void print_CLI_error(void);
+void print_inputs(Inputs in, int nprocs, int version);
+int print_results(Inputs in, int mype, double runtime, int nprocs, unsigned long long vhash);
+void binary_write(Inputs in, SimulationData SD);
+SimulationData binary_read(Inputs in);
+
+// Function declarations (Simulation.cpp)
+unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile);
+//Kokkos Kernel functions will be declared here.  These will replace the CUDA kernels.
+
+// Function declarations (GridInit.cpp)
+SimulationData grid_init_do_not_profile(Inputs in, int mype);
+SimulationData move_simulation_data_to_device(Inputs in, int mype, SimulationData SD);
+void release_device_memory(SimulationData GSD); //Note: This will likely need modification for Kokkos
+void release_memory(SimulationData SD);
+
+// Function declarations (XSutils.cpp)
+int NGP_compare(const void *a, const void *b);
+int double_compare(const void *a, const void *b);
+double rn_v(void);
+size_t estimate_mem_usage(Inputs in);
+double get_time(void);
+
+// Function declarations (Materials.cpp)
+int* load_num_nucs(long n_isotopes);
+int* load_mats(int* num_nucs, long n_isotopes, int* max_num_nucs);
+double* load_concs(int* num_nucs, int max_num_nucs);
+
+
+#endif
+```
