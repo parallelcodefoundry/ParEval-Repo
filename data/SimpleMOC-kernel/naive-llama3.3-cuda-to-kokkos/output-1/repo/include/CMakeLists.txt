@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.10)
+project(SimpleMOC-kernel)
+
+# Find Kokkos
+find_package(Kokkos REQUIRED)
+
+# Set compiler
+set(CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+
+# Set compiler flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O3")
+
+# Set include directories
+include_directories(${KOKKOS_INCLUDE_DIRS})
+
+# Add executable
+add_executable(SimpleMOC-kernel
+  kernel.cpp
+  main.cpp
+  init.cpp
+  io.cpp
+)
+
+# Link against Kokkos
+target_link_libraries(SimpleMOC-kernel ${KOKKOS_LIBS})
+
+# Set CUDA architecture
+if (KOKKOS_ENABLE_CUDA)
+  set(CUDA_ARCHITECTURE "35")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch=sm_${CUDA_ARCHITECTURE}")
+endif()

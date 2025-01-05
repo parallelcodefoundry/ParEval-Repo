@@ -1,0 +1,36 @@
+```cmake
+cmake_minimum_required(VERSION 3.10)
+project(XSBench_Kokkos)
+
+# Find the Kokkos library
+find_package(Kokkos REQUIRED)
+
+# Set the C++ standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Add the Kokkos include directory
+include_directories(${Kokkos_INCLUDE_DIRS})
+
+# Add the source files
+set(SOURCE
+  Main.cpp
+  io.cpp
+  Simulation.cpp
+  GridInit.cpp
+  XSutils.cpp
+  Materials.cpp
+)
+
+# Add the executable
+add_executable(XSBench ${SOURCE})
+
+# Link the Kokkos library
+target_link_libraries(XSBench ${Kokkos_LIBRARIES})
+
+# Set the compile flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+
+# Install the executable
+install(TARGETS XSBench DESTINATION bin)
+```

@@ -1,0 +1,12 @@
+// microXOR header file
+
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
+
+#include <iostream>
+#include <random>
+#include <Kokkos_Core.hpp>
+
+void cellsXOR(const int *input, int *output, size_t N, Kokkos::TeamPolicy<> policy);
+
+#endif

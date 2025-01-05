@@ -1,0 +1,49 @@
+```cmake
+cmake_minimum_required(VERSION 3.10)
+project(SimpleMOC-kernel)
+
+# Find the Kokkos library
+find_package(Kokkos REQUIRED)
+
+# Set the C++ standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Add the source files
+set(SOURCES
+  kernel.cpp
+  main.cpp
+  init.cpp
+  io.cpp
+)
+
+# Add the header files
+set(HEADERS
+  SimpleMOC-kernel_header.hpp
+)
+
+# Create the executable
+add_executable(SimpleMOC-kernel ${SOURCES})
+
+# Link the Kokkos library
+target_link_libraries(SimpleMOC-kernel Kokkos::KokkosCore)
+
+# Add include directories
+target_include_directories(SimpleMOC-kernel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Add compiler flags
+target_compile_options(SimpleMOC-kernel PUBLIC -Wall -Wextra)
+
+# Add the Kokkos options
+target_compile_definitions(SimpleMOC-kernel PUBLIC KOKKOS_ENABLE_CUDA_LAMBDA)
+target_compile_options(SimpleMOC-kernel PUBLIC ${Kokkos_CXX_FLAGS})
+```
+
+This CMakeLists.txt file will compile the SimpleMOC-kernel code using the Kokkos library. The `find_package(Kokkos REQUIRED)` line finds the Kokkos library and makes its flags and definitions available to the project. The `target_link_libraries` line links the Kokkos library to the executable. The `target_compile_definitions` and `target_compile_options` lines add the necessary compiler flags and definitions for the Kokkos library.
+
+To compile the code, navigate to the `include` directory and run the following commands:
+```bash
+cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=clang++ -Bbuild .
+cmake --build build/
+```
+This will create a `build` directory and compile the code using the Kokkos CUDA backend, targeting a system with an NVIDIA GPU, compiled with clang++ as the host compiler. The resulting executable will be located in the `build` directory.

@@ -1,0 +1,78 @@
+```cpp
+#include "SimpleMOC-kernel_header.hpp"
+#include <Kokkos_Core.hpp>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <random>
+#include <cmath>
+
+int main(int argc, char* argv[]) {
+    Kokkos::initialize(argc, argv);
+    {
+        int version = 4;
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<double> dis(0.0, 1.0);
+
+        Input I = set_default_input();
+        read_CLI(argc, argv, &I);
+
+        logo(version);
+
+        print_input_summary(I);
+
+        std::cout << "INITIALIZATION" << std::endl;
+        std::cout << "===============" << std::endl;
+
+        // Build Source Data
+        std::cout << "Building Source Data Arrays..." << std::endl;
+        Source_Arrays SA_h, SA_d;
+        Source* sources_h = initialize_sources(I, &SA_h);
+        Source* sources_d = initialize_device_sources(I, &SA_h, &SA_d, sources_h);
+
+        // Build Exponential Table
+        Table* table_d = nullptr;
+#ifdef TABLE
+        std::cout << "Building Exponential Table..." << std::endl;
+        Table table = buildExponentialTable();
+        table_d = new Table();
+        *table_d = table;
+#endif
+
+        // Setup Kokkos execution
+        Kokkos::View<float**, Kokkos::MemoryUnmanaged> flux_states("flux_states", I.egroups, 10000);
+        Kokkos::parallel_for(Kokkos::RangePolicy<>(0, I.egroups * 10000), KOKKOS_LAMBDA(const int i) {
+            flux_states(i / I.egroups, i % I.egroups) = dis(gen);
+        });
+
+        std::cout << "Initialization Complete." << std::endl;
+        std::cout << "===============" << std::endl;
+
+        std::cout << "SIMULATION" << std::endl;
+        std::cout << "===========" << std::endl;
+
+        // Run Simulation Kernel Loop
+        Kokkos::Timer timer;
+        Kokkos::parallel_for(Kokkos::RangePolicy<>(0, I.segments / I.seg_per_thread), KOKKOS_LAMBDA(const int i) {
+            run_kernel(I, sources_d, SA_d, table_d, flux_states, 10000, i);
+        });
+        double time = timer.seconds();
+
+        std::cout << "Simulation Complete." << std::endl;
+        std::cout << "===============" << std::endl;
+
+        std::cout << "RESULTS SUMMARY" << std::endl;
+        std::cout << "===============" << std::endl;
+
+        double tpi = (time / I.segments / I.egroups) * 1.0e9;
+        std::cout << "Runtime: " << time << " seconds" << std::endl;
+        std::cout << "Time per Intersection: " << tpi << " ns" << std::endl;
+        std::cout << "===============" << std::endl;
+    }
+    Kokkos::finalize();
+    return 0;
+}
+```
