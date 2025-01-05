@@ -196,7 +196,8 @@ def main():
         "run_results_debug": [],
         "run_exec_checks_debug": [],
         "run_stdouts_debug": [],
-        "run_stderrs_debug": []
+        "run_stderrs_debug": [],
+        "tempdir_path": []
     }
 
     # Gather all the code repositories
@@ -223,7 +224,6 @@ def main():
 
                 logging.debug(f"Running code repository: {code_repo['path']}")
                 results_row = run_repo(code_repo, system_config, args, tempdir)
-                update_results(results, results_row)
 
                 # Copy temporary directory to save_temps if provided
                 if args.save_temps:
@@ -231,6 +231,9 @@ def main():
                     tempdir_path = os.path.join(args.save_temps, tempdir_name)
                     logging.info(f"Saving temporary directory to {tempdir_path}.")
                     shutil.copytree(tempdir, tempdir_path)
+                    results_row["tempdir_path"] = str(tempdir_path)
+
+                update_results(results, results_row)
                 pbar()
 
     # Convert results dict to dataframe

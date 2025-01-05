@@ -89,8 +89,7 @@ def update_results(results, results_row):
     if path not in results["path"]:
         logging.error(f"Path {path} not found in results.")
         raise ValueError(f"Path {path} not found in results.")
-    else:
-        row_idx = results["path"].index(path)
+    row_idx = results["path"].index(path)
 
     # Update the results dict with the results row
     for key, value in results_row.items():
