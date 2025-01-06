@@ -53,7 +53,8 @@ typedef struct{
 
 // kernel.cpp
 void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table, double *  state_fluxes, int N_state_fluxes);
+        Source_Arrays SA, Table *  table,
+        double *  state_fluxes, int N_state_fluxes);
 
 // init.cpp
 double mem_estimate( Input I );

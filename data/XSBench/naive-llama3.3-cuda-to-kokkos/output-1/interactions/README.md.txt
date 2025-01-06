@@ -27,7 +27,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in C++ for use with the Kokkos parallel programming model. 
+XSBench has been implemented in C++ using the Kokkos parallel programming model for use with various architectures. 
 
 ## Compilation
 
@@ -51,6 +51,7 @@ set(CMAKE_CXX_COMPILER "g++")
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_BUILD_TYPE Release)
 ```
 - Optimization enables the `-O3` optimization flag.
 - Debugging enables the `-g` flag.
@@ -110,7 +111,7 @@ There are several optimized variants of the main kernel. All source bases run ba
 
 ### MPI Support
 
-While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the `CMAKE_ENABLE_MPI` flag in the `CMakeLists.txt` file.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the `CMAKE_ENABLE_MPI` flag in `CMakeLists.txt`. If you are not using the mpicc wrapper on your system, you may need to alter the `CMakeLists.txt` to make use of your desired compiler.
 
 ### Verification Support
 

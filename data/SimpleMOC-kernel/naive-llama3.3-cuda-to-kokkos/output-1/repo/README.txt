@@ -57,8 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is a C++ code and supports the Kokkos parallel programming model.
-It can be run on various architectures, including CPUs, GPUs, and other accelerators.
+SimpleMOC-kernel is a C++ code and supports the Kokkos parallel programming model,
+allowing it to run on a variety of architectures, including NVIDIA GPUs, Intel CPUs, and AMD CPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -86,10 +86,9 @@ Compilation-------------------------------------------------------------------
 
 	To compile SimpleMOC-kernel with default settings, use the following command:
 
+	>$ mkdir build && cd build
+	>$ cmake ..
 	>$ make
-
-	You will need to have the Kokkos library installed and configured properly.
-	Please refer to the Kokkos documentation for more information.
 
 Running SimpleMOC-kernel-------------------------------------------------------
 
@@ -106,7 +105,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per thread block
-	  -d <device>           Device to use (e.g. "CPU", "GPU", etc.)
+	  -d <device>           Device to run on (e.g. "cuda", "omp", "serial")
 
 	If not options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -118,21 +117,21 @@ Running SimpleMOC-kernel-------------------------------------------------------
 Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
-There are a number of switches that can be set at the top of the makefile, along
+There are a number of switches that can be set in the CMakeLists.txt file, along
 with more advanced compilation features.
 
-Here is a sample of the control panel at the top of the makefile:
+Here is a sample of the control panel in the CMakeLists.txt file:
 
-COMPILER    = g++
-OPTIMIZE    = yes
-DEBUG       = no
-PROFILE     = no
+set(COMPILER "g++" CACHE STRING "Compiler to use")
+set(OPTIMIZE "yes" CACHE BOOL "Enable optimization")
+set(DEBUG "no" CACHE BOOL "Enable debugging")
+set(PROFILE "no" CACHE BOOL "Enable profiling")
 
 Explanation of Flags:
 
-COMPILER <g++> - This selects your compiler.
+COMPILER - This selects your compiler (e.g. g++, icc).
 
-OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
+OPTIMIZE - Adds compiler optimization flags.
 
 DEBUG - Adds the compiler flag "-g".
 

@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(XSBench_Kokkos)
 
-# Find the Kokkos library
+# Find the Kokkos core package
 find_package(Kokkos REQUIRED)
+
+# Add the Kokkos CUDA backend
+set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_CUDA_COMPILER nvcc)
 
 # Set the C++ standard
 set(CMAKE_CXX_STANDARD 14)
@@ -27,16 +31,19 @@ set(HEADERS
 # Create the executable
 add_executable(XSBench ${SOURCE})
 
-# Add the Kokkos library to the executable
-target_link_libraries(XSBench Kokkos::Kokkos)
+# Link the Kokkos library
+target_link_libraries(XSBench Kokkos::KokkosCore)
 
-# Add the include directories
+# Add include directories
 target_include_directories(XSBench PUBLIC ${Kokkos_INCLUDE_DIRS})
 
-# Set the compiler flags
+# Set the CUDA architecture
+set(CUDA_ARCHITECTURE "60" CACHE STRING "CUDA architecture")
+set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCHITECTURE})
+
+# Set the C++ flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wall -Wextra")
 
 # Install the executable
 install(TARGETS XSBench DESTINATION bin)

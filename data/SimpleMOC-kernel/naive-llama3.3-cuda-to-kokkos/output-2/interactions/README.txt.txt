@@ -58,10 +58,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is a C++ code and supports multiple architectures through the Kokkos parallel programming model, including:
-- NVIDIA GPUs (using the Kokkos CUDA backend)
-- Intel CPUs (using the Kokkos OpenMP backend)
-- AMD GPUs (using the Kokkos HIP backend)
+SimpleMOC-kernel is a C++ code and supports multiple architectures through the Kokkos parallel programming model, including NVIDIA GPUs, Intel CPUs, and AMD CPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -109,7 +106,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per thread block
-	  -d <device>           Device to run on (e.g. "cuda", "omp")
+	  -d <device>           Device to run on (e.g. "cuda", "omp", "serial")
 
 	If not options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -127,7 +124,7 @@ with more advanced compilation features.
 Here is a sample of the control panel in the CMakeLists.txt file:
 
 set(COMPILER "g++" CACHE STRING "Compiler to use")
-set(OPTIMIZE "yes" CACHE STRING "Enable optimization")
+set(OPTIMIZE "yes" CACHE STRING "Enable optimizations")
 set(DEBUG "no" CACHE STRING "Enable debugging")
 set(PROFILE "no" CACHE STRING "Enable profiling")
 
@@ -135,7 +132,7 @@ Explanation of Flags:
 
 COMPILER <g++> - This selects your compiler.
 
-OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
+OPTIMIZE - Adds compiler optimization flags.
 
 DEBUG - Adds the compiler flag "-g".
 
@@ -160,7 +157,7 @@ John R. Tramm, Geoffrey Gunow, Tim He, Kord S. Smith, Benoit Forget,
 Andrew R. Siegel, (2016) "A task-based parallelism and vectorized approach
 to 3D Method of Characteristics (MOC) reactor simulation for high performance
 computing architectures", Computer Physics Communications, Volume 202, 
-Pages 141–150, (https://doi.org/10.1016/j.cpc.2016.01.007).
+Pages 141���150, (https://doi.org/10.1016/j.cpc.2016.01.007).
 
 The bibtext entry for this paper is given below:
 

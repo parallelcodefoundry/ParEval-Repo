@@ -12,7 +12,7 @@ void logo(int version)
         "                    /   \\  `--. \\ ___ \\/ _ \\ '_ \\ / __| '_ \\                    \n"
         "                   / /^\\ \\/\\__/ / |_/ /  __/ | | | (__| | | |                   \n"
         "                   \\/   \\/\\____/\\____/ \\___|_| |_|\\___|_| |_|                   \n\n"
-           );
+    );
     border_print();
     center_print("Developed at Argonne National Laboratory", 79);
     char v[100];
@@ -34,7 +34,7 @@ void center_print(const char *s, int width)
 }
 
 int print_results( Inputs in, int mype, double runtime, int nprocs,
-           unsigned long long vhash )
+                   unsigned long long vhash )
 {
     // Calculate Lookups per sec
     int lookups = 0;
@@ -49,7 +49,7 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
     int total_lookups = 0;
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Reduce(&lookups_per_sec, &total_lookups, 1, MPI_INT,
-           MPI_SUM, 0, MPI_COMM_WORLD);
+               MPI_SUM, 0, MPI_COMM_WORLD);
     #endif
 
     int is_invalid_result = 1;
@@ -79,8 +79,8 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
         #endif
     }
 
-    unsigned long large = 0;
-    unsigned long small = 0;
+    unsigned long long large = 0;
+    unsigned long long small = 0;
     if( in.simulation_method == EVENT_BASED )
     {
         small = 945990;
@@ -122,11 +122,17 @@ void print_inputs(Inputs in, int nprocs, int version )
     center_print("INPUT SUMMARY", 79);
     border_print();
     printf("Programming Model:            Kokkos\n");
-    printf("Simulation Method:            ");
-    if (in.simulation_method == EVENT_BASED)
-        printf("Event Based\n");
+    #ifdef KOKKOS_ENABLE_OPENMP
+    printf("Kokkos Backend:               OpenMP\n");
+    #elif defined(KOKKOS_ENABLE_CUDA)
+    printf("Kokkos Backend:               CUDA\n");
+    #elif defined(KOKKOS_ENABLE_HIP)
+    printf("Kokkos Backend:               HIP\n");
+    #endif
+    if( in.simulation_method == EVENT_BASED )
+        printf("Simulation Method:            Event Based\n");
     else
-        printf("History Based\n");
+        printf("Simulation Method:            History Based\n");
     if( in.grid_type == UNIONIZED )
         printf("Grid Type:                    Unionized Grid\n");
     else if( in.grid_type == NUCLIDE )
@@ -134,7 +140,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     else
         printf("Grid Type:                    Hash\n");
 
-    printf("Materials:                    12\n");
+    printf("Materials:                    %d\n", 12);
     printf("H-M Benchmark Size:           %s\n", in.HM);
     printf("Total Nuclides:               %ld\n", in.n_isotopes);
     printf("Gridpoints (per Nuclide):     ");
@@ -157,7 +163,7 @@ void print_inputs(Inputs in, int nprocs, int version )
     printf("Total XS Lookups:             "); fancy_int(in.lookups);
     printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
     #ifdef MPI
-    printf("MPI Ranks:                    %d\n", nprocs);
+    printf("MPI ranks:                    %d\n", nprocs);
     printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
     #else
     printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);

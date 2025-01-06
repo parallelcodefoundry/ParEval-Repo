@@ -5,16 +5,15 @@ project(XSBench_Kokkos)
 # Find the Kokkos library
 find_package(Kokkos REQUIRED)
 
-# Set up the compiler
-set(CMAKE_CXX_COMPILER g++)
+# Set the C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Set the Kokkos backend
-set(KOKKOS_BACKEND CUDA)
+# Add the Kokkos include directory
+include_directories(${Kokkos_INCLUDE_DIRS})
 
-# Add the Kokkos library to the project
-add_executable(XSBench_Kokkos
+# Add the source files
+set(SOURCE
   Main.cpp
   io.cpp
   Simulation.cpp
@@ -23,19 +22,15 @@ add_executable(XSBench_Kokkos
   Materials.cpp
 )
 
+# Add the executable
+add_executable(XSBench ${SOURCE})
+
 # Link the Kokkos library
-target_link_libraries(XSBench_Kokkos Kokkos::Kokkos)
+target_link_libraries(XSBench ${Kokkos_LIBRARIES})
 
-# Set the include directories
-target_include_directories(XSBench_Kokkos PUBLIC
-  ${KOKKOS_INCLUDE_DIRS}
-)
-
-# Set the compile options
+# Set the compile flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # Install the executable
-install(TARGETS XSBench_Kokkos DESTINATION bin)
+install(TARGETS XSBench DESTINATION bin)
 ```

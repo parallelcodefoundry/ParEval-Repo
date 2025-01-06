@@ -71,7 +71,7 @@ SimulationData binary_read(Inputs in);
 
 // Simulation.cpp
 unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData SD, int mype, Profile* profile);
-void xs_lookup_kernel_baseline(const Inputs& in, SimulationData& GSD, int i);
+void xs_lookup_kernel_baseline(const Inputs& in, SimulationData& GSD, const int i);
 void calculate_micro_xs(double p_energy, int nuc, long n_isotopes, long n_gridpoints, double* egrid, int* index_data, NuclideGridPoint* nuclide_grids, long idx, double* xs_vector, int grid_type, int hash_bins);
 void calculate_macro_xs(double p_energy, int mat, long n_isotopes, long n_gridpoints, int* num_nucs, double* concs, double* egrid, int* index_data, NuclideGridPoint* nuclide_grids, int* mats, double* macro_xs_vector, int grid_type, int hash_bins, int max_num_nucs);
 long grid_search(long n, double quarry, double* A);
@@ -81,20 +81,20 @@ double LCG_random_double(uint64_t* seed);
 uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
 
 unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData GSD, int mype);
-void sampling_kernel(const Inputs& in, SimulationData& GSD, int i);
-void xs_lookup_kernel_optimization_1(const Inputs& in, SimulationData& GSD, int i);
+void sampling_kernel(const Inputs& in, SimulationData& GSD, const int i);
+void xs_lookup_kernel_optimization_1(const Inputs& in, SimulationData& GSD, const int i);
 
 unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData GSD, int mype);
-void xs_lookup_kernel_optimization_2(const Inputs& in, SimulationData& GSD, int m, int i);
+void xs_lookup_kernel_optimization_2(const Inputs& in, SimulationData& GSD, int m, const int i);
 
 unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData GSD, int mype);
-void xs_lookup_kernel_optimization_3(const Inputs& in, SimulationData& GSD, int is_fuel, int i);
+void xs_lookup_kernel_optimization_3(const Inputs& in, SimulationData& GSD, int is_fuel, const int i);
 
 unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData GSD, int mype);
-void xs_lookup_kernel_optimization_4(const Inputs& in, SimulationData& GSD, int m, int n_lookups, int offset, int i);
+void xs_lookup_kernel_optimization_4(const Inputs& in, SimulationData& GSD, int m, int n_lookups, int offset, const int i);
 
 unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData GSD, int mype);
-void xs_lookup_kernel_optimization_5(const Inputs& in, SimulationData& GSD, int n_lookups, int offset, int i);
+void xs_lookup_kernel_optimization_5(const Inputs& in, SimulationData& GSD, int n_lookups, int offset, const int i);
 
 unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData GSD, int mype);
 

@@ -250,8 +250,8 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
         p_nuc = mats[mat*max_num_nucs + j];
         conc = concs[mat*max_num_nucs + j];
         calculate_micro_xs( p_energy, p_nuc, n_isotopes,
-                           n_gridpoints, egrid, index_data,
-                           nuclide_grids, idx, xs_vector, grid_type, hash_bins );
+                                   n_gridpoints, egrid, index_data,
+                                   nuclide_grids, idx, xs_vector, grid_type, hash_bins );
         for( int k = 0; k < 5; k++ )
                 macro_xs_vector[k] += xs_vector[k] * conc;
     }
@@ -316,18 +316,18 @@ int pick_mat( uint64_t * seed )
     // a better approximation, but volume does a good enough job for now.
 
     double dist[12];
-    dist[0]  = 0.140;  // fuel
-    dist[1]  = 0.052;  // cladding
-    dist[2]  = 0.275;  // cold, borated water
-    dist[3]  = 0.134;  // hot, borated water
-    dist[4]  = 0.154;  // RPV
-    dist[5]  = 0.064;  // Lower, radial reflector
-    dist[6]  = 0.066;  // Upper reflector / top plate
-    dist[7]  = 0.055;  // bottom plate
-    dist[8]  = 0.008;  // bottom nozzle
-    dist[9]  = 0.015;  // top nozzle
-    dist[10] = 0.025;  // top of fuel assemblies
-    dist[11] = 0.013;  // bottom of fuel assemblies
+    dist[0]  = 0.140;    // fuel
+    dist[1]  = 0.052;    // cladding
+    dist[2]  = 0.275;    // cold, borated water
+    dist[3]  = 0.134;    // hot, borated water
+    dist[4]  = 0.154;    // RPV
+    dist[5]  = 0.064;    // Lower, radial reflector
+    dist[6]  = 0.066;    // Upper reflector / top plate
+    dist[7]  = 0.055;    // bottom plate
+    dist[8]  = 0.008;    // bottom nozzle
+    dist[9]  = 0.015;    // top nozzle
+    dist[10] = 0.025;    // top of fuel assemblies
+    dist[11] = 0.013;    // bottom of fuel assemblies
 
     double roll = LCG_random_double(seed);
 
@@ -420,12 +420,12 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
     size_t total_sz = 0;
 
     sz = in.lookups * sizeof(double);
-    GSD.p_energy_samples = (double *) Kokkos::MemoryPool<Kokkos::DefaultHostMirrorSpace>().allocate(sz);
+    GSD.p_energy_samples = (double *) Kokkos::malloc("p_energy_samples", sz);
     total_sz += sz;
     GSD.length_p_energy_samples = in.lookups;
 
     sz = in.lookups * sizeof(int);
-    GSD.mat_samples = (int *) Kokkos::MemoryPool<Kokkos::DefaultHostMirrorSpace>().allocate(sz);
+    GSD.mat_samples = (int *) Kokkos::malloc("mat_samples", sz);
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
@@ -439,6 +439,29 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
 
+    sampling_kernel(in, GSD);
+    Kokkos::fence();
+
+    xs_lookup_kernel_optimization_1(in, GSD);
+    Kokkos::fence();
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // Reduce Verification Results
+    ////////////////////////////////////////////////////////////////////////////////
+    if( mype == 0) printf("Reducing verification results...\n");
+
+    unsigned long verification_scalar = 0;
+    for( int i =0; i < in.lookups; i++ )
+            verification_scalar += GSD.verification[i];
+
+    Kokkos::free(GSD.p_energy_samples);
+    Kokkos::free(GSD.mat_samples);
+
+    return verification_scalar;
+}
+
+void sampling_kernel(Inputs in, SimulationData GSD )
+{
     Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
         // The lookup ID.
         const int idx = i;
@@ -460,7 +483,10 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
         GSD.p_energy_samples[idx] = p_energy;
         GSD.mat_samples[idx] = mat;
     });
+}
 
+void xs_lookup_kernel_optimization_1(Inputs in, SimulationData GSD )
+{
     Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
         // The lookup ID. Used to set the seed, and to store the verification value
         const int idx = i;
@@ -506,17 +532,6 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
         }
         GSD.verification[idx] = max_idx+1;
     });
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // Reduce Verification Results
-    ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
-
-    unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-        verification_scalar += GSD.verification[i];
-
-    return verification_scalar;
 }
 
 // ... rest of the code remains the same ...

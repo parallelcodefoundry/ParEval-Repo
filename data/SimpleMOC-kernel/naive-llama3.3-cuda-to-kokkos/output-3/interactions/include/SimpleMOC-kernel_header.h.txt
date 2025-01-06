@@ -9,13 +9,10 @@
 #include <math.h>
 #include <string.h>
 #include <time.h>
-#include <stdbool.h>
 #include <limits.h>
 #include <assert.h>
-#include <pthread.h>
 #include <unistd.h>
 #include <malloc.h>
-#include <assert.h>
 
 // User inputs
 typedef struct{
@@ -61,6 +58,8 @@ void run_kernel( Input I, Source *  S,
 
 // init.cpp
 double mem_estimate( Input I );
+void setup_kernel(Kokkos::View<curandState *, Kokkos::MemoryUnmanaged> state, Input I);
+void init_flux_states( double * flux_states, int N_flux_states, Input I, Kokkos::View<curandState *, Kokkos::MemoryUnmanaged> state);
 Source * initialize_sources( Input I, Source_Arrays * SA );
 Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
 Table buildExponentialTable( void );

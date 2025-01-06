@@ -57,8 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is a C++ code that utilizes the Kokkos parallel programming model, 
-supporting a variety of architectures including NVIDIA GPUs, AMD GPUs, and CPUs.
+SimpleMOC-kernel is a C++ code and supports the Kokkos execution model, allowing
+it to run on various architectures, including NVIDIA GPUs, AMD GPUs, and CPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -86,10 +86,10 @@ Compilation-------------------------------------------------------------------
 
 	To compile SimpleMOC-kernel with default settings, use the following command:
 
-	>$ mkdir build
-	>$ cd build
-	>$ cmake ..
 	>$ make
+
+	Note: Make sure to configure your Kokkos installation and set the
+	KOKKOS_PATH environment variable before compiling.
 
 Running SimpleMOC-kernel-------------------------------------------------------
 
@@ -106,7 +106,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per thread block
-	
+	  -d <device>           Device to run on (e.g., NVIDIA, AMD, or CPU)
 
 	If not options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -118,25 +118,25 @@ Running SimpleMOC-kernel-------------------------------------------------------
 Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
-There are a number of switches that can be set in the CMakeLists.txt file, along
+There are a number of switches that can be set at the top of the makefile, along
 with more advanced compilation features.
 
-Here is a sample of the control panel in the CMakeLists.txt file:
+Here is a sample of the control panel at the top of the makefile:
 
-set(COMPILER "g++" CACHE STRING "Compiler to use")
-set(OPTIMIZE "yes" CACHE STRING "Add compiler optimization flags")
-set(DEBUG "no" CACHE STRING "Add compiler debug flags")
-set(PROFILE "no" CACHE STRING "Add compiler profiling flags")
+COMPILER    = g++
+OPTIMIZE    = yes
+DEBUG       = no
+PROFILE     = no
 
 Explanation of Flags:
 
-COMPILER - This selects your compiler.
+COMPILER <g++> - This selects your compiler (GCC is the default).
 
-OPTIMIZE - Adds compiler optimization flags.
+OPTIMIZE - Adds compiler optimization flag "-O3" and other optimizations.
 
-DEBUG - Adds the compiler debug flags.
+DEBUG - Adds the compiler flag "-g".
 
-PROFILE - Adds the compiler profiling flags.
+PROFILE - Adds the compiler flag "-pg".
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Defintion
@@ -157,7 +157,7 @@ John R. Tramm, Geoffrey Gunow, Tim He, Kord S. Smith, Benoit Forget,
 Andrew R. Siegel, (2016) "A task-based parallelism and vectorized approach
 to 3D Method of Characteristics (MOC) reactor simulation for high performance
 computing architectures", Computer Physics Communications, Volume 202, 
-Pages 141–150, (https://doi.org/10.1016/j.cpc.2016.01.007).
+Pages 141���150, (https://doi.org/10.1016/j.cpc.2016.01.007).
 
 The bibtext entry for this paper is given below:
 

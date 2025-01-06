@@ -27,7 +27,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented using the Kokkos parallel programming model for use with various architectures. 
+XSBench has been implemented in C++ for use with the Kokkos parallel programming model. 
 
 ## Compilation
 
@@ -47,15 +47,17 @@ cmake --build .
 There are also a number of switches that can be set in the `CMakeLists.txt` file. Here is a sample of the control panel at the top of the `CMakeLists.txt` file:
 
 ```make
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_COMPILER "g++")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 ```
 - Optimization enables the `-O3` optimization flag.
 - Debugging enables the `-g` flag.
 - Profiling enables the `-pg` flag. When profiling the code, you may
 wish to significantly increase the number of lookups (with the `-l`
 flag) in order to wash out the initialization phase of the code.
+- MPI enables MPI support in the code.
 
 ## Running XSBench
 
@@ -108,7 +110,7 @@ There are several optimized variants of the main kernel. All source bases run ba
 
 ### MPI Support
 
-While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the `CMAKE_ENABLE_MPI` flag in `CMakeLists.txt`. If you are not using the mpicc wrapper on your system, you may need to alter the `CMakeLists.txt` to make use of your desired compiler.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the `find_package(MPI)` flag in the `CMakeLists.txt` file.
 
 ### Verification Support
 

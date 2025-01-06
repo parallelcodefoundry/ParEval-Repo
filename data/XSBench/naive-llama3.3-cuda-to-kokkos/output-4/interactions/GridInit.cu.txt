@@ -4,7 +4,7 @@
 // Moves all required data structures to the GPU's memory space
 SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationData SD )
 {
-        if(mype == 0) printf("Allocating and moving simulation data to Kokkos memory space...\n");
+        if(mype == 0) printf("Allocating and moving simulation data to GPU memory space...\n");
 
         ////////////////////////////////////////////////////////////////////////////////
         // SUMMARY: Simulation Data Structure Manifest for "SD" Object
@@ -30,52 +30,65 @@ SimulationData move_simulation_data_to_device( Inputs in, int mype, SimulationDa
         // Shallow copy of CPU simulation data to GPU simulation data
         SimulationData GSD = SD;
 
-        // Move data to Kokkos memory space
+        // Move data to GPU memory space
         sz = GSD.length_num_nucs * sizeof(int);
-        Kokkos::View<int*> num_nucs("num_nucs", GSD.length_num_nucs);
-        Kokkos::deep_copy(num_nucs, SD.num_nucs);
+        Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+            GSD.num_nucs[i] = SD.num_nucs[i];
+        }, GSD.length_num_nucs);
         total_sz += sz;
 
         sz = GSD.length_concs * sizeof(double);
-        Kokkos::View<double*> concs("concs", GSD.length_concs);
-        Kokkos::deep_copy(concs, SD.concs);
+        Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+            GSD.concs[i] = SD.concs[i];
+        }, GSD.length_concs);
         total_sz += sz;
 
         sz = GSD.length_mats * sizeof(int);
-        Kokkos::View<int*> mats("mats", GSD.length_mats);
-        Kokkos::deep_copy(mats, SD.mats);
+        Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+            GSD.mats[i] = SD.mats[i];
+        }, GSD.length_mats);
         total_sz += sz;
 
         if (SD.length_unionized_energy_array != 0) {
                 sz = GSD.length_unionized_energy_array * sizeof(double);
-                Kokkos::View<double*> unionized_energy_array("unionized_energy_array", GSD.length_unionized_energy_array);
-                Kokkos::deep_copy(unionized_energy_array, SD.unionized_energy_array);
+                Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+                    GSD.unionized_energy_array[i] = SD.unionized_energy_array[i];
+                }, GSD.length_unionized_energy_array);
                 total_sz += sz;
         }
 
         if (SD.length_index_grid != 0) {
                 sz = GSD.length_index_grid * sizeof(int);
-                Kokkos::View<int*> index_grid("index_grid", GSD.length_index_grid);
-                Kokkos::deep_copy(index_grid, SD.index_grid);
+                Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+                    GSD.index_grid[i] = SD.index_grid[i];
+                }, GSD.length_index_grid);
                 total_sz += sz;
         }
 
         sz = GSD.length_nuclide_grid * sizeof(NuclideGridPoint);
-        Kokkos::View<NuclideGridPoint*> nuclide_grid("nuclide_grid", GSD.length_nuclide_grid);
-        Kokkos::deep_copy(nuclide_grid, SD.nuclide_grid);
+        Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+            GSD.nuclide_grid[i].energy = SD.nuclide_grid[i].energy;
+            GSD.nuclide_grid[i].total_xs = SD.nuclide_grid[i].total_xs;
+            GSD.nuclide_grid[i].elastic_xs = SD.nuclide_grid[i].elastic_xs;
+            GSD.nuclide_grid[i].absorbtion_xs = SD.nuclide_grid[i].absorbtion_xs;
+            GSD.nuclide_grid[i].fission_xs = SD.nuclide_grid[i].fission_xs;
+            GSD.nuclide_grid[i].nu_fission_xs = SD.nuclide_grid[i].nu_fission_xs;
+        }, GSD.length_nuclide_grid);
         total_sz += sz;
 
         // Allocate verification array on device. This structure is not needed on CPU, so we don't
         // have to copy anything over.
         sz = in.lookups * sizeof(unsigned long);
-        Kokkos::View<unsigned long*> verification("verification", in.lookups);
+        Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+            GSD.verification[i] = 0;
+        }, GSD.length_verification);
         total_sz += sz;
         GSD.length_verification = in.lookups;
 
         // Synchronize
         Kokkos::fence();
 
-        if(mype == 0 ) printf("Kokkos Initialization complete. Allocated %.0lf MB of data on device.\n", total_sz/1024.0/1024.0 );
+        if(mype == 0 ) printf("GPU Intialization complete. Allocated %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0 );
 
         return GSD;
 
@@ -130,15 +143,14 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         SD.nuclide_grid     = (NuclideGridPoint *) malloc( SD.length_nuclide_grid * sizeof(NuclideGridPoint));
         assert(SD.nuclide_grid != NULL);
         nbytes += SD.length_nuclide_grid * sizeof(NuclideGridPoint);
-        for( int i = 0; i < SD.length_nuclide_grid; i++ )
-        {
-                SD.nuclide_grid[i].energy        = LCG_random_double(&seed);
-                SD.nuclide_grid[i].total_xs      = LCG_random_double(&seed);
-                SD.nuclide_grid[i].elastic_xs    = LCG_random_double(&seed);
-                SD.nuclide_grid[i].absorbtion_xs = LCG_random_double(&seed);
-                SD.nuclide_grid[i].fission_xs    = LCG_random_double(&seed);
-                SD.nuclide_grid[i].nu_fission_xs = LCG_random_double(&seed);
-        }
+        Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+            SD.nuclide_grid[i].energy = LCG_random_double(&seed);
+            SD.nuclide_grid[i].total_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].elastic_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].absorbtion_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].fission_xs = LCG_random_double(&seed);
+            SD.nuclide_grid[i].nu_fission_xs = LCG_random_double(&seed);
+        }, SD.length_nuclide_grid);
 
         // Sort so that each nuclide has data stored in ascending energy order.
         for( int i = 0; i < in.n_isotopes; i++ )
@@ -158,7 +170,6 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
         size_t sz = in.lookups * sizeof(unsigned long);
         SD.verification = (unsigned long *) malloc(sz);
         nbytes += sz;
-
 
         ////////////////////////////////////////////////////////////////////
         // Initialize Acceleration Structure
@@ -181,8 +192,9 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
                 nbytes += SD.length_unionized_energy_array * sizeof(double);
 
                 // Copy energy data over from the nuclide energy grid
-                for( int i = 0; i < SD.length_unionized_energy_array; i++ )
-                        SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
+                Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int i) {
+                    SD.unionized_energy_array[i] = SD.nuclide_grid[i].energy;
+                }, SD.length_unionized_energy_array);
 
                 // Sort unionized energy array
                 qsort( SD.unionized_energy_array, SD.length_unionized_energy_array, sizeof(double), double_compare);
@@ -202,23 +214,22 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
                 for( int i = 0; i < in.n_isotopes; i++ )
                         energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + 1].energy;
 
-                for( long e = 0; e < SD.length_unionized_energy_array; e++ )
-                {
-                        double unionized_energy = SD.unionized_energy_array[e];
-                        for( long i = 0; i < in.n_isotopes; i++ )
-                        {
-                                if( unionized_energy < energy_high[i]  )
-                                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                                        else if( idx_low[i] == in.n_gridpoints - 2 )
-                                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                                        else
-                                        {
-                                        idx_low[i]++;
-                                        SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
-                                        energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
-                                }
-                        }
-                }
+                Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int e) {
+                    double unionized_energy = SD.unionized_energy_array[e];
+                    for( int i = 0; i < in.n_isotopes; i++ )
+                    {
+                            if( unionized_energy < energy_high[i]  )
+                                    SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                            else if( idx_low[i] == in.n_gridpoints - 2 )
+                                    SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                            else
+                            {
+                                    idx_low[i]++;
+                                    SD.index_grid[e * in.n_isotopes + i] = idx_low[i];
+                                    energy_high[i] = SD.nuclide_grid[i * in.n_gridpoints + idx_low[i] + 1].energy;
+                            }
+                    }
+                }, SD.length_unionized_energy_array);
 
                 free(idx_low);
                 free(energy_high);
@@ -236,16 +247,15 @@ SimulationData grid_init_do_not_profile( Inputs in, int mype )
                 double du = 1.0 / in.hash_bins;
 
                 // For each energy level in the hash table
-                for( long e = 0; e < in.hash_bins; e++ )
-                {
-                        double energy = e * du;
+                Kokkos::parallel_invoke(Kokkos::DefaultExecutionSpace(), KOKKOS_LAMBDA(const int e) {
+                    double energy = e * du;
 
-                        // We need to determine the bounding energy levels for all isotopes
-                        for( long i = 0; i < in.n_isotopes; i++ )
-                        {
-                                SD.index_grid[e * in.n_isotopes + i] = grid_search_nuclide( in.n_gridpoints, energy, SD.nuclide_grid + i * in.n_gridpoints, 0, in.n_gridpoints-1);
-                        }
-                }
+                    // We need to determine the bounding energy levels for all isotopes
+                    for( int i = 0; i < in.n_isotopes; i++ )
+                    {
+                            SD.index_grid[e * in.n_isotopes + i] = grid_search_nuclide( in.n_gridpoints, energy, SD.nuclide_grid + i * in.n_gridpoints, 0, in.n_gridpoints-1);
+                    }
+                }, in.hash_bins);
         }
 
         ////////////////////////////////////////////////////////////////////

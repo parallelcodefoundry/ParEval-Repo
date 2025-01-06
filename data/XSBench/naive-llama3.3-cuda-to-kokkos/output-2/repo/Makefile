@@ -39,6 +39,7 @@ CC = $(COMPILER)
 # Debug Flags
 ifeq ($(DEBUG),yes)
   CFLAGS += -g -O0
+  LDFLAGS  += -g -O0
 endif
 
 # Profiling Flags
@@ -53,8 +54,8 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 # Kokkos Flags
-KOKKOS_PATH ?= /path/to/kokkos
-CFLAGS += -I$(KOKKOS_PATH)/core/src
+KOKKOS_PATH ?= $(shell kokkos-core/configure.py --prefix)
+CFLAGS += -I$(KOKKOS_PATH)/include
 LDFLAGS += -L$(KOKKOS_PATH)/lib -lkokkoscore
 
 #===============================================================================

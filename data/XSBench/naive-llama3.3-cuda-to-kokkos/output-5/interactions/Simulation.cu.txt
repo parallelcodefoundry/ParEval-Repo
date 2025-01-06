@@ -250,8 +250,8 @@ void calculate_macro_xs( double p_energy, int mat, long n_isotopes,
         p_nuc = mats[mat*max_num_nucs + j];
         conc = concs[mat*max_num_nucs + j];
         calculate_micro_xs( p_energy, p_nuc, n_isotopes,
-                                   n_gridpoints, egrid, index_data,
-                                   nuclide_grids, idx, xs_vector, grid_type, hash_bins );
+                           n_gridpoints, egrid, index_data,
+                           nuclide_grids, idx, xs_vector, grid_type, hash_bins );
         for( int k = 0; k < 5; k++ )
                 macro_xs_vector[k] += xs_vector[k] * conc;
     }
@@ -451,10 +451,11 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
     if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long& sum) {
-        sum += GSD.verification[i];
-    }, verification_scalar);
-    Kokkos::fence();
+    for( int i =0; i < in.lookups; i++ )
+            verification_scalar += GSD.verification[i];
+
+    Kokkos::free(GSD.p_energy_samples);
+    Kokkos::free(GSD.mat_samples);
 
     return verification_scalar;
 }

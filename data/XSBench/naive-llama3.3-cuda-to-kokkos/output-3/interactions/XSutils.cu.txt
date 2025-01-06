@@ -27,7 +27,6 @@ int NGP_compare(const void * a, const void * b)
 		return 0;
 }
 
-
 // RNG Used for Verification Option.
 // This one has a static seed (must be set manually in source).
 // Park & Miller Multiplicative Conguential Algorithm
@@ -45,7 +44,6 @@ double rn_v(void)
 	return ret;
 }
 
-// Estimate memory usage
 size_t estimate_mem_usage( Inputs in )
 {
 	size_t single_nuclide_grid = in.n_gridpoints * sizeof( NuclideGridPoint );

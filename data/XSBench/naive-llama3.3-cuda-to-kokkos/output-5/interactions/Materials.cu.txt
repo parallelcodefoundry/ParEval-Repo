@@ -1,12 +1,13 @@
 ```cpp
+// Materials.cpp
+#include "XSbench_header.hpp"
+
 // Material data is hard coded into the functions in this file.
 // Note that there are 12 materials present in H-M (large or small)
 
-#include "XSbench_header.hpp"
-
 // num_nucs represents the number of nuclides that each material contains
 int* load_num_nucs(long n_isotopes) {
-    int* num_nucs = (int*)malloc(12 * sizeof(int));
+    int* num_nucs = new int[12];
 
     // Material 0 is a special case (fuel). The H-M small reactor uses
     // 34 nuclides, while H-M larges uses 300.
@@ -38,7 +39,7 @@ int* load_mats(int* num_nucs, long n_isotopes, int* max_num_nucs) {
         if (num_nucs[m] > *max_num_nucs)
             *max_num_nucs = num_nucs[m];
     }
-    int* mats = (int*)malloc(num_mats * (*max_num_nucs) * sizeof(int));
+    int* mats = new int[num_mats * (*max_num_nucs)];
 
     // Small H-M has 34 fuel nuclides
     int mats0_Sml[] = {58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
@@ -73,22 +74,22 @@ int* load_mats(int* num_nucs, long n_isotopes, int* max_num_nucs) {
 
     // H-M large v small dependency
     if (n_isotopes == 68)
-        memcpy(mats, mats0_Sml, num_nucs[0] * sizeof(int));
+        std::memcpy(mats, mats0_Sml, num_nucs[0] * sizeof(int));
     else
-        memcpy(mats, mats0_Lrg, num_nucs[0] * sizeof(int));
+        std::memcpy(mats, mats0_Lrg, num_nucs[0] * sizeof(int));
 
     // Copy other materials
-    memcpy(mats + *max_num_nucs * 1, mats1, num_nucs[1] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 2, mats2, num_nucs[2] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 3, mats3, num_nucs[3] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 4, mats4, num_nucs[4] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 5, mats5, num_nucs[5] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 6, mats6, num_nucs[6] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 7, mats7, num_nucs[7] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 8, mats8, num_nucs[8] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 9, mats9, num_nucs[9] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 10, mats10, num_nucs[10] * sizeof(int));
-    memcpy(mats + *max_num_nucs * 11, mats11, num_nucs[11] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 1, mats1, num_nucs[1] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 2, mats2, num_nucs[2] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 3, mats3, num_nucs[3] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 4, mats4, num_nucs[4] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 5, mats5, num_nucs[5] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 6, mats6, num_nucs[6] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 7, mats7, num_nucs[7] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 8, mats8, num_nucs[8] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 9, mats9, num_nucs[9] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 10, mats10, num_nucs[10] * sizeof(int));
+    std::memcpy(mats + *max_num_nucs * 11, mats11, num_nucs[11] * sizeof(int));
 
     return mats;
 }
@@ -96,7 +97,7 @@ int* load_mats(int* num_nucs, long n_isotopes, int* max_num_nucs) {
 // Randomizes the concentrations of all nuclides in a variety of materials
 double* load_concs(int* num_nucs, int max_num_nucs) {
     uint64_t seed = STARTING_SEED * STARTING_SEED;
-    double* concs = (double*)malloc(12 * max_num_nucs * sizeof(double));
+    double* concs = new double[12 * max_num_nucs];
 
     for (int i = 0; i < 12; i++)
         for (int j = 0; j < num_nucs[i]; j++)

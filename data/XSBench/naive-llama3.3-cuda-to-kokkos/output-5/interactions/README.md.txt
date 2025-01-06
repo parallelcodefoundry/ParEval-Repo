@@ -27,7 +27,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 6. [Citing XSBench](#Citing-XSBench)
 7. [Development Team](#Development-Team) 
 
-XSBench has been implemented in C++ for use with the Kokkos parallel programming model. 
+XSBench has been implemented in C++ using the Kokkos parallel programming model for use with various architectures. 
 
 ## Compilation
 
@@ -46,11 +46,11 @@ cmake --build .
 
 There are also a number of switches that can be set in the `CMakeLists.txt` file. Here is a sample of the control panel at the top of the `CMakeLists.txt` file:
 
-```make
-set(CMAKE_CXX_COMPILER "g++")
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+```cmake
+set(OPTIMIZE ON)
+set(DEBUG OFF)
+set(PROFILE OFF)
+set(MPI ON)
 ```
 - Optimization enables the `-O3` optimization flag.
 - Debugging enables the `-g` flag.
@@ -104,13 +104,13 @@ Sets the number of hash bins (only relevant when using the hash lookup algorithm
 This optional mode can read or write the simulation data structures to disk. Options are ("read" or "write"). This may be useful if it is necessary to minimize the initialization phase of the program, which has a non-trivial runtime. The generated file is named "XS_data.dat" and will be located in the current working directory. The same file name and location will be used when reading. Note that as the file is binary, it may not be portable between compilers and computer systems. NOTE: When running in the "read" mode, you must be running with an identical program configuration as when the file was generated. E.g., if the file was generated with the "-G nuclide" argument, subsequent runs reading from that file must use the same configuration flags.
 
 - **-k [kernel]**
-There are several optimized variants of the main kernel. All source bases run basically the same "baseline" kernel as default. Optimized kernels can be selected at runtime with this argument. Default is "0" for the baseline, other variants are numbered 1, 2, ... etc. People interested in implementing their own optimized variants are encouraged to use this interface for convenience rather than writing over the main kernel. The baseline kernel is defined at the top of the "Simulation.cpp" source file, with the other variants being defined towards the end of the file after a large comment block delineation. The optimized variants are related to different ways of sorting the sampled values such that there is less thread divergence and much better cache re-usage when executing the lookup kernel on contiguous sorted elements. More details can be found in the [Optimized Kernels](#Optimized-Kernels) section.
+There are several optimized variants of the main kernel. All source bases run basically the same "baseline" kernel as default. Optimized kernels can be selected at runtime with this argument. Default is "0" for the baseline, other variants are numbered 1, 2, ... etc. People interested in implementing their own optimized variants are encouraged to use this interface for convenience rather than writing over the main kernel. The baseline kernel is defined at the top of the `Simulation.cpp` source file, with the other variants being defined towards the end of the file after a large comment block delineation. The optimized variants are related to different ways of sorting the sampled values such that there is less thread divergence and much better cache re-usage when executing the lookup kernel on contiguous sorted elements. More details can be found in the [Optimized Kernels](#Optimized-Kernels) section.
 
 ## Feature Discussion
 
 ### MPI Support
 
-While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the `find_package(MPI)` flag in the `CMakeLists.txt` file.
+While XSBench is primarily used to investigate "on node parallelism" issues, some systems provide power & performance statistics batched in multi-node configurations. To accommodate this, XSBench provides an MPI mode which runs the code on all MPI ranks simultaneously. There is no decomposition across ranks of any kind, and all ranks accomplish the same work. This is a "weak scaling" approach -- for instance, if running the event-based model all MPI ranks will execute 17,000,000 cross section lookups regardless of how many ranks are used. There is only one point of MPI communication (a reduce) at the end, which aggregates the timing statistics and averages them across MPI ranks before printing them out. MPI support can be enabled with the `MPI` option in the `CMakeLists.txt` file. If you are not using the mpicc wrapper on your system, you may need to alter the `CMakeLists.txt` file to make use of your desired compiler.
 
 ### Verification Support
 

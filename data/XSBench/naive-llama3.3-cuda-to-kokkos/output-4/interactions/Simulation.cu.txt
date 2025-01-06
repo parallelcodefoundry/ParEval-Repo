@@ -316,18 +316,18 @@ int pick_mat( uint64_t * seed )
     // a better approximation, but volume does a good enough job for now.
 
     double dist[12];
-    dist[0]  = 0.140;    // fuel
-    dist[1]  = 0.052;    // cladding
-    dist[2]  = 0.275;    // cold, borated water
-    dist[3]  = 0.134;    // hot, borated water
-    dist[4]  = 0.154;    // RPV
-    dist[5]  = 0.064;    // Lower, radial reflector
-    dist[6]  = 0.066;    // Upper reflector / top plate
-    dist[7]  = 0.055;    // bottom plate
-    dist[8]  = 0.008;    // bottom nozzle
-    dist[9]  = 0.015;    // top nozzle
-    dist[10] = 0.025;    // top of fuel assemblies
-    dist[11] = 0.013;    // bottom of fuel assemblies
+    dist[0]  = 0.140;	// fuel
+    dist[1]  = 0.052;	// cladding
+    dist[2]  = 0.275;	// cold, borated water
+    dist[3]  = 0.134;	// hot, borated water
+    dist[4]  = 0.154;	// RPV
+    dist[5]  = 0.064;	// Lower, radial reflector
+    dist[6]  = 0.066;	// Upper reflector / top plate
+    dist[7]  = 0.055;	// bottom plate
+    dist[8]  = 0.008;	// bottom nozzle
+    dist[9]  = 0.015;	// top nozzle
+    dist[10] = 0.025;	// top of fuel assemblies
+    dist[11] = 0.013;	// bottom of fuel assemblies
 
     double roll = LCG_random_double(seed);
 
@@ -410,12 +410,12 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
 {
     const char * optimization_name = "Optimization 1 - basic sample/lookup kernel splitting";
 
-    if( mype == 0) printf("Simulation Kernel:\"%s\"\n", optimization_name);
+    if( mype == 0)	printf("Simulation Kernel:\"%s\"\n", optimization_name);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Allocate Additional Data Structures Needed by Optimized Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Allocating additional device data required by kernel...\n");
+    if( mype == 0)	printf("Allocating additional device data required by kernel...\n");
     size_t sz;
     size_t total_sz = 0;
 
@@ -429,12 +429,12 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
-    if( mype == 0) printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+    if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Beginning optimized simulation...\n");
+    if( mype == 0)	printf("Beginning optimized simulation...\n");
 
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
@@ -448,14 +448,13 @@ unsigned long long run_event_based_simulation_optimization_1(Inputs in, Simulati
     ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
+    if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-            verification_scalar += GSD.verification[i];
-
-    Kokkos::free(GSD.p_energy_samples);
-    Kokkos::free(GSD.mat_samples);
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long & sum) {
+        sum += GSD.verification[i];
+    }, verification_scalar);
+    Kokkos::fence();
 
     return verification_scalar;
 }
@@ -548,12 +547,12 @@ unsigned long long run_event_based_simulation_optimization_2(Inputs in, Simulati
 {
     const char * optimization_name = "Optimization 2 - Material Lookup Kernels";
 
-    if( mype == 0) printf("Simulation Kernel:\"%s\"\n", optimization_name);
+    if( mype == 0)	printf("Simulation Kernel:\"%s\"\n", optimization_name);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Allocate Additional Data Structures Needed by Optimized Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Allocating additional device data required by kernel...\n");
+    if( mype == 0)	printf("Allocating additional device data required by kernel...\n");
     size_t sz;
     size_t total_sz = 0;
 
@@ -567,12 +566,12 @@ unsigned long long run_event_based_simulation_optimization_2(Inputs in, Simulati
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
-    if( mype == 0) printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+    if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Beginning optimized simulation...\n");
+    if( mype == 0)	printf("Beginning optimized simulation...\n");
 
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
@@ -588,14 +587,13 @@ unsigned long long run_event_based_simulation_optimization_2(Inputs in, Simulati
     ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
+    if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-            verification_scalar += GSD.verification[i];
-
-    Kokkos::free(GSD.p_energy_samples);
-    Kokkos::free(GSD.mat_samples);
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long & sum) {
+        sum += GSD.verification[i];
+    }, verification_scalar);
+    Kokkos::fence();
 
     return verification_scalar;
 }
@@ -666,12 +664,12 @@ unsigned long long run_event_based_simulation_optimization_3(Inputs in, Simulati
 {
     const char * optimization_name = "Optimization 3 - Fuel or Other Lookup Kernels";
 
-    if( mype == 0) printf("Simulation Kernel:\"%s\"\n", optimization_name);
+    if( mype == 0)	printf("Simulation Kernel:\"%s\"\n", optimization_name);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Allocate Additional Data Structures Needed by Optimized Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Allocating additional device data required by kernel...\n");
+    if( mype == 0)	printf("Allocating additional device data required by kernel...\n");
     size_t sz;
     size_t total_sz = 0;
 
@@ -685,12 +683,12 @@ unsigned long long run_event_based_simulation_optimization_3(Inputs in, Simulati
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
-    if( mype == 0) printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+    if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Beginning optimized simulation...\n");
+    if( mype == 0)	printf("Beginning optimized simulation...\n");
 
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
@@ -706,14 +704,13 @@ unsigned long long run_event_based_simulation_optimization_3(Inputs in, Simulati
     ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
+    if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-            verification_scalar += GSD.verification[i];
-
-    Kokkos::free(GSD.p_energy_samples);
-    Kokkos::free(GSD.mat_samples);
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long & sum) {
+        sum += GSD.verification[i];
+    }, verification_scalar);
+    Kokkos::fence();
 
     return verification_scalar;
 }
@@ -785,12 +782,12 @@ unsigned long long run_event_based_simulation_optimization_4(Inputs in, Simulati
 {
     const char * optimization_name = "Optimization 4 - All Material Lookup Kernels + Material Sort";
 
-    if( mype == 0) printf("Simulation Kernel:\"%s\"\n", optimization_name);
+    if( mype == 0)	printf("Simulation Kernel:\"%s\"\n", optimization_name);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Allocate Additional Data Structures Needed by Optimized Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Allocating additional device data required by kernel...\n");
+    if( mype == 0)	printf("Allocating additional device data required by kernel...\n");
     size_t sz;
     size_t total_sz = 0;
 
@@ -804,12 +801,12 @@ unsigned long long run_event_based_simulation_optimization_4(Inputs in, Simulati
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
-    if( mype == 0) printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+    if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Beginning optimized simulation...\n");
+    if( mype == 0)	printf("Beginning optimized simulation...\n");
 
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
@@ -822,22 +819,16 @@ unsigned long long run_event_based_simulation_optimization_4(Inputs in, Simulati
     for( int m = 0; m < 12; m++ )
     {
         int count = 0;
-        for( int i = 0; i < in.lookups; i++ )
-            if( GSD.mat_samples[i] == m )
-                count++;
+        Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, int & sum) {
+            if(GSD.mat_samples[i] == m) sum++;
+        }, count);
         n_lookups_per_material[m] = count;
     }
+    Kokkos::fence();
 
     // Sort materials
     Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
-        int mat = GSD.mat_samples[i];
-        GSD.mat_samples[i] = mat * in.lookups + i;
-    });
-    Kokkos::fence();
-    Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
-        int mat = GSD.mat_samples[i] / in.lookups;
-        double energy = GSD.p_energy_samples[i];
-        GSD.p_energy_samples[i] = mat * in.lookups + energy;
+        GSD.p_energy_samples[i] = GSD.p_energy_samples[i] * 1000 + GSD.mat_samples[i];
     });
     Kokkos::fence();
 
@@ -845,8 +836,6 @@ unsigned long long run_event_based_simulation_optimization_4(Inputs in, Simulati
     int offset = 0;
     for( int m = 0; m < 12; m++ )
     {
-        nthreads = 32;
-        nblocks = ceil((double) n_lookups_per_material[m] / (double) nthreads);
         xs_lookup_kernel_optimization_4(in, GSD, m, n_lookups_per_material[m], offset);
         offset += n_lookups_per_material[m];
     }
@@ -855,14 +844,13 @@ unsigned long long run_event_based_simulation_optimization_4(Inputs in, Simulati
     ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
+    if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-            verification_scalar += GSD.verification[i];
-
-    Kokkos::free(GSD.p_energy_samples);
-    Kokkos::free(GSD.mat_samples);
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long & sum) {
+        sum += GSD.verification[i];
+    }, verification_scalar);
+    Kokkos::fence();
 
     return verification_scalar;
 }
@@ -877,7 +865,7 @@ void xs_lookup_kernel_optimization_4(Inputs in, SimulationData GSD, int m, int n
             return;
 
         // Check that our material type matches the kernel material
-        int mat = GSD.mat_samples[idx] / in.lookups;
+        int mat = GSD.mat_samples[idx];
         if( mat != m )
             return;
 
@@ -885,7 +873,7 @@ void xs_lookup_kernel_optimization_4(Inputs in, SimulationData GSD, int m, int n
 
         // Perform macroscopic Cross Section Lookup
         calculate_macro_xs(
-            GSD.p_energy_samples[idx] - mat * in.lookups,        // Sampled neutron energy (in lethargy)
+            GSD.p_energy_samples[idx],        // Sampled neutron energy (in lethargy)
             mat,             // Sampled material type index neutron is in
             in.n_isotopes,   // Total number of isotopes in simulation
             in.n_gridpoints, // Number of gridpoints per isotope in simulation
@@ -943,12 +931,12 @@ unsigned long long run_event_based_simulation_optimization_5(Inputs in, Simulati
 {
     const char * optimization_name = "Optimization 5 - Fuel/No Fuel Lookup Kernels + Fuel/No Fuel Sort";
 
-    if( mype == 0) printf("Simulation Kernel:\"%s\"\n", optimization_name);
+    if( mype == 0)	printf("Simulation Kernel:\"%s\"\n", optimization_name);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Allocate Additional Data Structures Needed by Optimized Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Allocating additional device data required by kernel...\n");
+    if( mype == 0)	printf("Allocating additional device data required by kernel...\n");
     size_t sz;
     size_t total_sz = 0;
 
@@ -962,12 +950,12 @@ unsigned long long run_event_based_simulation_optimization_5(Inputs in, Simulati
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
-    if( mype == 0) printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+    if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Beginning optimized simulation...\n");
+    if( mype == 0)	printf("Beginning optimized simulation...\n");
 
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
@@ -977,17 +965,14 @@ unsigned long long run_event_based_simulation_optimization_5(Inputs in, Simulati
 
     // Count the number of fuel material lookups that need to be performed (fuel id = 0)
     int n_fuel_lookups = 0;
-    for( int i = 0; i < in.lookups; i++ )
-        if( GSD.mat_samples[i] == 0 )
-            n_fuel_lookups++;
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, int & sum) {
+        if(GSD.mat_samples[i] == 0) sum++;
+    }, n_fuel_lookups);
+    Kokkos::fence();
 
     // Partition fuel into the first part of the array
     Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
-        int mat = GSD.mat_samples[i];
-        if( mat == 0 )
-            GSD.mat_samples[i] = i;
-        else
-            GSD.mat_samples[i] = n_fuel_lookups + i;
+        GSD.p_energy_samples[i] = GSD.p_energy_samples[i] * 1000 + GSD.mat_samples[i];
     });
     Kokkos::fence();
 
@@ -999,14 +984,13 @@ unsigned long long run_event_based_simulation_optimization_5(Inputs in, Simulati
     ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
+    if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-            verification_scalar += GSD.verification[i];
-
-    Kokkos::free(GSD.p_energy_samples);
-    Kokkos::free(GSD.mat_samples);
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long & sum) {
+        sum += GSD.verification[i];
+    }, verification_scalar);
+    Kokkos::fence();
 
     return verification_scalar;
 }
@@ -1025,7 +1009,7 @@ void xs_lookup_kernel_optimization_5(Inputs in, SimulationData GSD, int n_lookup
         // Perform macroscopic Cross Section Lookup
         calculate_macro_xs(
             GSD.p_energy_samples[idx],        // Sampled neutron energy (in lethargy)
-            GSD.mat_samples[idx] - offset,             // Sampled material type index neutron is in
+            GSD.mat_samples[idx],             // Sampled material type index neutron is in
             in.n_isotopes,   // Total number of isotopes in simulation
             in.n_gridpoints, // Number of gridpoints per isotope in simulation
             GSD.num_nucs,     // 1-D array with number of nuclides per material
@@ -1079,12 +1063,12 @@ unsigned long long run_event_based_simulation_optimization_6(Inputs in, Simulati
 {
     const char * optimization_name = "Optimization 6 - Material & Energy Sorts + Material-specific Kernels";
 
-    if( mype == 0) printf("Simulation Kernel:\"%s\"\n", optimization_name);
+    if( mype == 0)	printf("Simulation Kernel:\"%s\"\n", optimization_name);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Allocate Additional Data Structures Needed by Optimized Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Allocating additional device data required by kernel...\n");
+    if( mype == 0)	printf("Allocating additional device data required by kernel...\n");
     size_t sz;
     size_t total_sz = 0;
 
@@ -1098,12 +1082,12 @@ unsigned long long run_event_based_simulation_optimization_6(Inputs in, Simulati
     total_sz += sz;
     GSD.length_mat_samples = in.lookups;
 
-    if( mype == 0) printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
+    if( mype == 0)	printf("Allocated an additional %.0lf MB of data on GPU.\n", total_sz/1024.0/1024.0);
 
     ////////////////////////////////////////////////////////////////////////////////
     // Configure & Launch Simulation Kernel
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Beginning optimized simulation...\n");
+    if( mype == 0)	printf("Beginning optimized simulation...\n");
 
     int nthreads = 32;
     int nblocks = ceil( (double) in.lookups / 32.0);
@@ -1116,22 +1100,16 @@ unsigned long long run_event_based_simulation_optimization_6(Inputs in, Simulati
     for( int m = 0; m < 12; m++ )
     {
         int count = 0;
-        for( int i = 0; i < in.lookups; i++ )
-            if( GSD.mat_samples[i] == m )
-                count++;
+        Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, int & sum) {
+            if(GSD.mat_samples[i] == m) sum++;
+        }, count);
         n_lookups_per_material[m] = count;
     }
+    Kokkos::fence();
 
     // Sort by material first
     Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
-        int mat = GSD.mat_samples[i];
-        GSD.mat_samples[i] = mat * in.lookups + i;
-    });
-    Kokkos::fence();
-    Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i) {
-        int mat = GSD.mat_samples[i] / in.lookups;
-        double energy = GSD.p_energy_samples[i];
-        GSD.p_energy_samples[i] = mat * in.lookups + energy;
+        GSD.p_energy_samples[i] = GSD.p_energy_samples[i] * 1000 + GSD.mat_samples[i];
     });
     Kokkos::fence();
 
@@ -1139,20 +1117,6 @@ unsigned long long run_event_based_simulation_optimization_6(Inputs in, Simulati
     int offset = 0;
     for( int m = 0; m < 12; m++ )
     {
-        Kokkos::parallel_for(Kokkos::RangePolicy<>(0, n_lookups_per_material[m]), KOKKOS_LAMBDA (const int i) {
-            double energy = GSD.p_energy_samples[offset + i];
-            GSD.p_energy_samples[offset + i] = energy;
-        });
-        offset += n_lookups_per_material[m];
-    }
-    Kokkos::fence();
-
-    // Launch all material kernels individually
-    offset = 0;
-    for( int m = 0; m < 12; m++ )
-    {
-        nthreads = 32;
-        nblocks = ceil((double) n_lookups_per_material[m] / (double) nthreads);
         xs_lookup_kernel_optimization_4(in, GSD, m, n_lookups_per_material[m], offset);
         offset += n_lookups_per_material[m];
     }
@@ -1161,14 +1125,13 @@ unsigned long long run_event_based_simulation_optimization_6(Inputs in, Simulati
     ////////////////////////////////////////////////////////////////////////////////
     // Reduce Verification Results
     ////////////////////////////////////////////////////////////////////////////////
-    if( mype == 0) printf("Reducing verification results...\n");
+    if( mype == 0)	printf("Reducing verification results...\n");
 
     unsigned long verification_scalar = 0;
-    for( int i =0; i < in.lookups; i++ )
-            verification_scalar += GSD.verification[i];
-
-    Kokkos::free(GSD.p_energy_samples);
-    Kokkos::free(GSD.mat_samples);
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups), KOKKOS_LAMBDA (const int i, unsigned long & sum) {
+        sum += GSD.verification[i];
+    }, verification_scalar);
+    Kokkos::fence();
 
     return verification_scalar;
 }

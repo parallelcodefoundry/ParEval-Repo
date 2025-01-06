@@ -8,7 +8,7 @@ void init_flux_states( float * flux_states, int N_flux_states, Input I, Kokkos::
     Kokkos::parallel_for(Kokkos::RangePolicy<>(0, N_flux_states), KOKKOS_LAMBDA(const int i) {
         Kokkos::Random_XorShift64_Pool::generator_type gen = pool.get_state();
         for (int j = 0; j < I.egroups; j++) {
-            flux_states[i * I.egroups + j] = Kokkos::Random_XorShift64_Pool::random(gen);
+            flux_states[i * I.egroups + j] = Kokkos::Random_XorShift64_Pool::real_01(gen);
         }
         pool.free_state(gen);
     });
@@ -31,7 +31,7 @@ Input set_default_input(void)
     return I;
 }
 
-// Returns a memory estimate (in MB) for the program's primary data structures
+// Returns a memory esimate (in MB) for the program's primary data structures
 double mem_estimate(Input I)
 {
     size_t nbytes = 0;
@@ -94,25 +94,23 @@ Source* initialize_device_sources(Input I, Source_Arrays* SA_h, Source_Arrays* S
 {
     // Allocate & Copy Fine Source Data
     long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    Kokkos::View<float*> fine_source_arr("fine_source_arr", N_fine);
-    Kokkos::deep_copy(fine_source_arr, SA_h->fine_source_arr);
-    SA_d->fine_source_arr = fine_source_arr.data();
+    SA_d->fine_source_arr = Kokkos::View<float*>(Kokkos::DefaultExecutionSpace::memory_space());
+    Kokkos::deep_copy(SA_d->fine_source_arr, SA_h->fine_source_arr);
 
     // Allocate & Copy Fine Flux Data
-    Kokkos::View<float*> fine_flux_arr("fine_flux_arr", N_fine);
-    Kokkos::deep_copy(fine_flux_arr, SA_h->fine_flux_arr);
-    SA_d->fine_flux_arr = fine_flux_arr.data();
+    SA_d->fine_flux_arr = Kokkos::View<float*>(Kokkos::DefaultExecutionSpace::memory_space());
+    Kokkos::deep_copy(SA_d->fine_flux_arr, SA_h->fine_flux_arr);
 
     // Allocate & Copy SigT Data
     long N_sigT = I.source_3D_regions * I.egroups;
-    Kokkos::View<float*> sigT_arr("sigT_arr", N_sigT);
-    Kokkos::deep_copy(sigT_arr, SA_h->sigT_arr);
-    SA_d->sigT_arr = sigT_arr.data();
+    SA_d->sigT_arr = Kokkos::View<float*>(Kokkos::DefaultExecutionSpace::memory_space());
+    Kokkos::deep_copy(SA_d->sigT_arr, SA_h->sigT_arr);
 
     // Allocate & Copy Source Array Data
-    Kokkos::View<Source*> sources_d("sources_d", I.source_3D_regions);
+    Source* sources_d = Kokkos::View<Source*>(Kokkos::DefaultExecutionSpace::memory_space());
     Kokkos::deep_copy(sources_d, sources_h);
-    return sources_d.data();
+
+    return sources_d;
 }
 
 // Builds a table of exponential values for linear interpolation

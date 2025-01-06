@@ -57,7 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is a C++ code using the Kokkos parallel programming model and supports various architectures, including NVIDIA GPUs, AMD GPUs, and CPUs.
+SimpleMOC-kernel is a C++ code that utilizes the Kokkos parallel programming model, 
+supporting a variety of architectures including NVIDIA GPUs, AMD GPUs, and CPUs.
 
 ==============================================================================
 Quick Start Guide
@@ -105,7 +106,7 @@ Running SimpleMOC-kernel-------------------------------------------------------
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per thread block
-	  -d <device>           Device to use (e.g. "cuda", "omp", "serial")
+	
 
 	If not options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
@@ -156,7 +157,7 @@ John R. Tramm, Geoffrey Gunow, Tim He, Kord S. Smith, Benoit Forget,
 Andrew R. Siegel, (2016) "A task-based parallelism and vectorized approach
 to 3D Method of Characteristics (MOC) reactor simulation for high performance
 computing architectures", Computer Physics Communications, Volume 202, 
-Pages 141���150, (https://doi.org/10.1016/j.cpc.2016.01.007).
+Pages 141–150, (https://doi.org/10.1016/j.cpc.2016.01.007).
 
 The bibtext entry for this paper is given below:
 

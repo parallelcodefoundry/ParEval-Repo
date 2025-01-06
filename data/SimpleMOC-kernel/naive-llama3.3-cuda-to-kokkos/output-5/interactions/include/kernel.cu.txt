@@ -10,16 +10,18 @@
 // 		- A set of __shared__ SIMD vectors, each thread id being its idx
 KOKKOS_INLINE_FUNCTION
 void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const Table* table, const curandState* state, float* state_fluxes, int N_state_fluxes) {
-    int blockId = Kokkos::parallel_for::get_block_id();
-    if (blockId >= I.segments / I.seg_per_thread) return;
+    int blockId = Kokkos::parallel_for::get_block_id(); // geometric segment
+    int threadId = Kokkos::parallel_for::get_thread_id(); // Each energy group (g) is one thread in a block
+
+    if (blockId >= I.segments / I.seg_per_thread) {
+        return;
+    }
 
     // Assign RNG state
     curandState localState = state[blockId % I.streams];
 
     blockId *= I.seg_per_thread;
     blockId--;
-
-    int g = Kokkos::parallel_for::get_thread_id(); // Each energy group (g) is one thread in a block
 
     // Thread Local (i.e., specific to E group) variables
     // Similar to SIMD vectors in CPU code
@@ -39,12 +41,11 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
     float t4;
 
     // Randomized variables (common accross all thread within block)
-    Kokkos::Shared<int, Kokkos::DefaultExecutionSpace> shm(Kokkos::PerThread, I.seg_per_thread * 3);
-    int* state_flux_id = &shm[0];
-    int* QSR_id = &shm[I.seg_per_thread];
-    int* FAI_id = &shm[I.seg_per_thread * 2];
+    int state_flux_id[I.seg_per_thread];
+    int QSR_id[I.seg_per_thread];
+    int FAI_id[I.seg_per_thread];
 
-    if (Kokkos::parallel_for::get_thread_id() == 0) {
+    if (threadId == 0) {
         for (int i = 0; i < I.seg_per_thread; i++) {
             state_flux_id[i] = curand(&localState) % N_state_fluxes;
             QSR_id[i] = curand(&localState) % I.source_3D_regions;
@@ -52,14 +53,14 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
         }
     }
 
-    Kokkos::fence();
+    Kokkos::parallel_for::sync_block();
 
     for (int i = 0; i < I.seg_per_thread; i++) {
         blockId++;
 
         float* state_flux = &state_fluxes[state_flux_id[i]];
 
-        Kokkos::fence();
+        Kokkos::parallel_for::sync_block();
 
         ////////////////////////////////////////////////////////////
         // Attenuate Segment
@@ -86,8 +87,8 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
             float* f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
             // cycle over energy groups
             // load neighboring sources
-            float y2 = f2[g];
-            float y3 = f3[g];
+            float y2 = f2[threadId];
+            float y3 = f3[threadId];
 
             // do linear "fitting"
             float c0 = y2;
@@ -102,8 +103,8 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
             float* f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
             // cycle over energy groups
             // load neighboring sources
-            float y1 = f1[g];
-            float y2 = f2[g];
+            float y1 = f1[threadId];
+            float y2 = f2[threadId];
 
             // do linear "fitting"
             float c0 = y2;
@@ -119,23 +120,23 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
             float* f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
             // cycle over energy groups
             // load neighboring sources
-            float y1 = f1[g];
-            float y2 = f2[g];
-            float y3 = f3[g];
+            float y1 = f1[threadId];
+            float y2 = f2[threadId];
+            float y3 = f3[threadId];
 
             // do quadratic "fitting"
             float c0 = y2;
-            float c1 = (y1 - y3) / (2.f * dz);
-            float c2 = (y1 - 2.f * y2 + y3) / (2.f * dz * dz);
+            float c1 = (y1 - y3) / (2.0f * dz);
+            float c2 = (y1 - 2.0f * y2 + y3) / (2.0f * dz * dz);
 
             // calculate q0, q1, q2
             q0 = c0 + c1 * zin + c2 * zin * zin;
-            q1 = c1 + 2.f * c2 * zin;
+            q1 = c1 + 2.0f * c2 * zin;
             q2 = c2;
         }
 
         // load total cross section
-        sigT = SA.sigT_arr[S[QSR_id[i]].sigT_id + g];
+        sigT = SA.sigT_arr[S[QSR_id[i]].sigT_id + threadId];
 
         // calculate common values for efficiency
         tau = sigT * ds;
@@ -144,23 +145,23 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
 #ifdef TABLE
         interpolateTable(table, tau, &expVal);
 #else
-        expVal = 1.f - expf(-tau); // EXP function is fater than table lookup
+        expVal = 1.0f - expf(-tau); // EXP function is fater than table lookup
 #endif
 
         // Flux Integral
 
         // Re-used Term
-        reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
+        reuse = tau * (tau - 2.0f) + 2.0f * expVal / (sigT * sigT2);
 
         // add contribution to new source flux
-        flux_integral = (q0 * tau + (sigT * state_flux[g] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
+        flux_integral = (q0 * tau + (sigT * state_flux[threadId] - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.0f) + 6.0f) - 6.0f * expVal) / (3.0f * sigT2 * sigT2);
 
         // Prepare tally
         tally = weight * flux_integral;
 
         // SHOULD BE ATOMIC HERE!
-        // FSR_flux[g] += tally;
-        Kokkos::atomic_add(&FSR_flux[g], (float)tally);
+        // FSR_flux[threadId] += tally;
+        Kokkos::atomic_add(&FSR_flux[threadId], (float)tally);
 
         // Term 1
         t1 = q0 * expVal / sigT;
@@ -169,9 +170,9 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
         // Term 3
         t3 = q2 * mu2 * reuse;
         // Term 4
-        t4 = state_flux[g] * (1.f - expVal);
+        t4 = state_flux[threadId] * (1.0f - expVal);
         // Total psi
-        state_flux[g] = t1 + t2 + t3 + t4;
+        state_flux[threadId] = t1 + t2 + t3 + t4;
     }
 }
 
@@ -180,9 +181,9 @@ void run_kernel(const Input& I, const Source* S, const Source_Arrays& SA, const 
 KOKKOS_INLINE_FUNCTION
 void interpolateTable(const Table* table, float x, float* out) {
     // check to ensure value is in domain
-    if (x > table->maxVal)
+    if (x > table->maxVal) {
         *out = 1.0f;
-    else {
+    } else {
         int interval = (int)(x / table->dx + 0.5f * table->dx);
         interval = interval * 2;
         float slope = table->values[interval];

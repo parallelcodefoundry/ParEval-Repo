@@ -38,9 +38,9 @@ typedef struct{
 
 // Source Arrays
 typedef struct{
-    double * fine_flux_arr;
-    double * fine_source_arr;
-    double * sigT_arr;
+    double* fine_flux_arr;
+    double* fine_source_arr;
+    double* sigT_arr;
 } Source_Arrays;
 
 // Table structure for computing exponential
@@ -52,24 +52,22 @@ typedef struct{
 } Table;
 
 // kernel.cpp
-void run_kernel( Input I, Source *  S,
-        Source_Arrays SA, Table *  table,
-        double *  state_fluxes, int N_state_fluxes);
+void run_kernel( Input I, Source* S, Source_Arrays SA, Table* table, double* state_fluxes, int N_state_fluxes);
 
 // init.cpp
 double mem_estimate( Input I );
-Source * initialize_sources( Input I, Source_Arrays * SA );
-Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h );
+Source* initialize_sources( Input I, Source_Arrays* SA );
+Source* initialize_device_sources( Input I, Source_Arrays* SA_h, Source_Arrays* SA_d, Source* sources_h );
 Table buildExponentialTable( void );
 Input set_default_input( void );
 
 // io.cpp
 void logo(int version);
-void center_print(const char *s, int width);
+void center_print(const char* s, int width);
 void border_print(void);
 void fancy_int( int a );
 void print_input_summary(Input input);
-void read_CLI( int argc, char * argv[], Input * input );
+void read_CLI( int argc, char* argv[], Input* input );
 void print_CLI_error(void);
 
 #endif

@@ -9,46 +9,56 @@ find_package(Kokkos REQUIRED)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Set the source files
-set(SOURCES
+# Add the source files
+add_executable(SimpleMOC-kernel
   kernel.cpp
   main.cpp
   init.cpp
   io.cpp
 )
 
-# Set the header files
-set(HEADERS
-  SimpleMOC-kernel_header.hpp
-)
-
-# Add the executable
-add_executable(SimpleMOC-kernel ${SOURCES})
-
 # Link the Kokkos library
-target_link_libraries(SimpleMOC-kernel Kokkos::KokkosCore)
+target_link_libraries(SimpleMOC-kernel ${Kokkos_LIBRARIES})
 
 # Add include directories
-target_include_directories(SimpleMOC-kernel PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(SimpleMOC-kernel PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
-# Set the CUDA architecture
+# Set the CUDA architecture if using the CUDA backend
 if (KOKKOS_ENABLE_CUDA)
   set(CUDA_ARCHITECTURE "52" CACHE STRING "CUDA architecture")
-  set_property(TARGET SimpleMOC-kernel PROPERTY CUDA_ARCHITECTURE ${CUDA_ARCHITECTURE})
+  target_compile_definitions(SimpleMOC-kernel PUBLIC -DSM_VERSION=${CUDA_ARCHITECTURE})
 endif()
 
-# Set the optimization flags
-if (NOT DEBUG)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+# Add compiler flags
+target_compile_options(SimpleMOC-kernel PUBLIC
+  -Wall
+  -Wextra
+  -Wpedantic
+)
+
+# Add optimization flags if OPTIMIZE is ON
+option(OPTIMIZE "Enable compiler optimizations" ON)
+if (OPTIMIZE)
+  target_compile_options(SimpleMOC-kernel PUBLIC -O3)
 endif()
 
-# Set the debug flags
+# Add debug flags if DEBUG is ON
+option(DEBUG "Enable debug mode" OFF)
 if (DEBUG)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -G")
+  target_compile_options(SimpleMOC-kernel PUBLIC -g)
 endif()
 
-# Set the profiling flags
+# Add profiling flags if PROFILE is ON
+option(PROFILE "Enable profiling" OFF)
 if (PROFILE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+  target_compile_options(SimpleMOC-kernel PUBLIC -pg)
+endif()
+
+# Add table flag if TABLE is ON
+option(TABLE "Enable exponential table" OFF)
+if (TABLE)
+  target_compile_definitions(SimpleMOC-kernel PUBLIC -DTABLE)
 endif()
 ```
