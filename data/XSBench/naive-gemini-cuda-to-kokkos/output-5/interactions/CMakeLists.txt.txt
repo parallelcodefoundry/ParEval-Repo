@@ -11,32 +11,37 @@ project(
 find_package(Kokkos REQUIRED)
 
 # Set compiler flags
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
+
+# Add Kokkos flags based on backend (CUDA in this example)
+if(KOKKOS_BACKEND STREQUAL "CUDA")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKOKKOS_BACKEND=CUDA")
+elseif(KOKKOS_BACKEND STREQUAL "OpenMP")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKOKKOS_BACKEND=OpenMP")
+elseif(KOKKOS_BACKEND STREQUAL "Serial")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKOKKOS_BACKEND=Serial")
+# Add other backends as needed
+endif()
+
 
 # Source files
-set(SOURCE
-    Main.cpp
-    io.cpp
-    Simulation.cpp
-    GridInit.cpp
-    XSutils.cpp
-    Materials.cpp
-)
+set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+set(HEADER XSbench_header.hpp XSbench_shared_header.h)
 
-# Header files
-set(HEADER
-    XSbench_header.hpp
-    XSbench_shared_header.h
-)
+
+# Add Kokkos dependency to the target
+target_include_directories(XSBench PRIVATE ${Kokkos_INCLUDE_DIRS})
+target_link_libraries(XSBench PRIVATE ${Kokkos_LIBRARIES} )
+
 
 # Add executable
 add_executable(XSBench ${SOURCE} ${HEADER})
 
-# Link Kokkos libraries
-target_link_libraries(XSBench Kokkos::Kokkos)
-
-# Install target (optional)
 install(TARGETS XSBench DESTINATION bin)
+
 ```

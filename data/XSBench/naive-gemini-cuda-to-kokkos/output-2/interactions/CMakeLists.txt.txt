@@ -7,48 +7,26 @@ project(
     LANGUAGES CXX
 )
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
 # Find Kokkos
 find_package(Kokkos REQUIRED)
 
-# Set compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-endif()
+# Kokkos-specific compile flags.  These are appended to CMAKE_CXX_FLAGS.
+set(KOKKOS_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Kokkos_CXX_FLAGS}")
 
-# Set Kokkos specific flags (can be customized)
-set(KOKKOS_CXX_FLAGS "${KOKKOS_CXX_FLAGS}") # Add any Kokkos-specific flags here if needed
-
-
-# Source files
-set(SOURCE
-    Main.cpp
-    io.cpp
-    Simulation.cpp
-    GridInit.cpp
-    XSutils.cpp
-    Materials.cpp
-)
-
-# Header files
-set(HEADER
-    XSbench_header.hpp
-    XSbench_shared_header.h
-)
-
-# Add executable
-add_executable(XSBench ${SOURCE})
+set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
+add_executable(XSBench ${SOURCE} XSbench_header.hpp XSbench_shared_header.h)
 
 # Link Kokkos libraries
 target_link_libraries(XSBench Kokkos::Kokkos)
 
-# Install target (optional)
+
 install(TARGETS XSBench DESTINATION bin)
-
-# Add include directories. Assuming XSbench_header.hpp and XSbench_shared_header.h are in the same directory.  Adjust if necessary.
-target_include_directories(XSBench PRIVATE .)
-
-
 ```

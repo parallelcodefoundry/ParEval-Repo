@@ -28,14 +28,13 @@ std::vector<int> load_num_nucs(long n_isotopes) {
 }
 
 // Assigns an array of nuclide ID's to each material
-std::vector<int> load_mats(const std::vector<int>& num_nucs, long n_isotopes, int* max_num_nucs) {
-    *max_num_nucs = 0;
-    int num_mats = 12;
-    for (int m = 0; m < num_mats; m++) {
-        if (num_nucs[m] > *max_num_nucs)
-            *max_num_nucs = num_nucs[m];
+std::vector<int> load_mats(const std::vector<int>& num_nucs, long n_isotopes, int& max_num_nucs) {
+    max_num_nucs = 0;
+    for (int m = 0; m < 12; m++) {
+        if (num_nucs[m] > max_num_nucs)
+            max_num_nucs = num_nucs[m];
     }
-    std::vector<int> mats(num_mats * (*max_num_nucs));
+    std::vector<int> mats(12 * max_num_nucs);
 
     // Small H-M has 34 fuel nuclides
     int mats0_Sml[] = {58, 59, 60, 61, 40, 42, 43, 44, 45, 46, 1, 2, 3, 7,
@@ -67,7 +66,6 @@ std::vector<int> load_mats(const std::vector<int>& num_nucs, long n_isotopes, in
     int mats10[] = {24, 41, 4, 5, 63, 64, 65, 66, 67}; // top of FA's
     int mats11[] = {24, 41, 4, 5, 63, 64, 65, 66, 67}; // bottom FA's
 
-
     // H-M large v small dependency
     if (n_isotopes == 68)
         std::copy(std::begin(mats0_Sml), std::end(mats0_Sml), std::begin(mats));
@@ -75,17 +73,17 @@ std::vector<int> load_mats(const std::vector<int>& num_nucs, long n_isotopes, in
         std::copy(std::begin(mats0_Lrg), std::end(mats0_Lrg), std::begin(mats));
 
     // Copy other materials
-    std::copy(std::begin(mats1), std::end(mats1), std::begin(mats) + (*max_num_nucs) * 1);
-    std::copy(std::begin(mats2), std::end(mats2), std::begin(mats) + (*max_num_nucs) * 2);
-    std::copy(std::begin(mats3), std::end(mats3), std::begin(mats) + (*max_num_nucs) * 3);
-    std::copy(std::begin(mats4), std::end(mats4), std::begin(mats) + (*max_num_nucs) * 4);
-    std::copy(std::begin(mats5), std::end(mats5), std::begin(mats) + (*max_num_nucs) * 5);
-    std::copy(std::begin(mats6), std::end(mats6), std::begin(mats) + (*max_num_nucs) * 6);
-    std::copy(std::begin(mats7), std::end(mats7), std::begin(mats) + (*max_num_nucs) * 7);
-    std::copy(std::begin(mats8), std::end(mats8), std::begin(mats) + (*max_num_nucs) * 8);
-    std::copy(std::begin(mats9), std::end(mats9), std::begin(mats) + (*max_num_nucs) * 9);
-    std::copy(std::begin(mats10), std::end(mats10), std::begin(mats) + (*max_num_nucs) * 10);
-    std::copy(std::begin(mats11), std::end(mats11), std::begin(mats) + (*max_num_nucs) * 11);
+    std::copy(std::begin(mats1), std::end(mats1), std::begin(mats) + max_num_nucs);
+    std::copy(std::begin(mats2), std::end(mats2), std::begin(mats) + max_num_nucs * 2);
+    std::copy(std::begin(mats3), std::end(mats3), std::begin(mats) + max_num_nucs * 3);
+    std::copy(std::begin(mats4), std::end(mats4), std::begin(mats) + max_num_nucs * 4);
+    std::copy(std::begin(mats5), std::end(mats5), std::begin(mats) + max_num_nucs * 5);
+    std::copy(std::begin(mats6), std::end(mats6), std::begin(mats) + max_num_nucs * 6);
+    std::copy(std::begin(mats7), std::end(mats7), std::begin(mats) + max_num_nucs * 7);
+    std::copy(std::begin(mats8), std::end(mats8), std::begin(mats) + max_num_nucs * 8);
+    std::copy(std::begin(mats9), std::end(mats9), std::begin(mats) + max_num_nucs * 9);
+    std::copy(std::begin(mats10), std::end(mats10), std::begin(mats) + max_num_nucs * 10);
+    std::copy(std::begin(mats11), std::end(mats11), std::begin(mats) + max_num_nucs * 11);
 
     return mats;
 }

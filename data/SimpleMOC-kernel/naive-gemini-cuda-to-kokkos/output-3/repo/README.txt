@@ -57,8 +57,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now a Kokkos code and supports various architectures
-through Kokkos's execution spaces (e.g., OpenMP, CUDA, OpenCL).
+SimpleMOC-kernel is now a Kokkos code and supports a variety of architectures
+through Kokkos' execution spaces.
 
 ==============================================================================
 Quick Start Guide
@@ -84,22 +84,22 @@ Download----------------------------------------------------------------------
 
 Compilation-------------------------------------------------------------------
 
-	To compile SimpleMOC-kernel with default settings,  you will need to have
-  Kokkos installed.  Then use a build system like CMake to compile.  Refer to
-  Kokkos documentation for details.
+	To compile SimpleMOC-kernel with default settings, use the following command (adjusting compiler and Kokkos flags as needed):
+
+	>$ make
 
 Running SimpleMOC-kernel-------------------------------------------------------
 
-	To run SimpleMOC-kernel with default settings (after successful compilation):
+	To run SimpleMOC-kernel with default settings, use the following command:
 
 	>$ ./SimpleMOC-kernel
 
 	For non-default settings, SimpleMOC-kernel supports the following
-	command line options (these may be handled differently with Kokkos):
+	command line options:
 
 	Usage: ./SimpleMOC-kernel <options>
 	Options include:
-	  -t <threads>          Number of threads to run (OpenMP, if applicable)
+	  -t <threads>          Number of threads to run (Kokkos execution space dependent)
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per Kokkos team (if applicable)
@@ -115,12 +115,34 @@ Running SimpleMOC-kernel-------------------------------------------------------
 Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
-Compilation and optimization options are managed through the Kokkos build system
-(e.g., CMake).  Debugging and profiling will also depend on your build system
-and chosen Kokkos execution space.
+There are a number of switches that can be set at the top of the makefile, along
+with more advanced compilation features.  Refer to the Kokkos documentation
+for details on additional compilation flags and options.
+
+Here is a sample of the control panel at the top of the makefile:
+
+KOKKOS_DEVICES  ?= OpenMP
+KOKKOS_ARCH     ?= native
+OPTIMIZE       ?= yes
+DEBUG          ?= no
+PROFILE        ?= no
+TABLE          ?= no
+
+
+Explanation of Flags:
+
+KOKKOS_DEVICES <OpenMP, CUDA, Serial, ...> - This selects your Kokkos execution space.
+
+OPTIMIZE - Adds compiler optimization flags.
+
+DEBUG - Adds debugging flags.
+
+PROFILE - Adds profiling flags.
+
+TABLE - Enables/disables the use of the pre-computed exponential table.
 
 ===============================================================================
-SimpleMOC-kernel Strawman Reactor Definition
+SimpleMOC-kernel Strawman Reactor Defintion
 ===============================================================================
 
 For the purposes of simplicity this mini-app uses a conservative "strawman"

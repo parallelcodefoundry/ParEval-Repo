@@ -2,28 +2,18 @@
 cmake_minimum_required(VERSION 3.10)
 project(SimpleMOC-kernel)
 
-# Set compiler and other options
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if (NOT CMAKE_CXX_COMPILER MATCHES "clang\\+\\+")
-  message(WARNING "Recommended to use clang++ as the host compiler")
-endif
-
-# Kokkos configuration
-if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif
-option(KOKKOS_BACKEND "Kokkos backend (Serial, OpenMP, CUDA, OpenCL, SYCL)" "CUDA")
-if (KOKKOS_BACKEND STREQUAL "CUDA")
-  find_package(CUDA REQUIRED)
-endif
+# Find Kokkos
 find_package(Kokkos REQUIRED)
-add_definitions(${Kokkos_DEFINITIONS})
 
-# Add include directories
-include_directories(include)
+# Set compiler and architecture flags
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17") #Needed for C++17 features
+if(KOKKOS_BACKEND STREQUAL "CUDA")
+  set(CMAKE_CUDA_ARCHITECTURES 35) # Adjust as needed
+  # Add CUDA specific flags if necessary
+endif
 
-# Source files
+# Specify source files
 set(SOURCES
   main.cpp
   kernel.cpp
@@ -31,40 +21,39 @@ set(SOURCES
   io.cpp
 )
 
+# Add header file directory
+include_directories(./)
 
-# Add executables
-add_executable(SimpleMOC-kernel ${SOURCES})
-target_link_libraries(SimpleMOC-kernel ${Kokkos_LIBRARIES} ${CUDA_LIBRARIES})
+# Add Kokkos library to the link libraries
+target_link_libraries(SimpleMOC-kernel Kokkos::Kokkos)
 
-# Set build options based on user settings
-if (OPTIMIZE STREQUAL "yes")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math")
+# Create executable
+add_executable(SimpleMOC-kernel ${SOURCES} SimpleMOC-kernel_header.hpp)
+
+# Set options (OPTIMIZE, DEBUG, PROFILE, TABLE)
+option(OPTIMIZE "Enable compiler optimizations" ON)
+option(DEBUG "Enable debugging information" OFF)
+option(PROFILE "Enable profiling" OFF)
+option(TABLE "Use exponential table" OFF)
+
+
+if(OPTIMIZE)
+  target_compile_options(SimpleMOC-kernel PRIVATE -O3 -ffast-math)
 endif
 
-if (DEBUG STREQUAL "yes")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+if(DEBUG)
+  target_compile_options(SimpleMOC-kernel PRIVATE -g)
 endif
 
-if (TABLE STREQUAL "yes")
-    add_definitions(-DTABLE)
+if(PROFILE)
+  target_compile_options(SimpleMOC-kernel PRIVATE -pg)
 endif
 
+if(TABLE)
+  target_compile_options(SimpleMOC-kernel PRIVATE -DTABLE)
+endif
 
-# Add a custom target to generate the exponential table if needed
-# (this part is not strictly necessary but demonstrates how one might
-# handle the TABLE flag in CMake).  The original Makefile included
-# TABLE handling in the compilation flags.  For Kokkos, it's often
-# easier to handle such compilation-time switches using `add_definitions`.
-# The Table is now generated in init.cpp as an array rather than as a
-# separate function.
+# Add custom commands if necessary (e.g., for pre-processing steps)
 
-#Example for separate table generation:
-#if (TABLE STREQUAL "yes")
-# add_custom_target(generate_table
-#  COMMAND ${CMAKE_COMMAND} -E echo "Generating Exponential Table..."
-#  COMMAND ${CMAKE_COMMAND} -E touch table.dat # replace with your actual table generation command
-# )
-# add_dependencies(SimpleMOC-kernel generate_table)
-#endif
 
 ```

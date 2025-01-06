@@ -6,29 +6,45 @@ project(
     LANGUAGES CXX
 )
 
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-
 # Find Kokkos
 find_package(Kokkos REQUIRED)
 
-# Kokkos specific flags.  These might need adjustments depending on your Kokkos installation
-set(KOKKOS_FLAGS "${Kokkos_CXX_FLAGS} ${Kokkos_LINK_FLAGS}")
+# Set compiler flags (adjust as needed)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
 
 
-set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
-add_executable(XSBench ${SOURCE} XSbench_header.hpp XSbench_shared_header.h)
+# Source files
+set(SOURCE
+    Main.cpp
+    io.cpp
+    Simulation.cpp
+    GridInit.cpp
+    XSutils.cpp
+    Materials.cpp
+)
 
-target_link_libraries(XSBench Kokkos::Kokkos) #Link against Kokkos library
+# Header files (adjust paths as needed)
+set(HEADER
+    XSbench_header.hpp
+    XSbench_shared_header.h
+)
 
-# Set compiler and linker flags
-target_compile_options(XSBench PRIVATE ${CMAKE_CXX_FLAGS} ${KOKKOS_FLAGS})
-target_link_options(XSBench PRIVATE ${KOKKOS_FLAGS})
+# Add executable
+add_executable(XSBench ${SOURCE})
 
+# Link Kokkos libraries
+target_link_libraries(XSBench Kokkos::KokkosCore)
 
+# Install target (optional)
 install(TARGETS XSBench DESTINATION bin)
+
+#Add headers to target
+target_include_directories(XSBench PRIVATE
+    .
+    include #Add other necessary directories here
+)

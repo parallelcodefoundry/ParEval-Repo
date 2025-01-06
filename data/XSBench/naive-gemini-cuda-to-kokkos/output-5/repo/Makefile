@@ -2,7 +2,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= g++
+COMPILER    ?= clang++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -31,7 +31,7 @@ obj = $(source:.cpp=.o)
 CFLAGS := -std=c++17 -I$(KOKKOS_ROOT)/include
 
 # Linker Flags
-LDFLAGS = -lm -L$(KOKKOS_ROOT)/lib -lkokkos_core
+LDFLAGS = -lm -L$(KOKKOS_ROOT)/lib -lkokkos_core -lkokkos_kernels
 
 # Debug Flags
 ifeq ($(DEBUG),yes)

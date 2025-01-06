@@ -6,9 +6,9 @@ int main(int argc, char *argv[]) {
     // Initialization & Command Line Read-In
     // =====================================================================
     int version = 20;
-    int mype = 0; // Kokkos doesn't inherently have MPI ranks; this will need adjustment for MPI.
+    int mype = 0; // Kokkos doesn't inherently have MPI ranks.  This will need adjustment for parallel runs.
     double omp_start, omp_end;
-    int nprocs = 1; // Similar to mype, this needs adjustment for MPI in Kokkos.
+    int nprocs = 1; // Similarly, nprocs needs adjustment for parallel Kokkos.
     unsigned long long verification;
 
     // Process CLI Fields -- store in "Inputs" structure
@@ -56,42 +56,28 @@ int main(int argc, char *argv[]) {
     // Start Simulation Timer
     omp_start = get_time();
 
+    // Run simulation using Kokkos::parallel_for
     Kokkos::Timer timer;
-
-    // Run simulation using Kokkos
-    Kokkos::parallel_for(Kokkos::RangePolicy<>(0, in.lookups), [&](int i) {
-            // ... Kokkos-based implementation of the chosen kernel ...
-        });
-
-
-    // Choose the appropriate kernel based on kernel_id.  This needs to be implemented with Kokkos::parallel_for.  The code below is illustrative and needs replacing.  The actual Kokkos kernels will be similar to the CUDA kernels, but use Kokkos::parallel_for and Kokkos::View.
-
     if (in.simulation_method == EVENT_BASED) {
-        if (in.kernel_id == 0) {
-            //Kokkos::parallel_for(...); //Implement baseline event-based simulation in Kokkos
-            verification = run_event_based_simulation_baseline_kokkos(in, SD, mype, &profile);
-        } else if (in.kernel_id == 1) {
-            //Kokkos::parallel_for(...); //Implement Optimization 1 in Kokkos
-            verification = run_event_based_simulation_optimization_1_kokkos(in, SD, mype);
-        } else if (in.kernel_id == 2) {
-            //Kokkos::parallel_for(...); //Implement Optimization 2 in Kokkos
-            verification = run_event_based_simulation_optimization_2_kokkos(in, SD, mype);
-        } else if (in.kernel_id == 3) {
-            //Kokkos::parallel_for(...); //Implement Optimization 3 in Kokkos
-            verification = run_event_based_simulation_optimization_3_kokkos(in, SD, mype);
-        } else if (in.kernel_id == 4) {
-            //Kokkos::parallel_for(...); //Implement Optimization 4 in Kokkos
-            verification = run_event_based_simulation_optimization_4_kokkos(in, SD, mype);
-        } else if (in.kernel_id == 5) {
-            //Kokkos::parallel_for(...); //Implement Optimization 5 in Kokkos
-            verification = run_event_based_simulation_optimization_5_kokkos(in, SD, mype);
-        } else if (in.kernel_id == 6) {
-            //Kokkos::parallel_for(...); //Implement Optimization 6 in Kokkos
-            verification = run_event_based_simulation_optimization_6_kokkos(in, SD, mype);
-        } else {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, mype);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, mype);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, mype);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, mype);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, mype);
+        else {
             printf("Error: No kernel ID %d found!\n", in.kernel_id);
             exit(1);
         }
+        profile.kernel_time = timer.seconds();
     } else {
         printf(
                 "History-based simulation not implemented in Kokkos code. Instead,\nuse "
@@ -108,7 +94,7 @@ int main(int argc, char *argv[]) {
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory  (Kokkos handles memory management automatically, but you need to free any manually allocated memory)
+    // Release device memory (Kokkos handles memory management automatically)
     release_memory(SD);
 
     // Final Hash Step
@@ -123,20 +109,3 @@ int main(int argc, char *argv[]) {
     return is_invalid_result;
 }
 ```
-
-**Note:** This translation is a skeletal structure.  You'll need to replace the placeholder comments with actual Kokkos code.  This includes:
-
-1. **Kernel Implementations:**  Each CUDA kernel (`xs_lookup_kernel_baseline`, etc.) needs a corresponding Kokkos kernel using `Kokkos::parallel_for` and `Kokkos::View` to manage data on the Kokkos execution space.  You'll need to carefully translate the CUDA memory management and operations to their Kokkos equivalents.  Pay special attention to memory allocation, copying, and synchronization.  Thrust is replaced by Kokkos' parallel algorithms.
-
-2. **Data Structures:**  The `SimulationData` struct needs to be adapted to use Kokkos Views for device-resident data.
-
-3. **Random Number Generation:** The CUDA-specific random number generation functions will need to be replaced with Kokkos-compatible alternatives.  Kokkos provides tools for parallel random number generation.
-
-4. **Reduction:** The Thrust reduction will be replaced by Kokkos' reduction functionality.
-
-5. **MPI Adaptation:** The CUDA code uses `cudaDeviceSynchronize()`. Kokkos handles synchronization implicitly, but you need to ensure correct ordering of operations.  The MPI aspects will require a significant redesign using Kokkos' MPI integration features (if you're using MPI).
-
-6. **Header Files:**  Ensure that all necessary Kokkos header files are included.
-
-
-This comprehensive translation is a substantial undertaking and would require significant C++ and Kokkos expertise.  The above provides a starting point for the translation process, illustrating how to integrate Kokkos into the `Main` function's structure.  Each kernel will need individual translation.

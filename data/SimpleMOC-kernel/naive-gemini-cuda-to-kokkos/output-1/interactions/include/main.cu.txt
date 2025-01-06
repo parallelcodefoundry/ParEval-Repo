@@ -2,114 +2,196 @@
 #include "SimpleMOC-kernel_header.hpp"
 #include <Kokkos_Core.hpp>
 
-int main( int argc, char * argv[] )
-{
-	int version = 4;
-
-	srand(time(NULL));
-
-	Input I = set_default_input();
-	read_CLI( argc, argv, &I );
-	
-	// Calculate Number of 3D Source Regions
-	I.source_3D_regions = (int) ceil((double)I.source_2D_regions *
-		I.coarse_axial_intervals / I.decomp_assemblies_ax);
-
-	logo(version);
-
-	print_input_summary(I);
-	
-	center_print("INITIALIZATION", 79);
-	border_print();
-
-	// Build Source Data
-	printf("Building Source Data Arrays...\n");
-	Source_Arrays SA_h, SA_d;
-	Source * sources_h = initialize_sources(I, &SA_h); 
-
-  //Kokkos::Space::DeviceSpace deviceSpace;
-	// Allocate Kokkos device memory
-  Kokkos::View<Source*, Kokkos::DefaultExecutionSpace::device_type> sources_d("sources_d", I.source_3D_regions);
-  Kokkos::View<float*, Kokkos::DefaultExecutionSpace::device_type> fine_source_d("fine_source_d", N_fine);
-  Kokkos::View<float*, Kokkos::DefaultExecutionSpace::device_type> fine_flux_d("fine_flux_d", N_fine);
-  Kokkos::View<float*, Kokkos::DefaultExecutionSpace::device_type> sigT_d("sigT_d", N_sigT);
-
-	//Copy data to kokkos device
-  Kokkos::deep_copy(sources_d, sources_h);
-  Kokkos::deep_copy(fine_source_d, SA_h.fine_source_arr);
-  Kokkos::deep_copy(fine_flux_d, SA_h.fine_flux_arr);
-  Kokkos::deep_copy(sigT_d, SA_h.sigT_arr);
-
-	// Build Exponential Table
-	Kokkos::View<Table*, Kokkos::DefaultExecutionSpace::device_type> table_d("table_d", 1);
-	#ifdef TABLE
-	printf("Building Exponential Table...\n");
-	Table table = buildExponentialTable();
-	Kokkos::deep_copy(table_d, &table);
-	#endif
-
-	// Setup Kokkos execution space for the GPU
-  Kokkos::DefaultExecutionSpace execution_space;
-
-	// Setup Kokkos RNG on Device (replace with Kokkos RNG implementation)
-	printf("Setting up Kokkos RNG...\n");
-	Kokkos::View<curandState*, Kokkos::DefaultExecutionSpace::device_type> RNG_states("RNG_states", I.streams);
-	Kokkos::parallel_for("setup_kernel", Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(execution_space, 0, I.streams), [&](int i){
-		curand_init(1234, i, 0, &RNG_states[i]);
-	});
+// Kokkos kernel for running the simulation
+KOKKOS_INLINE_FUNCTION
+void run_kernel_kokkos(const Input& I, const Source* S, const Source_Arrays& SA, const Table* table, 
+                       curandState* state, float* state_fluxes, int N_state_fluxes, int i, int g, int& blockId,
+                       float& q0, float& q1, float& q2, float& sigT, float& tau, float& sigT2, float& expVal,
+                       float& reuse, float& flux_integral, float& tally, float& t1, float& t2, float& t3, float& t4,
+                       int state_flux_id, int QSR_id, int FAI_id) {
 
 
-	// Allocate Some Flux State vectors to randomly pick from
-	printf("Setting up Flux State Vectors...\n");
-	Kokkos::View<float*, Kokkos::DefaultExecutionSpace::device_type> flux_states("flux_states", N_flux_states * I.egroups);
-  Kokkos::parallel_for("init_flux_states", Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(execution_space, 0, N_flux_states), [&](int i){
-    for(int j=0; j< I.egroups; ++j){
-      flux_states[i*I.egroups + j] = curand_uniform(&RNG_states[i % I.streams]);
+    float dz = 0.1f;
+    float zin = 0.3f;
+    float weight = 0.5f;
+    float mu = 0.9f;
+    float mu2 = 0.3f;
+    float ds = 0.7f;
+
+    // load fine source region flux vector
+    float* FSR_flux = &SA.fine_flux_arr[S[QSR_id].fine_flux_id + FAI_id * I.egroups];
+
+    if (FAI_id == 0) {
+        float* f2 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id)*I.egroups];
+        float* f3 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id + 1)*I.egroups];
+        float y2 = __ldg(&f2[g]);
+        float y3 = __ldg(&f3[g]);
+
+        float c0 = y2;
+        float c1 = (y3 - y2) / dz;
+
+        q0 = c0 + c1 * zin;
+        q1 = c1;
+        q2 = 0;
     }
-  });
+    else if (FAI_id == I.fine_axial_intervals - 1) {
+        float* f1 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id - 1)*I.egroups];
+        float* f2 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id)*I.egroups];
+        float y1 = __ldg(&f1[g]);
+        float y2 = __ldg(&f2[g]);
 
-	printf("Initialization Complete.\n");
-	border_print();
-	center_print("SIMULATION", 79);
-	border_print();
+        float c0 = y2;
+        float c1 = (y2 - y1) / dz;
 
-	printf("Attentuating fluxes across segments...\n");
+        q0 = c0 + c1 * zin;
+        q1 = c1;
+        q2 = 0;
+    }
+    else {
+        float* f1 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id - 1)*I.egroups];
+        float* f2 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id)*I.egroups];
+        float* f3 = &SA.fine_source_arr[S[QSR_id].fine_source_id + (FAI_id + 1)*I.egroups];
+        float y1 = __ldg(&f1[g]);
+        float y2 = __ldg(&f2[g]);
+        float y3 = __ldg(&f3[g]);
 
-	// Kokkos timer variables
-	Kokkos::Timer timer;
+        float c0 = y2;
+        float c1 = (y1 - y3) / (2.f * dz);
+        float c2 = (y1 - 2.f * y2 + y3) / (2.f * dz * dz);
 
-	// Setup kernel call parameters.  Adapt to Kokkos's parallel_for
-  int n_blocks = I.segments / I.seg_per_thread; //Adjust as needed for Kokkos policy
+        q0 = c0 + c1 * zin + c2 * zin * zin;
+        q1 = c1 + 2.f * c2 * zin;
+        q2 = c2;
+    }
 
-	// Run Simulation Kernel Loop
-	timer.start();
-	Kokkos::parallel_for("run_kernel", Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(execution_space, 0, n_blocks), [&](int i){
-    // Adapt run_kernel to Kokkos, likely requiring restructuring
-    // Implement shared memory similarly within Kokkos parallel_for
-    run_kernel_kokkos(i, I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
-  });
-	timer.stop();
+    sigT = __ldg(&SA.sigT_arr[S[QSR_id].sigT_id + g]);
+    tau = sigT * ds;
+    sigT2 = sigT * sigT;
 
-	//Copy results back from device
-  Kokkos::View<float*, Kokkos::HostSpace> host_flux_states("host_flux_states", N_flux_states * I.egroups);
-  Kokkos::deep_copy(host_flux_states, flux_states);
+#ifdef TABLE
+    interpolateTable(table, tau, &expVal);
+#else
+    expVal = 1.f - expf(-tau);
+#endif
+
+    reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
+
+    flux_integral = (q0 * tau + (sigT * __ldg(&state_fluxes[state_flux_id + g]) - q0) * expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
+    tally = weight * flux_integral;
+    atomicAdd(&FSR_flux[g], (float)tally);
+
+    t1 = q0 * expVal / sigT;
+    t2 = q1 * mu * (tau - expVal) / sigT2;
+    t3 = q2 * mu2 * reuse;
+    t4 = __ldg(&state_fluxes[state_flux_id + g]) * (1.f - expVal);
+    state_fluxes[state_flux_id + g] = t1 + t2 + t3 + t4;
+
+}
 
 
-	printf("Simulation Complete.\n");
+int main(int argc, char* argv[]) {
+    int version = 4;
+    srand(time(NULL));
 
-	border_print();
-	center_print("RESULTS SUMMARY", 79);
-	border_print();
+    Input I = set_default_input();
+    read_CLI(argc, argv, &I);
 
-	double time = timer.seconds();
-	double tpi = ((double) (time) /
-			(double)I.segments / (double) I.egroups) * 1.0e9;
-	printf("%-25s%.3f seconds\n", "Runtime:", time);
-	printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
-	border_print();
+    I.source_3D_regions = (int)ceil((double)I.source_2D_regions * I.coarse_axial_intervals / I.decomp_assemblies_ax);
 
-	return 0;
+    logo(version);
+    print_input_summary(I);
+
+    center_print("INITIALIZATION", 79);
+    border_print();
+
+    // Build Source Data
+    printf("Building Source Data Arrays...\n");
+    Source_Arrays SA_h, SA_d;
+    Source* sources_h = initialize_sources(I, &SA_h);
+    Source* sources_d = initialize_device_sources(I, &SA_h, &SA_d, sources_h);
+
+
+    // Build Exponential Table (Host-side)
+    Table table_h;
+#ifdef TABLE
+    printf("Building Exponential Table...\n");
+    table_h = buildExponentialTable();
+#endif
+
+
+    // Kokkos Space Allocation and Data Transfer
+    Kokkos::View<Source_Arrays::fine_flux_arr_t::type> fine_flux_d("fine_flux_d", SA_h.fine_flux_arr);
+    Kokkos::View<Source_Arrays::fine_source_arr_t::type> fine_source_d("fine_source_d", SA_h.fine_source_arr);
+    Kokkos::View<Source_Arrays::sigT_arr_t::type> sigT_d("sigT_d", SA_h.sigT_arr);
+    Kokkos::View<Source*> sources_kokkos("sources_kokkos", sources_d);
+    Kokkos::View<Table> table_kokkos("table_kokkos"); 
+    Kokkos::View<float*> flux_states_d("flux_states_d", I.segments * I.egroups); 
+
+    Kokkos::DeepCopy(fine_flux_d, SA_h.fine_flux_arr);
+    Kokkos::DeepCopy(fine_source_d, SA_h.fine_source_arr);
+    Kokkos::DeepCopy(sigT_d, SA_h.sigT_arr);
+    Kokkos::DeepCopy(sources_kokkos, sources_d);
+
+#ifdef TABLE
+    Kokkos::DeepCopy(table_kokkos, table_h);
+#endif
+
+    // Setup CUDA RNG on Device (This part needs adaptation to Kokkos)
+    printf("Setting up CUDA RNG...\n");
+    curandState* RNG_states;
+    CUDA_CALL(cudaMalloc((void**)&RNG_states, I.streams * sizeof(curandState)));
+    setup_kernel<<<I.streams / 100 + 1, 100>>>(RNG_states, I);
+    CudaCheckError();
+    cudaDeviceSynchronize();
+
+    // Allocate Some Flux State vectors to randomly pick from (Adaptation needed)
+    printf("Setting up Flux State Vectors...\n");
+    int N_flux_states = 10000;
+    assert(I.segments >= N_flux_states);
+    CUDA_CALL(cudaMalloc((void**)&state_fluxes, N_flux_states * I.egroups * sizeof(float)));
+    init_flux_states<<<1, N_flux_states>>>(state_fluxes, N_flux_states, I, RNG_states);
+    printf("Initialization Complete.\n");
+    border_print();
+    center_print("SIMULATION", 79);
+    border_print();
+    cudaDeviceSynchronize();
+    printf("Attentuating fluxes across segments...\n");
+
+    //Kokkos Timer
+    Kokkos::Timer timer;
+
+    //Kokkos Parallel For Loop
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(0, I.segments), 
+    [&](int blockId) {
+        curandState* localState = &RNG_states[blockId % I.streams];
+        for (int i = 0; i < I.seg_per_thread; i++) {
+            int index = blockId * I.seg_per_thread + i;
+            int state_flux_id = curand(localState) % N_flux_states;
+            int QSR_id = curand(localState) % I.source_3D_regions;
+            int FAI_id = curand(localState) % I.fine_axial_intervals;
+
+
+            for (int g = 0; g < I.egroups; g++) {
+                float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
+                run_kernel_kokkos(I, sources_d, SA_d, &table_h, RNG_states, state_fluxes, N_flux_states, i, g, blockId, q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4, state_flux_id, QSR_id, FAI_id);
+            }
+        }
+    });
+
+    double time = timer.seconds();
+    float* host_flux_states = (float*)malloc(N_flux_states * I.egroups * sizeof(float));
+    CUDA_CALL(cudaMemcpy(host_flux_states, state_fluxes, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost));
+
+    printf("Simulation Complete.\n");
+    border_print();
+    center_print("RESULTS SUMMARY", 79);
+    border_print();
+
+    double tpi = ((double)(time) / (double)I.segments / (double)I.egroups) * 1.0e9;
+    printf("%-25s%.3f seconds\n", "Runtime:", time);
+    printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
+    border_print();
+
+    return 0;
 }
 ```
-
-**Note:**  This translation is a skeleton.  The `run_kernel` function needs significant adaptation to the Kokkos parallel programming model.  The shared memory (`extern __shared__ int shm[]`) needs to be replaced with Kokkos's mechanisms for shared memory or other appropriate parallel data structures.  The atomic operations (`atomicAdd`)  also need to be replaced with Kokkos's atomic operations.  The CUDA random number generator (`curand`) must be replaced with a Kokkos-compatible random number generator.  Finally, error checking and other CUDA-specific code needs to be removed or replaced with C++ equivalents.  This example uses a `Kokkos::RangePolicy` but other policies like `Kokkos::TeamPolicy` might be more suitable depending on the algorithm's structure.  You will also need to create a  `run_kernel_kokkos` function that mirrors the functionality of the CUDA kernel, using Kokkos::parallel_for and appropriate Kokkos data structures and functions.  The included header files will also need to be updated to include Kokkos headers and any custom Kokkos-specific functions or classes.  Remember to link against the Kokkos library during compilation.

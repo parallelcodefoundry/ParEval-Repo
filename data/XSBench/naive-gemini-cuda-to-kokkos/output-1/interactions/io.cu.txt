@@ -44,8 +44,17 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		lookups = in.lookups;
 	long long lookups_per_sec = (long long) ((double) lookups / runtime);
 
-	// Kokkos reduction for timing statistics.  This replaces MPI_Reduce.
-        Kokkos::parallel_reduce(Kokkos::DefaultExecutionSpace(), lookups_per_sec, lookups_per_sec, std::plus<long long>());
+	// Kokkos reduction for timing statistics if running in parallel
+        Kokkos::Sum<long long> total_lookups("total_lookups");
+        Kokkos::parallel_reduce(Kokkos::DefaultExecutionSpace(),
+                                 Kokkos::RangePolicy<>(0,1),
+                                 [&](const int& i, long long& update) {
+                                     update = lookups_per_sec;
+                                 },
+                                 total_lookups);
+        total_lookups.fetch_sum();
+        long long total_lookups_value = total_lookups.sum();
+
 
 	int is_invalid_result = 1;
 
@@ -58,12 +67,12 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 
 		// Print the results
 		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-		
-		printf("Runtime:     %.3lf seconds\n", runtime);
-		printf("Lookups:     "); fancy_int(lookups);
-		printf("Lookups/s:   ");
-		fancy_int(lookups_per_sec);
-		
+		printf("MPI ranks:   %d\n", nprocs);
+
+		printf("Total Lookups/s:            ");
+		fancy_int(total_lookups_value);
+		printf("Avg Lookups/s per MPI rank: ");
+		fancy_int(total_lookups_value / nprocs);
 	}
 
 	unsigned long long large = 0;
@@ -104,12 +113,22 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 void print_inputs(Inputs in, int nprocs, int version )
 {
 	// Calculate Estimate of Memory Usage
-	int mem_tot = estimate_mem_usage( in );
+	size_t mem_tot = estimate_mem_usage( in );
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            Kokkos\n"); // Changed to Kokkos
-	//  CUDA Device information is removed as it's not relevant for Kokkos.
+	printf("Programming Model:            Kokkos\n");
+	// Kokkos specific device information
+        std::string execution_space_name;
+        Kokkos::Experimental::get_execution_space_name(execution_space_name);
+        printf("Execution Space:              %s\n", execution_space_name.c_str());
+
+        Kokkos::HardwareProperties hw_props = Kokkos::Experimental::get_hardware_properties();
+        printf("Device:                       %s\n", hw_props.model_name.c_str());
+        printf("Cores:                        %d\n", hw_props.num_cores);
+
+
+
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -143,7 +162,7 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot); // Removed MPI specific line.
+	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
 	printf("Binary File Mode:             ");
 	if( in.binary_mode == NONE )
 		printf("Off\n");
@@ -164,25 +183,25 @@ void border_print(void)
 }
 
 // Prints comma separated integers - for ease of reading
-void fancy_int( long a )
+void fancy_int( long long a )
 {
 	if( a < 1000 )
-		printf("%ld\n",a);
+		printf("%lld\n",a);
 
 	else if( a >= 1000 && a < 1000000 )
-		printf("%ld,%03ld\n", a / 1000, a % 1000);
+		printf("%lld,%03lld\n", a / 1000, a % 1000);
 
 	else if( a >= 1000000 && a < 1000000000 )
-		printf("%ld,%03ld,%03ld\n",a / 1000000,(a % 1000000) / 1000,a % 1000 );
+		printf("%lld,%03lld,%03lld\n",a / 1000000,(a % 1000000) / 1000,a % 1000 );
 
 	else if( a >= 1000000000 )
-		printf("%ld,%03ld,%03ld,%03ld\n",
+		printf("%lld,%03lld,%03lld,%03lld\n",
 		       a / 1000000000,
 		       (a % 1000000000) / 1000000,
 		       (a % 1000000) / 1000,
 		       a % 1000 );
 	else
-		printf("%ld\n",a);
+		printf("%lld\n",a);
 }
 
 void print_CLI_error(void)
@@ -474,7 +493,7 @@ void binary_write( Inputs in, SimulationData SD )
 	fwrite(&SD, sizeof(SimulationData), 1, fp);
 
 	// Write heap arrays in SimulationData Object
-	fwrite(SD.num_nucs.data(),       sizeof(int), SD.num_nucs.size(), fp); //Kokkos View changes
+	fwrite(SD.num_nucs.data(),       sizeof(int), SD.num_nucs.size(), fp);
 	fwrite(SD.concs.data(),          sizeof(double), SD.concs.size(), fp);
 	fwrite(SD.mats.data(),           sizeof(int), SD.mats.size(), fp);
 	fwrite(SD.nuclide_grid.data(),   sizeof(NuclideGridPoint), SD.nuclide_grid.size(), fp);
@@ -497,13 +516,13 @@ SimulationData binary_read( Inputs in )
 	// Read SimulationData Object. Include pointers, even though we won't be using them.
 	fread(&SD, sizeof(SimulationData), 1, fp);
 
-	// Allocate space for arrays using Kokkos Views
+	// Allocate space for arrays using Kokkos
 	SD.num_nucs = Kokkos::View<int*>( "num_nucs", SD.length_num_nucs );
-	SD.concs = Kokkos::View<double*>( "concs", SD.length_concs );
-	SD.mats = Kokkos::View<int*>( "mats", SD.length_mats );
-	SD.nuclide_grid = Kokkos::View<NuclideGridPoint*>( "nuclide_grid", SD.length_nuclide_grid );
-	SD.index_grid = Kokkos::View<int*>( "index_grid", SD.length_index_grid );
-	SD.unionized_energy_array = Kokkos::View<double*>( "unionized_energy_array", SD.length_unionized_energy_array );
+	SD.concs = Kokkos::View<double*>("concs", SD.length_concs);
+	SD.mats = Kokkos::View<int*>("mats", SD.length_mats);
+	SD.nuclide_grid = Kokkos::View<NuclideGridPoint*>("nuclide_grid", SD.length_nuclide_grid);
+	SD.index_grid = Kokkos::View<int*>("index_grid", SD.length_index_grid);
+	SD.unionized_energy_array = Kokkos::View<double*>("unionized_energy_array", SD.length_unionized_energy_array);
 
 
 	// Read heap arrays into SimulationData Object

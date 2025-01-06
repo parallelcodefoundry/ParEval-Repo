@@ -1,52 +1,29 @@
 ```cpp
 #include "SimpleMOC-kernel_header.hpp"
 
-// Kokkos kernels require a separate function for the execution space
-// and a functor struct that defines the kernel operations
-
-// Functor for setup_kernel
-struct SetupKernelFunctor {
-    Kokkos::View<curandState*, Kokkos::DeviceSpace> state;
-    Input I;
-
-    KOKKOS_INLINE_FUNCTION
-    void operator()(const int i) const {
-        if (i >= I.streams) return;
-        curand_init(1234, i, 0, &state(i));
-    }
-};
-
-// Function to launch setup_kernel using Kokkos
-void setup_kernel_kokkos(Kokkos::View<curandState*, Kokkos::DeviceSpace>& state, Input I) {
-    Kokkos::parallel_for(I.streams, SetupKernelFunctor{state, I});
+// Kokkos kernels require a separate function for the kernel launch
+// and the kernel execution.
+void setup_kernel_kokkos(Kokkos::View<curandState*, Kokkos::HostSpace> state, const Input& I) {
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(0, I.streams), 
+                         KOKKOS_LAMBDA(int i) {
+        curand_init(1234, i, 0, &state[i]);
+    });
 }
 
 
-// Functor for init_flux_states
-struct InitFluxStatesFunctor {
-    Kokkos::View<float*, Kokkos::DeviceSpace> flux_states;
-    int N_flux_states;
-    Input I;
-    Kokkos::View<curandState*, Kokkos::DeviceSpace> state;
-
-    KOKKOS_INLINE_FUNCTION
-    void operator()(const int i) const {
-        if (i >= N_flux_states) return;
-
-        // Assign RNG state.  Need to handle potential out-of-bounds access carefully
-        int stream_id = i % I.streams;
-        curandState* localState = &state(stream_id);
-
+// Initialize global flux states to random numbers on device
+// Slow, poor use of GPU, but fine since it's just initialization code
+void init_flux_states_kokkos(Kokkos::View<float*, Kokkos::DefaultExecutionSpace> flux_states, int N_flux_states, const Input& I, Kokkos::View<curandState*, Kokkos::DefaultExecutionSpace> state) {
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(0, N_flux_states),
+                         KOKKOS_LAMBDA(int i) {
+        // Assign RNG state (assuming a suitable mapping for stream assignment)
+        int stream_id = i % I.streams;  //Simple stream mapping, adjust as needed
+        curandState* localState = &state[stream_id];
 
         for (int j = 0; j < I.egroups; ++j) {
             flux_states(i * I.egroups + j) = curand_uniform(localState);
         }
-    }
-};
-
-// Function to launch init_flux_states using Kokkos
-void init_flux_states_kokkos(Kokkos::View<float*, Kokkos::DeviceSpace>& flux_states, int N_flux_states, Input I, Kokkos::View<curandState*, Kokkos::DeviceSpace>& state) {
-    Kokkos::parallel_for(N_flux_states, InitFluxStatesFunctor{flux_states, N_flux_states, I, state});
+    });
 }
 
 
@@ -67,7 +44,7 @@ Input set_default_input(void) {
 }
 
 // Returns a memory estimate (in MB) for the program's primary data structures
-double mem_estimate(Input I) {
+double mem_estimate(const Input& I) {
     size_t nbytes = 0;
 
     // Sources Array
@@ -88,7 +65,7 @@ double mem_estimate(Input I) {
     return (double)nbytes / 1024.0 / 1024.0;
 }
 
-Source* initialize_sources(Input I, Source_Arrays* SA) {
+Source* initialize_sources(const Input& I, Source_Arrays* SA) {
     // Source Data Structure Allocation
     Source* sources = (Source*)malloc(I.source_3D_regions * sizeof(Source));
 
@@ -122,40 +99,33 @@ Source* initialize_sources(Input I, Source_Arrays* SA) {
     return sources;
 }
 
-Source* initialize_device_sources(Input I, Source_Arrays* SA_h, Source_Arrays* SA_d, Source* sources_h) {
-    // Allocate & Copy Fine Source Data using Kokkos
-    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
-    SA_d->fine_source_arr = Kokkos::create_mirror_view(Kokkos::View<float*, Kokkos::DeviceSpace>(SA_h->fine_source_arr, N_fine));
-    Kokkos::deep_copy(SA_d->fine_source_arr, SA_h->fine_source_arr);
-
-    // Allocate & Copy Fine Flux Data using Kokkos
-    SA_d->fine_flux_arr = Kokkos::create_mirror_view(Kokkos::View<float*, Kokkos::DeviceSpace>(SA_h->fine_flux_arr, N_fine));
-    Kokkos::deep_copy(SA_d->fine_flux_arr, SA_h->fine_flux_arr);
+Source* initialize_device_sources(const Input& I, Source_Arrays* SA_h, Source_Arrays* SA_d, Source* sources_h) {
+    //Kokkos Views for device data
+    Kokkos::View<float*, Kokkos::DefaultExecutionSpace> d_fine_source("fine_source", I.source_3D_regions * I.fine_axial_intervals * I.egroups);
+    Kokkos::View<float*, Kokkos::DefaultExecutionSpace> d_fine_flux("fine_flux", I.source_3D_regions * I.fine_axial_intervals * I.egroups);
+    Kokkos::View<float*, Kokkos::DefaultExecutionSpace> d_sigT("sigT", I.source_3D_regions * I.egroups);
+    Kokkos::View<Source*, Kokkos::DefaultExecutionSpace> d_sources("sources", I.source_3D_regions);
 
 
-    // Allocate & Copy SigT Data using Kokkos
-    long N_sigT = I.source_3D_regions * I.egroups;
-    SA_d->sigT_arr = Kokkos::create_mirror_view(Kokkos::View<float*, Kokkos::DeviceSpace>(SA_h->sigT_arr, N_sigT));
-    Kokkos::deep_copy(SA_d->sigT_arr, SA_h->sigT_arr);
+    //Copy host data to Kokkos views
+    Kokkos::deep_copy(d_fine_source, Kokkos::View<float*,Kokkos::HostSpace>(SA_h->fine_source_arr, I.source_3D_regions * I.fine_axial_intervals * I.egroups));
+    Kokkos::deep_copy(d_fine_flux, Kokkos::View<float*,Kokkos::HostSpace>(SA_h->fine_flux_arr, I.source_3D_regions * I.fine_axial_intervals * I.egroups));
+    Kokkos::deep_copy(d_sigT, Kokkos::View<float*,Kokkos::HostSpace>(SA_h->sigT_arr, I.source_3D_regions * I.egroups));
+    Kokkos::deep_copy(d_sources, Kokkos::View<Source*,Kokkos::HostSpace>(sources_h, I.source_3D_regions));
 
-    // Allocate & Copy Source Array Data using Kokkos
-    SA_d->sources = Kokkos::create_mirror_view(Kokkos::View<Source*, Kokkos::DeviceSpace>(sources_h, I.source_3D_regions));
-    Kokkos::deep_copy(SA_d->sources, sources_h);
-
-    return SA_d->sources;
+    SA_d->fine_source_arr = d_fine_source.data();
+    SA_d->fine_flux_arr = d_fine_flux.data();
+    SA_d->sigT_arr = d_sigT.data();
+    return d_sources.data();
 }
-
 
 // Builds a table of exponential values for linear interpolation
 Table buildExponentialTable(void) {
     // define table
     Table table;
 
-    //float precision = 0.01;
     float maxVal = 10.0;
 
-    // compute number of array values
-    //int N = (int)(maxVal * sqrt(1.0 / (8.0 * precision * 0.01)));
     int N = 353;
 
     // compute spacing
@@ -163,7 +133,7 @@ Table buildExponentialTable(void) {
 
     // store linear segment information (slope and y-intercept)
     for (int n = 0; n < N; n++) {
-        // compute slope and y-intercept for (1 - exp(-x))
+        // compute slope and y-intercept for ( 1 - exp(-x) )
         float exponential = exp(-n * dx);
         table.values[2 * n] = -exponential;
         table.values[2 * n + 1] = 1 + (n * dx - 1) * exponential;

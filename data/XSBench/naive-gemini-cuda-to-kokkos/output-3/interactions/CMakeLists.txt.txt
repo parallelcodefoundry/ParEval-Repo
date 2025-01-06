@@ -18,18 +18,22 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # Find Kokkos
 find_package(Kokkos REQUIRED)
 
-# Kokkos-specific include directories.  May need adjustments based on your Kokkos installation
-# include_directories(${KOKKOS_INCLUDE_DIRS})
+# Kokkos specific include directories
+target_include_directories(XSBench PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:include>
+  ${Kokkos_INCLUDE_DIRS}
+)
 
 
+# list of source files
 set(SOURCE Main.cpp io.cpp Simulation.cpp GridInit.cpp XSutils.cpp Materials.cpp)
-set(HEADER XSbench_header.hpp XSbench_shared_header.h)
+add_executable(XSBench ${SOURCE} XSbench_header.hpp XSbench_shared_header.h)
 
-
-add_executable(XSBench ${SOURCE} ${HEADER})
-
-target_link_libraries(XSBench Kokkos::Kokkos)
+# Link Kokkos libraries
+target_link_libraries(XSBench ${Kokkos_LIBRARIES})
 
 
 install(TARGETS XSBench DESTINATION bin)
+
 ```

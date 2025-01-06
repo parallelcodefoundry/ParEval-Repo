@@ -1,101 +1,48 @@
 cmake_minimum_required(VERSION 3.10)
 project(SimpleMOC-kernel)
 
-#===============================================================================
-# User Options
-#===============================================================================
+# Find Kokkos
+find_package(Kokkos REQUIRED)
 
-set(CMAKE_CXX_STANDARD 17) # Or higher as needed
-option(KOKKOS_BACKEND "Kokkos Backend (Serial, OpenMP, CUDA, OpenCL, HIP)" "CUDA")
-option(OPTIMIZE "Enable compiler optimizations" ON)
-option(DEBUG "Enable debugging symbols" OFF)
-option(PROFILE "Enable profiling" OFF)
-option(TABLE "Use exponential table" OFF)
-set(SM_VERSION 35 CACHE STRING "CUDA compute capability")
+# Set compiler flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
-
-#===============================================================================
-# Program name & source code list
-#===============================================================================
-
-set(PROGRAM SimpleMOC-kernel)
-
+# Add source files
 set(SOURCES
-    main.cpp
-    kernel.cpp
-    init.cpp
-    io.cpp
+  main.cpp
+  kernel.cpp
+  init.cpp
+  io.cpp
 )
 
+# Add header file
 set(HEADERS SimpleMOC-kernel_header.hpp)
 
-
-#===============================================================================
-# Sets Flags
-#===============================================================================
-
-# Add Kokkos include directory
-find_package(Kokkos REQUIRED)
-include_directories(${Kokkos_INCLUDE_DIRS})
-
-
-# Standard Flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I. -std=c++17 -DKOKKOS_ENABLE_CUDA")
-
-# Linker Flags
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${Kokkos_LIBRARIES}")
-
-
-# Debug Flags
-if(DEBUG)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0") # Disable optimizations in debug mode
-endif
-
-# Profiling Flags
-if(PROFILE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-endif
-
-# Optimization Flags
-if(OPTIMIZE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math") #Consider -march=native for extra optimization
-endif
-
-
-# Exponential Table Build
-if(TABLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTABLE")
-endif
-
-# CUDA specific flags (if using CUDA backend)
+# Add Kokkos-specific compilation flags
 if(KOKKOS_BACKEND STREQUAL "CUDA")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch=sm_${SM_VERSION}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKOKKOS_BACKEND=CUDA")
 endif
 
+# Create executable
+add_executable(SimpleMOC-kernel ${SOURCES} ${HEADERS})
 
-#===============================================================================
-# Targets to Build
-#===============================================================================
+# Link against Kokkos libraries
+target_link_libraries(SimpleMOC-kernel Kokkos::Kokkos)
 
-add_executable(${PROGRAM} ${SOURCES})
-target_link_libraries(${PROGRAM} ${Kokkos_LIBRARIES})
-
-
-#For CUDA, ensure proper linking
-if(KOKKOS_BACKEND STREQUAL "CUDA")
-  target_link_libraries(${PROGRAM}  curand) # Link against curand for CUDA backend
+# Add optional flags for debugging, optimization and profiling
+if(DEBUG STREQUAL "yes")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif
 
+if(OPTIMIZE STREQUAL "yes")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math")
+endif
 
-add_custom_target(clean COMMAND ${CMAKE_COMMAND} -E remove_directory -f ${CMAKE_BINARY_DIR}/CMakeFiles ${CMAKE_BINARY_DIR}/SimpleMOC-kernel)
+if(PROFILE STREQUAL "yes")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+endif
 
-add_custom_target(edit
-    COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_SOURCE_DIR}/include"
-    COMMAND ${CMAKE_COMMAND} -E make edit
-)
-
-
-add_custom_target(run
-    COMMAND ./${PROGRAM}
-    DEPENDS ${PROGRAM}
-)
+# Add TABLE flag if needed
+if(TABLE STREQUAL "yes")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTABLE")
+endif

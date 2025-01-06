@@ -5,56 +5,50 @@ project(SimpleMOC-kernel)
 # Find Kokkos
 find_package(Kokkos REQUIRED)
 
-# Set compiler and other flags
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3 -ffast-math") # Add other optimization flags as needed
+# Set compiler flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17") # Or a more recent standard as needed
 
-# Set Kokkos backend (CUDA in this example)
-if(NOT CMAKE_CXX_COMPILER)
-  message(FATAL_ERROR "CMAKE_CXX_COMPILER is not set. Please set it.")
+# Set Kokkos specific flags and include directories.  Adjust as needed for your system.
+if(KOKKOS_BACKEND STREQUAL "CUDA")
+  set(CMAKE_CUDA_ARCHITECTURES "sm_35") # Or adjust as appropriate for your GPU architecture
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DKOKKOS_BACKEND=CUDA")
 endif
 
-if(NOT KOKKOS_BACKEND)
-  message(FATAL_ERROR "KOKKOS_BACKEND is not set. Please set it (e.g., -DKOKKOS_BACKEND=CUDA).")
-endif
-
-# List source files
-set(SOURCES
-    main.cpp
-    kernel.cpp
-    init.cpp
-    io.cpp
+# Add source files
+add_executable(SimpleMOC-kernel
+  main.cpp
+  kernel.cu
+  init.cpp
+  io.cpp
 )
 
-# Add header file location
-include_directories(include)
-
-# Add executable
-add_executable(SimpleMOC-kernel ${SOURCES})
-
-# Link Kokkos libraries
+# Link Kokkos
 target_link_libraries(SimpleMOC-kernel Kokkos::Kokkos)
 
-#Add CUDA compilation flags if needed.
-if ("${KOKKOS_BACKEND}" STREQUAL "CUDA")
-  target_link_libraries(SimpleMOC-kernel CUDA::cuda)
-  target_compile_options(SimpleMOC-kernel PRIVATE -arch sm_$ENV{SM_VERSION})
-  target_compile_definitions(SimpleMOC-kernel PRIVATE KOKKOS_ENABLE_CUDA)
+
+# Handle CUDA specific linking if needed.
+if(KOKKOS_BACKEND STREQUAL "CUDA")
+  target_link_libraries(SimpleMOC-kernel ${CUDA_LIBRARIES})
+  target_compile_options(SimpleMOC-kernel PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_${CMAKE_CUDA_ARCHITECTURES}>)
 endif
 
-# Optionally add debug flags
-if(DEBUG)
+# Add options for optimization, debug, and profiling.
+if(OPTIMIZE STREQUAL "yes")
+  target_compile_options(SimpleMOC-kernel PRIVATE -O3 -ffast-math)
+endif
+
+if(DEBUG STREQUAL "yes")
   target_compile_options(SimpleMOC-kernel PRIVATE -g)
 endif
 
-# Optionally add profiling flags (e.g., for gprof)
-if(PROFILE)
+if(PROFILE STREQUAL "yes")
   target_compile_options(SimpleMOC-kernel PRIVATE -pg)
 endif
 
-# Optionally include exponential table
-if(TABLE)
-  target_compile_definitions(SimpleMOC-kernel PRIVATE TABLE)
+
+if(TABLE STREQUAL "yes")
+  target_compile_options(SimpleMOC-kernel PRIVATE -DTABLE)
 endif
+
 
 ```

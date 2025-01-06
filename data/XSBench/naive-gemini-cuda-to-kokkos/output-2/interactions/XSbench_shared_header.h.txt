@@ -3,8 +3,8 @@
 #define XSBENCH_SHARED_HEADER_HPP
 
 #include <Kokkos_Core.hpp>
-#include <cstdio>
-#include <cstring> // for strlen, strcpy
+#include <fstream>
+#include <string>
 
 // Header for shared utilities across XSBench versions
 
@@ -13,7 +13,7 @@ struct Inputs {
     long n_isotopes;
     long n_gridpoints;
     int lookups;
-    char *HM;
+    std::string HM;
     int grid_type; // 0: Unionized Grid (default)    1: Nuclide Grid
     int hash_bins;
     int particles;
@@ -22,7 +22,7 @@ struct Inputs {
     int kernel_id;
     int num_iterations;
     int num_warmups;
-    char *filename;
+    std::string filename;
 };
 
 
@@ -32,25 +32,26 @@ struct Profile {
   double host_to_device_time;
 };
 
-// Kokkos::View declarations for data structures that will be used with Kokkos
-//  (Note:  These are only declarations, the actual views are allocated in the 
-//          Kokkos version of GridInit.cpp)
+template <typename ExecutionSpace>
+void print_profile(const Profile& profile, const Inputs& in) {
+  if (!in.filename.empty()) {
+    std::ofstream output(in.filename);
+    output << "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n";
+    output << profile.host_to_device_time * 1000 << ","
+           << profile.kernel_time * 1000 << ","
+           << profile.device_to_host_time * 1000 << ","
+           << in.num_iterations << ","
+           << in.num_warmups << "\n";
+    output.close();
+  } else {
+    std::cout << "host_to_device_ms,kernel_ms,device_to_host_ms,num_iterations,num_warmups\n";
+    std::cout << profile.host_to_device_time * 1000 << ","
+              << profile.kernel_time * 1000 << ","
+              << profile.device_to_host_time * 1000 << ","
+              << in.num_iterations << ","
+              << in.num_warmups << "\n";
+  }
+}
 
-// Example:  This shows how a Kokkos::View would replace a regular C++ array.
-//           Note the use of Kokkos::LayoutRight for better cache performance on many systems
-
-template <typename T>
-using DeviceArray1D = Kokkos::View<T*, Kokkos::LayoutRight, Kokkos::Device>;
-
-
-template <typename T>
-using DeviceArray2D = Kokkos::View<T**, Kokkos::LayoutRight, Kokkos::Device>;
-
-
-// Function declaration for Kokkos::parallel_for to handle the printing.
-//  This function will be implemented in the Kokkos version of io.cpp
-
-void print_profile(const Profile& profile, const Inputs& in);
-
-#endif // XSBENCH_SHARED_HEADER_HPP
+#endif // XSBENCH_SHARED_HEADER_H
 ```

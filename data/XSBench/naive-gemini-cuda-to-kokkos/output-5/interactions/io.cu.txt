@@ -44,10 +44,8 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		lookups = in.lookups;
 	long long lookups_per_sec = (long long) ((double) lookups / runtime);
 
-	// If running in MPI, reduce timing statistics and calculate average
-	//  MPI is not directly supported in Kokkos, this section would need to be
-	//  reimplemented using Kokkos::parallel_reduce if MPI functionality is
-	//  desired.
+	//Kokkos reduction for MPI timing statistics.  Replace with appropriate Kokkos::Reduction if needed.
+	long long total_lookups = lookups_per_sec; // Placeholder - needs Kokkos::Reduction for MPI
 
 	int is_invalid_result = 1;
 
@@ -60,20 +58,20 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 
 		// Print the results
 		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-		// #ifdef MPI  -- This is replaced, MPI is not used in Kokkos version
-		// printf("MPI ranks:   %d\n", nprocs);
-		// #endif
-		// #ifdef MPI -- This is replaced, MPI is not used in Kokkos version
-		// printf("Total Lookups/s:            ");
-		// fancy_int(total_lookups);
-		// printf("Avg Lookups/s per MPI rank: ");
-		// fancy_int(total_lookups / nprocs);
-		// #else
+		#ifdef MPI
+		printf("MPI ranks:   %d\n", nprocs);
+		#endif
+		#ifdef MPI
+		printf("Total Lookups/s:            ");
+		fancy_int(total_lookups);
+		printf("Avg Lookups/s per MPI rank: ");
+		fancy_int(total_lookups / nprocs);
+		#else
 		printf("Runtime:     %.3lf seconds\n", runtime);
 		printf("Lookups:     "); fancy_int(lookups);
 		printf("Lookups/s:   ");
 		fancy_int(lookups_per_sec);
-		// #endif
+		#endif
 	}
 
 	unsigned long long large = 0;
@@ -114,12 +112,12 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 void print_inputs(Inputs in, int nprocs, int version )
 {
 	// Calculate Estimate of Memory Usage
-	size_t mem_tot = estimate_mem_usage( in );
+	int mem_tot = estimate_mem_usage( in );
 	logo(version);
 	center_print("INPUT SUMMARY", 79);
 	border_print();
-	printf("Programming Model:            Kokkos\n");
-	// CUDA Device information is not relevant for Kokkos
+	printf("Programming Model:            Kokkos\n"); // Changed to Kokkos
+  //Get Kokkos device info here and print it out.  This will require Kokkos specific calls.
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -153,12 +151,12 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-	// #ifdef MPI -- This is replaced, MPI is not used in Kokkos version
-	// printf("MPI Ranks:                    %d\n", nprocs);
-	// printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
-	// #else
+	#ifdef MPI
+	printf("MPI Ranks:                    %d\n", nprocs);
+	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
+	#else
 	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
-	// #endif
+	#endif
 	printf("Binary File Mode:             ");
 	if( in.binary_mode == NONE )
 		printf("Off\n");
@@ -307,7 +305,7 @@ Inputs read_CLI( int argc, char * argv[] )
 			if( strcmp(sim_type, "history") == 0 )
 				input.simulation_method = HISTORY_BASED;
 			else if( strcmp(sim_type, "event") == 0 )
-			{
+		{
 				input.simulation_method = EVENT_BASED;
 				// Also resets default # of lookups
 				if( default_lookups && default_particles )
@@ -485,18 +483,16 @@ void binary_write( Inputs in, SimulationData SD )
 	printf("Writing all data structures to binary file %s...\n", fname);
 	FILE * fp = fopen(fname, "w");
 
-	// Write SimulationData Object.  Kokkos views are not directly writable to files.
-  // You'd need to copy the data to a host-side array before writing.
-	//fwrite(&SD, sizeof(SimulationData), 1, fp);
+	// Write SimulationData Object. Include pointers, even though we won't be using them.
+	fwrite(&SD, sizeof(SimulationData), 1, fp);
 
-	// Write heap arrays in SimulationData Object. Kokkos views require manual copying.
-  //Example for one view:  Copy data from Kokkos view to a host array before writing
-  //std::vector<int> num_nucs_host(SD.num_nucs.size());
-  //Kokkos::deep_copy(num_nucs_host, SD.num_nucs);
-  //fwrite(num_nucs_host.data(), sizeof(int), num_nucs_host.size(), fp);
-
-	// ...similar code for other views...
-
+	// Write heap arrays in SimulationData Object
+	fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+	fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
+	fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
+	fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+	fwrite(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+	fwrite(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
 
 	fclose(fp);
 }
@@ -511,20 +507,24 @@ SimulationData binary_read( Inputs in )
 	FILE * fp = fopen(fname, "r");
 	assert(fp != NULL);
 
-	// Read SimulationData Object. Kokkos views need allocation and copying.
-	//fread(&SD, sizeof(SimulationData), 1, fp);
+	// Read SimulationData Object. Include pointers, even though we won't be using them.
+	fread(&SD, sizeof(SimulationData), 1, fp);
 
-	// Allocate space for arrays.  Kokkos views handle this differently.
-  // Example:  SD.num_nucs = Kokkos::View<int*>("num_nucs", length);
+	// Allocate space for arrays on heap
+	SD.num_nucs = (int *) malloc(SD.length_num_nucs * sizeof(int));
+	SD.concs = (double *) malloc(SD.length_concs * sizeof(double));
+	SD.mats = (int *) malloc(SD.length_mats * sizeof(int));
+	SD.nuclide_grid = (NuclideGridPoint *) malloc(SD.length_nuclide_grid * sizeof(NuclideGridPoint));
+	SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+	SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
 
-	// Read heap arrays into SimulationData Object.  Kokkos views need copying.
-  // Example:  std::vector<int> num_nucs_host(length);
-  //           fread(num_nucs_host.data(), sizeof(int), length, fp);
-  //           SD.num_nucs = Kokkos::View<int*>("num_nucs", length);
-  //           Kokkos::deep_copy(SD.num_nucs, num_nucs_host);
-
-	//... similar code for other views...
-
+	// Read heap arrays into SimulationData Object
+	fread(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+	fread(SD.concs,          sizeof(double), SD.length_concs, fp);
+	fread(SD.mats,           sizeof(int), SD.length_mats, fp);
+	fread(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+	fread(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+	fread(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
 
 	fclose(fp);
 

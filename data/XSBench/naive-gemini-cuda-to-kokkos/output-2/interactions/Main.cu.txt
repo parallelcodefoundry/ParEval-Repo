@@ -6,17 +6,19 @@ int main(int argc, char *argv[]) {
     // Initialization & Command Line Read-In
     // =====================================================================
     int version = 20;
-    int mype = 0; // Kokkos doesn't inherently have MPI ranks.  This will need adjustment for parallel Kokkos.
+    //int mype = 0; // Removed as Kokkos handles parallelism differently
     double omp_start, omp_end;
-    int nprocs = 1; // Kokkos doesn't inherently have MPI ranks. This will need adjustment for parallel Kokkos.
+    //int nprocs = 1; // Removed as Kokkos handles parallelism differently
     unsigned long long verification;
 
     // Process CLI Fields -- store in "Inputs" structure
     Inputs in = read_CLI(argc, argv);
 
     // Print-out of Input Summary
-    if (mype == 0)
-        print_inputs(in, nprocs, version);
+    Kokkos::parallel_for(1, KOKKOS_LAMBDA(const int& i) {
+        if (i == 0) print_inputs(in, 1, version); // Assuming 1 process for now
+    });
+
 
     // =====================================================================
     // Prepare Nuclide Energy Grids, Unionized Energy Grid, & Material Data
@@ -31,12 +33,16 @@ int main(int argc, char *argv[]) {
     if (in.binary_mode == READ)
         SD = binary_read(in);
     else
-        SD = grid_init_do_not_profile(in, mype);
+        SD = grid_init_do_not_profile(in, 0); // Assuming 0 for single process
+
 
     // If writing from file mode is selected, write all simulation data
     // structures to file
-    if (in.binary_mode == WRITE && mype == 0)
-        binary_write(in, SD);
+    if (in.binary_mode == WRITE) {
+        Kokkos::parallel_for(1, KOKKOS_LAMBDA(const int& i) {
+            if (i == 0) binary_write(in, SD);
+        });
+    }
 
     Profile profile;
 
@@ -46,98 +52,65 @@ int main(int argc, char *argv[]) {
     // realistic continuous energy Monte Carlo macroscopic cross section
     // lookup kernel.
     // =====================================================================
-    if (mype == 0) {
-        printf("\n");
-        border_print();
-        center_print("SIMULATION", 79);
-        border_print();
-    }
+    Kokkos::parallel_for(1, KOKKOS_LAMBDA(const int& i) {
+        if (i == 0) {
+            printf("\n");
+            border_print();
+            center_print("SIMULATION", 79);
+            border_print();
+        }
+    });
 
     // Start Simulation Timer
     omp_start = get_time();
 
-    //Kokkos::Timer timer;
+    // Run simulation using Kokkos::parallel_reduce
+    Kokkos::parallel_reduce(Kokkos::RangePolicy<>(0, in.lookups),
+                            KOKKOS_LAMBDA(const int& i, unsigned long long& update, const long& i_){
+                                if (in.simulation_method == EVENT_BASED) {
+                                    if (in.kernel_id == 0) {
+                                        //Call baseline kernel here.  Requires restructuring.
+                                    } else if (in.kernel_id == 1) {
+                                        //Call optimization 1 kernel here. Requires restructuring.
+                                    } else if (in.kernel_id == 2) {
+                                        //Call optimization 2 kernel here. Requires restructuring.
+                                    } else if (in.kernel_id == 3) {
+                                        //Call optimization 3 kernel here. Requires restructuring.
+                                    } else if (in.kernel_id == 4) {
+                                        //Call optimization 4 kernel here. Requires restructuring.
+                                    } else if (in.kernel_id == 5) {
+                                        //Call optimization 5 kernel here. Requires restructuring.
+                                    } else if (in.kernel_id == 6) {
+                                        //Call optimization 6 kernel here. Requires restructuring.
+                                    } else {
+                                        printf("Error: No kernel ID %d found!\n", in.kernel_id);
+                                        exit(1);
+                                    }
+                                } else {
+                                    printf(
+                                            "History-based simulation not implemented in Kokkos code. Instead,\nuse "
+                                            "the event-based method with \"-m event\" argument.\n");
+                                    exit(1);
+                                }
 
-    // Run simulation using Kokkos Views
-    Kokkos::View<double*> d_p_energy_samples("p_energy_samples", in.lookups);
-    Kokkos::View<int*> d_mat_samples("mat_samples", in.lookups);
-    Kokkos::View<unsigned long*> d_verification("verification", in.lookups);
+                            },verification);
 
-
-    Kokkos::parallel_for(in.lookups, KOKKOS_LAMBDA(const int i){
-      uint64_t seed = STARTING_SEED;
-      seed = fast_forward_LCG(seed, 2*i);
-      d_p_energy_samples(i) = LCG_random_double(&seed);
-      d_mat_samples(i) = pick_mat(&seed);
-    });
-
-    if (in.simulation_method == EVENT_BASED) {
-        if (in.kernel_id == 0) {
-          Kokkos::parallel_for(in.lookups, KOKKOS_LAMBDA(const int i){
-            double macro_xs_vector[5] = {0};
-            calculate_macro_xs(
-                d_p_energy_samples(i),
-                d_mat_samples(i),
-                in.n_isotopes,
-                in.n_gridpoints,
-                Kokkos::subview(Kokkos::create_mirror_view(SD.num_nucs), Kokkos::ALL()),
-                Kokkos::subview(Kokkos::create_mirror_view(SD.concs), Kokkos::ALL()),
-                Kokkos::subview(Kokkos::create_mirror_view(SD.unionized_energy_array), Kokkos::ALL()),
-                Kokkos::subview(Kokkos::create_mirror_view(SD.index_grid), Kokkos::ALL()),
-                Kokkos::subview(Kokkos::create_mirror_view(SD.nuclide_grid), Kokkos::ALL()),
-                Kokkos::subview(Kokkos::create_mirror_view(SD.mats), Kokkos::ALL()),
-                macro_xs_vector,
-                in.grid_type,
-                in.hash_bins,
-                SD.max_num_nucs
-            );
-            double max = -1.0;
-            int max_idx = 0;
-            for(int j = 0; j < 5; j++ ) {
-                if( macro_xs_vector[j] > max ) {
-                    max = macro_xs_vector[j];
-                    max_idx = j;
-                }
-            }
-            d_verification(i) = max_idx+1;
-          });
-        } else {
-            printf("Error: Optimized kernels not yet implemented in Kokkos version.\n");
-            exit(1);
-        }
-    } else {
-        printf(
-                "History-based simulation not implemented in Kokkos code. Instead,\nuse "
-                "the event-based method with \"-m event\" argument.\n");
-        exit(1);
-    }
-
-    //Reduce verification results (Kokkos)
-    unsigned long long h_verification[in.lookups];
-    Kokkos::deep_copy(Kokkos::View<unsigned long*>(h_verification, in.lookups), d_verification);
-    verification = 0;
-    for(int i = 0; i < in.lookups; i++) {
-      verification += h_verification[i];
-    }
-
-
-    if (mype == 0) {
-        printf("\n");
-        printf("Simulation complete.\n");
-    }
 
 
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory (Kokkos handles this automatically for views)
+    // Release device memory (Kokkos handles memory management)
+    release_memory(SD);
 
     // Final Hash Step
     verification = verification % 999983;
 
     // Print / Save Results and Exit
-    int is_invalid_result =
-            print_results(in, mype, omp_end - omp_start, nprocs, verification);
+    int is_invalid_result = 1;
+    Kokkos::parallel_for(1, KOKKOS_LAMBDA(const int& i) {
+        if (i == 0) is_invalid_result = print_results(in, 0, omp_end - omp_start, 1, verification); // Assuming 1 process
+    });
 
     print_profile(profile, in);
 

@@ -73,10 +73,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
                 fpath + ":\n"
                 + self._input_repo.get_file_contents(rel_path=fpath),
                 all_fpaths))
-        prompt_config_src = self._input_repo.get_meta_dict()
-        prompt_config_dst = json.load(open(self._dst_config, 'r'))
 
-        exts_str = ", ".join(v for v in self._type_to_ext[prompt_config_dst["filename_desc"].lower()].values())
+        exts_str = ", ".join(v for v in self._type_to_ext[self._prompt_config_dst["filename_desc"].lower()].values())
         base_prompt = self.PROMPT_TEMPLATE.format(
             src_model=self._src_model,
             dst_model=self._dst_model,
@@ -84,34 +82,34 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             all_files=all_files_str,
             filename=fname,
             exts=exts_str,
-            filename_desc=prompt_config_dst["filename_desc"])
+            filename_desc=self._prompt_config_dst["filename_desc"])
 
-        if fname == prompt_config_src["main_filename"]:
+        if fname == self._prompt_config_src["main_filename"]:
             base_prompt += ("\n" + self.MAIN_ADDENDUM.format(
                 dst_model=self._dst_model,
-                ex_run_cmd=prompt_config_dst["ex_run_cmd"],
-                ex_run_desc=prompt_config_dst["ex_run_desc"]))
+                ex_run_cmd=self._prompt_config_dst["ex_run_cmd"],
+                ex_run_desc=self._prompt_config_dst["ex_run_desc"]))
 
         trigger_rename = None
-        key_filename = prompt_config_src["build_filename"]
-        if prompt_config_dst["build_filename"] != prompt_config_src["build_filename"]:
-            trigger_rename = prompt_config_dst["build_filename"]
+        key_filename = self._prompt_config_src["build_filename"]
+        if self._prompt_config_dst["build_filename"] != self._prompt_config_src["build_filename"]:
+            trigger_rename = self._prompt_config_dst["build_filename"]
 
             # If the repo being translated already has the build file that we want
             # to use, but it's not the default build file, then we should trigger
             # the build addendum for that extra build file rather than the default.
-            if ("extra_build_files" in prompt_config_src
-                and prompt_config_dst["build_filename"] in prompt_config_src["extra_build_files"]):
-                key_filename = prompt_config_dst["build_filename"]
+            if ("extra_build_files" in self._prompt_config_src
+                and self._prompt_config_dst["build_filename"] in self._prompt_config_src["extra_build_files"]):
+                key_filename = self._prompt_config_dst["build_filename"]
 
         if fname == key_filename:
             base_prompt += ("\n" + self.BUILD_ADDENDUM.format(
-                new_build_file=prompt_config_dst["build_filename"],
+                new_build_file=self._prompt_config_dst["build_filename"],
                 dst_model=self._dst_model,
                 exts=exts_str,
-                filename_desc=prompt_config_dst["filename_desc"],
-                ex_build_cmd=prompt_config_dst["ex_build_cmd"],
-                ex_build_desc=prompt_config_dst["ex_build_desc"]))
+                filename_desc=self._prompt_config_dst["filename_desc"],
+                ex_build_cmd=self._prompt_config_dst["ex_build_cmd"],
+                ex_build_desc=self._prompt_config_dst["ex_build_desc"]))
         else:
             trigger_rename = None
 
@@ -139,10 +137,10 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             # Check if the extension is in the dict
             if current_ext in self._ext_to_type:
                 if self._dst_model == "cuda":
-                    ext_category = self._dst_model
+                    ext_category = "cuda"
                 else:
-                    ext_category = self._input_repo.get_meta_dict()["filename_desc"]
-                return name + self._type_to_ext[ext_category.lower()][self._ext_to_type[current_ext]]
+                    ext_category = self._prompt_config_dst["filename_desc"].lower()
+                return name + self._type_to_ext[ext_category][self._ext_to_type[current_ext]]
 
         return fname
 
@@ -154,6 +152,8 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
+        self._prompt_config_dst = json.load(open(self._dst_config, 'r'))
+        self._prompt_config_src = self._input_repo.get_meta_dict()
 
         try:
             max_cols = os.get_terminal_size().columns

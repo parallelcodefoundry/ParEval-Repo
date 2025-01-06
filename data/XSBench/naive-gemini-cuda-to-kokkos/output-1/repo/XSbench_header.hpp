@@ -1,0 +1,108 @@
+#ifndef __XSBENCH_HEADER_HPP__
+#define __XSBENCH_HEADER_HPP__
+
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <cassert>
+#include <Kokkos_Core.hpp>
+#include <algorithm> //for std::sort
+#include <stdint.h>
+#include <chrono>
+#include "XSbench_shared_header.h"
+
+// Grid types
+enum GridType {UNIONIZED, NUCLIDE, HASH};
+
+// Simulation types
+enum SimulationMethod {HISTORY_BASED, EVENT_BASED};
+
+// Binary Mode Type
+enum BinaryMode {NONE, READ, WRITE};
+
+// Starting Seed
+constexpr uint64_t STARTING_SEED = 1070;
+
+
+// Structures
+struct NuclideGridPoint {
+        double energy;
+        double total_xs;
+        double elastic_xs;
+        double absorbtion_xs;
+        double fission_xs;
+        double nu_fission_xs;
+};
+
+struct SimulationData {
+        std::vector<int> num_nucs;                     
+        std::vector<double> concs;                     
+        std::vector<int> mats;                         
+        std::vector<double> unionized_energy_array;    
+        std::vector<int> index_grid;                   
+        std::vector<NuclideGridPoint> nuclide_grid;    
+        std::vector<unsigned long> verification;
+        std::vector<double> p_energy_samples;
+        std::vector<int> mat_samples;
+        int max_num_nucs;
+
+};
+
+
+// io.cpp
+void logo(int version);
+void center_print(const char *s, int width);
+void border_print(void);
+void fancy_int(long a);
+Inputs read_CLI(int argc, char *argv[]);
+void print_CLI_error(void);
+void print_inputs(Inputs in, int nprocs, int version);
+int print_results(Inputs in, int mype, double runtime, int nprocs, unsigned long long vhash);
+void binary_write(Inputs in, SimulationData SD);
+SimulationData binary_read(Inputs in);
+
+// Simulation.cpp
+unsigned long long run_event_based_simulation_baseline(Inputs in, SimulationData& SD, int mype, Profile* profile);
+KOKKOS_FUNCTION void calculate_micro_xs(double p_energy, int nuc, long n_isotopes,
+                                   long n_gridpoints,
+                                   const Kokkos::View<const double*>::HostMirror& egrid, const Kokkos::View<const int*>::HostMirror& index_data,
+                                   const Kokkos::View<const NuclideGridPoint*>::HostMirror& nuclide_grids,
+                                   long idx, Kokkos::View<double*>::HostMirror& xs_vector, GridType grid_type, int hash_bins);
+KOKKOS_FUNCTION void calculate_macro_xs(double p_energy, int mat, long n_isotopes,
+                                   long n_gridpoints, const Kokkos::View<const int*>::HostMirror& num_nucs,
+                                   const Kokkos::View<const double*>::HostMirror& concs,
+                                   const Kokkos::View<const double*>::HostMirror& egrid, const Kokkos::View<const int*>::HostMirror& index_data,
+                                   const Kokkos::View<const NuclideGridPoint*>::HostMirror& nuclide_grids,
+                                   const Kokkos::View<const int*>::HostMirror& mats,
+                                   Kokkos::View<double*>::HostMirror& macro_xs_vector, GridType grid_type, int hash_bins, int max_num_nucs);
+KOKKOS_FUNCTION long grid_search(long n, double quarry, const Kokkos::View<const double*>::HostMirror& A);
+KOKKOS_FUNCTION long grid_search_nuclide(long n, double quarry, const Kokkos::View<const NuclideGridPoint*>::HostMirror& A, long low, long high);
+KOKKOS_FUNCTION int pick_mat(uint64_t* seed);
+KOKKOS_FUNCTION double LCG_random_double(uint64_t* seed);
+KOKKOS_FUNCTION uint64_t fast_forward_LCG(uint64_t seed, uint64_t n);
+
+unsigned long long run_event_based_simulation_optimization_1(Inputs in, SimulationData& SD, int mype);
+unsigned long long run_event_based_simulation_optimization_2(Inputs in, SimulationData& SD, int mype);
+unsigned long long run_event_based_simulation_optimization_3(Inputs in, SimulationData& SD, int mype);
+unsigned long long run_event_based_simulation_optimization_4(Inputs in, SimulationData& SD, int mype);
+unsigned long long run_event_based_simulation_optimization_5(Inputs in, SimulationData& SD, int mype);
+unsigned long long run_event_based_simulation_optimization_6(Inputs in, SimulationData& SD, int mype);
+
+
+// GridInit.cpp
+SimulationData grid_init_do_not_profile(Inputs in, int mype);
+
+
+// XSutils.cpp
+int NGP_compare(const void* a, const void* b);
+int double_compare(const void* a, const void* b);
+double rn_v(void);
+size_t estimate_mem_usage(Inputs in);
+double get_time(void);
+
+// Materials.cpp
+std::vector<int> load_num_nucs(long n_isotopes);
+std::vector<int> load_mats(const std::vector<int>& num_nucs, long n_isotopes, int& max_num_nucs);
+std::vector<double> load_concs(const std::vector<int>& num_nucs, int max_num_nucs);
+
+#endif

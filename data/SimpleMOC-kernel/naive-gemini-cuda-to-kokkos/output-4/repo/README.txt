@@ -44,7 +44,7 @@ the code and enable more transparent analysis techniques on high performance
 architectures.
 
 The scope of this kernel is essentially the inner-loop of SimpleMOC, i.e., the
-attenuation of neutron fluxes across an individual geometrical segment.
+attentuation of neutron fluxes across an individual geometrical segment.
 This kernel composes approximately 92% of the walltime of the full application,
 and is therefore useful for analyzing optimization methods and performance
 implications for exascale supercomputer architectures.
@@ -57,8 +57,7 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now a Kokkos code and supports various architectures
-through Kokkos's execution spaces (e.g., OpenMP, CUDA, OpenCL).
+SimpleMOC-kernel is now a Kokkos code and supports various architectures through Kokkos's execution space abstractions.
 
 ==============================================================================
 Quick Start Guide
@@ -99,17 +98,15 @@ Running SimpleMOC-kernel-------------------------------------------------------
 
 	Usage: ./SimpleMOC-kernel <options>
 	Options include:
-	  -t <threads>          Number of threads to run (OpenMP)
+	  -t <threads>          Number of threads to run (Kokkos's thread management)
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
-	  -p <segs per thread>  Number of segments per Kokkos team
-	  -k <Kokkos backend>   Kokkos execution space (e.g., OpenMP, CUDA, Serial)
+	  -p <segs per thread>  Number of segments per Kokkos execution space unit.
 
-
-	If no options are specified, then a default set of parameters will
+	If not options are specified, then a default set of parameters will
 	automatically be run. These parameters reflect the approximate per node
 	work load for a full core reactor simulation (the the number of geometry
-	segments has been significantly reduced to reduce runtime while preserving
+	segments has been signficantly reduced to reduce runtime while preserving
 	the computational profile).
 
 ==============================================================================
@@ -117,20 +114,20 @@ Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
 There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.  The makefile will need to be adapted
-to correctly configure Kokkos.
+with more advanced compilation features.  Kokkos's compilation options and runtime parameters should also be considered.
 
 Here is a sample of the control panel at the top of the makefile:
 
-KOKKOS_BACKEND ?= OpenMP
+KOKKOS_DEVICES ?= OpenMP,Serial  // Example: choose OpenMP, CUDA, or others
+KOKKOS_ARCH    ?= 
+# ... other Kokkos-related settings ...
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
-TABLE       ?= no
 
 Explanation of Flags:
 
-KOKKOS_BACKEND <OpenMP, CUDA, Serial, etc.> - This selects your Kokkos backend.
+KOKKOS_DEVICES - Selects the Kokkos execution space(s) (e.g., OpenMP, CUDA, Serial).
 
 OPTIMIZE - Adds compiler optimization flags.
 
@@ -139,12 +136,12 @@ DEBUG - Adds debugging flags.
 PROFILE - Adds profiling flags.
 
 ===============================================================================
-SimpleMOC-kernel Strawman Reactor Definition
+SimpleMOC-kernel Strawman Reactor Defintion
 ===============================================================================
 
 For the purposes of simplicity this mini-app uses a conservative "strawman"
 reactor model to represent a good target problem for full core reactor
-simulations to be run on exascale class supercomputers. Arbitrary
+simualations to be run on exascale class supercomputers. Arbitrary
 user-defined geometries are not supported.
 
 ===============================================================================

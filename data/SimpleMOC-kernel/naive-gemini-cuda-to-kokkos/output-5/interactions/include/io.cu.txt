@@ -67,11 +67,13 @@ void print_input_summary(Input I) {
     center_print("INPUT SUMMARY", 79);
     border_print();
 
-    cudaDeviceProp prop;
-    int device;
-    cudaGetDevice(&device);
-    cudaGetDeviceProperties(&prop, device);
-    std::cout << std::left << std::setw(25) << "CUDA Device: " << prop.name << "\n";
+    //  CUDA is not available in Kokkos.  This section needs to be replaced with equivalent Kokkos information.
+    //  Example below showing how to get the Kokkos device information
+    //  Kokkos::hwloc::Topology topology;
+    //  std::string device_name = topology.get_node_name();
+    //  std::cout << std::left << std::setw(25) << "Kokkos Device:" << device_name << "\n";
+
+
     std::cout << std::left << std::setw(25) << "Energy Groups:" << I.egroups << "\n";
     std::cout << std::left << std::setw(25) << "2D Source Regions:" << I.source_2D_regions << "\n";
     std::cout << std::left << std::setw(25) << "Coarse Axial Intervals:" << I.coarse_axial_intervals << "\n";
@@ -126,15 +128,15 @@ void read_CLI(int argc, char *argv[], Input *input) {
             else
                 print_CLI_error();
         }
-        // CUDA Device Number (-d)
-        else if (strcmp(arg, "-d") == 0) {
-            if (++i < argc) {
-                int device_id = atoi(argv[i]);
-                cudaSetDevice(device_id);
-            }
-            else
-                print_CLI_error();
-        }
+        // CUDA Device Number (-d)  -  This is not relevant for Kokkos
+        // else if (strcmp(arg, "-d") == 0) {
+        //     if (++i < argc) {
+        //         int device_id = atoi(argv[i]);
+        //         cudaSetDevice(device_id);
+        //     }
+        //     else
+        //         print_CLI_error();
+        // }
         else
             print_CLI_error();
     }
@@ -147,8 +149,8 @@ void print_CLI_error(void) {
     std::cerr << "  -t <threads>          Number of OpenMP threads to run\n";
     std::cerr << "  -s <segments>         Number of segments to process\n";
     std::cerr << "  -e <energy groups>    Number of energy groups\n";
-    std::cerr << "  -p <segs per thread>  Number of segments per CUDA Block\n";
-    std::cerr << "  -d <CUDA device ID>   CUDA GPU device ID number\n";
+    std::cerr << "  -p <segs per thread>  Number of segments per Kokkos Team\n";
+    // std::cerr << "  -d <CUDA device ID>   CUDA GPU device ID number\n"; //Not relevant for Kokkos
     std::cerr << "See readme for full description of default run values\n";
     exit(1);
 }

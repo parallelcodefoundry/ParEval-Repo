@@ -37,15 +37,14 @@ To compile XSBench with default settings, navigate to your selected source direc
 mkdir build
 cd build
 cmake ..
-make
+cmake --build .
 ```
 
-You can alter compiler settings in the included CMakeLists.txt.
+You can alter compiler settings in the included CMakeLists.txt file.
 
 ### Debugging, Optimization & Profiling
 
-Optimization and debugging flags can be controlled through CMake's build type settings (e.g., `Release`, `Debug`). Profiling can be done using tools like gprof or other profilers compatible with your chosen Kokkos backend.
-
+Optimization and debugging flags can be set through CMake, e.g., `cmake -DCMAKE_BUILD_TYPE=Debug ..` or `cmake -DCMAKE_BUILD_TYPE=Release ..`. Profiling can be done using appropriate tools for your target architecture (e.g., perf for CPU, NVIDIA Nsight for GPUs).
 
 ## Running XSBench
 
@@ -53,7 +52,7 @@ To run XSBench with default settings, use the following command:
 ```bash
 ./XSBench
 ```
-For non-default settings, XSBench supports the following command line options (see `io.cpp` for details):
+For non-default settings, XSBench supports the following command line options:  (Note:  CLI parsing implementation might need changes for Kokkos version)
 
 | Argument    |Description | Options     | Default
 |-------------|------------|---------------|------------|
@@ -66,75 +65,64 @@ For non-default settings, XSBench supports the following command line options (s
 -h | # of hash bins (only used with hash-based grid search) | integer value | 10,000 |
 -b | Read/Write binary files | read, write |  |
 -k | Optimized kernel ID | integer value | 0
--n | Number of iterations | integer value | 1
--w | Number of warmup iterations | integer value | 0
---csv <file path> | Save output to CSV file | file path | stdout
 
 
 - **-m [simulation method]**
-Sets the simulation method, either "history" or "event".  These options represent the history-based or event-based algorithms respectively. The default is the history-based method. These two methods represent different methods of parallelizing the Monte Carlo transport method.  See the [Transport Simulation Styles](#Transport-Simulation-Styles) section for more information.
+Sets the simulation method, either "history" or "event".  These options represent the history-based or event-based algorithms respectively. The default is the history-based method. These two methods represent different methods of parallelizing the Monte Carlo transport method. See the [Transport Simulation Styles](#Transport-Simulation-Styles) section for more information.
 
 - **-s [size]**
-Sets the size of the Hoogenboom-Martin reactor model. There are four options: 'small', 'large', 'XL', and 'XXL'. By default, the 'large' option is selected.  See the original README for details on the impact of this parameter.
+Sets the size of the Hoogenboom-Martin reactor model.  There are four options: 'small', 'large', 'XL', and 'XXL'. By default, the 'large' option is selected.  See the details in the original README.
 
 - **-g [gridpoints]**
-Sets the number of gridpoints per nuclide. This will override the number of default gridpoints set by the '-s' option.
+Sets the number of gridpoints per nuclide. See the details in the original README.
 
 - **-G [grid type]**
-Sets the grid search type (unionized, nuclide, hash). Defaults to unionized. See the [Cross Section Lookup Methods](#Cross-Section-Lookup-Methods) section for more details.
+Sets the grid search type (unionized, nuclide, hash). Defaults to unionized.  See the details in the original README.
 
 - **-p [particles]**
-Sets the number of particle histories to simulate.
-
+Sets the number of particle histories to simulate. See the details in the original README.
 
 - **-l [lookups]**
-Sets the number of cross-section (XS) lookups to perform per particle (history-based) or total lookups (event-based).
-
+Sets the number of cross-section (XS) lookups to perform per particle. See the details in the original README.
 
 - **-h [hash bins]**
-Sets the number of hash bins (only relevant when using the hash lookup algorithm).
-
+Sets the number of hash bins (only relevant when using the hash lookup algorithm, as selected with "-G hash"). Default is 10,000.
 
 - **-b [binary mode]**
-This optional mode can read or write the simulation data structures to disk.  See the original README for details.
-
+This optional mode can read or write the simulation data structures to disk.  See the details in the original README.
 
 - **-k [kernel]**
-Select the Kokkos kernel implementation to use.
+There are several optimized variants of the main kernel.  See the details in the original README.  The Kokkos implementation will likely use Kokkos::parallel_for to express parallelism.
 
 
 ## Feature Discussion
 
 ### Kokkos Support
 
-XSBench now utilizes Kokkos for parallel execution. Kokkos allows for portability across different hardware backends (CPUs, GPUs, etc.) by abstracting away hardware-specific details. The choice of backend is configured at compile time.
+The Kokkos version of XSBench utilizes the Kokkos programming model for parallel execution. This allows for portability across different architectures (CPUs, GPUs, etc.) by specifying the Kokkos execution space (e.g., Kokkos::Serial, Kokkos::Cuda).  The CUDA-specific functions and headers (`cuda.h`, `cudaMemcpy`, etc.) will be replaced with Kokkos equivalents.
 
 ### Verification Support
 
-XSBench generates a hash of the results for verification purposes.
-
+XSBench generates a hash of the results at the end of the simulation and displays it with the other data once the code has completed executing.  The hash should be consistent across different execution spaces (CPU, GPU) provided the same input parameters are used.
 
 ### Binary File Support
 
-The binary file support remains the same as in the original CUDA version.
+The binary file support remains the same.
 
 
 ## Algorithms
 
-(The Algorithms section remains largely unchanged from the original README.)
+(This section remains the same as in the original README)
 
 
 ## Optimized Kernels
 
-(The Optimized Kernels section remains largely unchanged, but note that the optimizations will be implemented using Kokkos parallel constructs.)
-
+The optimized kernels in the Kokkos version will leverage Kokkos' parallel capabilities to achieve better performance.  The sorting operations (e.g., `thrust::sort`) will likely be replaced with Kokkos-based sorting algorithms.  The material-specific kernels and partitioning strategies will be implemented using Kokkos::parallel_for and Kokkos views.
 
 ## Citing XSBench
 
-(The Citing XSBench section remains unchanged.)
-
+(This section remains the same as in the original README)
 
 ## Development Team
-
-(The Development Team section remains unchanged.)
+(This section remains the same as in the original README)
 ```

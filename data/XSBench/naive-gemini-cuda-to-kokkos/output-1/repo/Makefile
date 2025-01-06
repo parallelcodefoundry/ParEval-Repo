@@ -31,7 +31,7 @@ obj = $(source:.cpp=.o)
 CFLAGS := -std=c++17 -I$(KOKKOS_ROOT)/include
 
 # Linker Flags
-LDFLAGS = -lm -L$(KOKKOS_ROOT)/lib -lkokkos_core -lkokkos_blas
+LDFLAGS = -lm -lkokkos_core
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -49,6 +49,14 @@ endif
 ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
+
+# Kokkos Specific flags.  Adapt as needed for your Kokkos configuration
+KOKKOS_FLAGS = 
+
+# Add Kokkos flags to CFLAGS and LDFLAGS
+CFLAGS += $(KOKKOS_FLAGS)
+LDFLAGS += $(KOKKOS_FLAGS)
+
 
 #===============================================================================
 # Targets to Build

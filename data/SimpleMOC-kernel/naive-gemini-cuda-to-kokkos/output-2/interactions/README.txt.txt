@@ -58,8 +58,8 @@ http://dx.doi.org/10.1016/j.cpc.2016.01.007
 Architectural Support
 ==============================================================================
 
-SimpleMOC-kernel is now a Kokkos code and supports various architectures 
-through Kokkos's execution spaces (e.g., OpenMP, CUDA, HIP).
+SimpleMOC-kernel is now a Kokkos code and supports a variety of architectures
+including CPUs and GPUs through Kokkos's execution spaces.
 
 ==============================================================================
 Quick Start Guide
@@ -100,11 +100,11 @@ Running SimpleMOC-kernel-------------------------------------------------------
 
 	Usage: ./SimpleMOC-kernel <options>
 	Options include:
-	  -t <threads>          Number of threads to run (OpenMP only)
+	  -t <threads>          Number of threads to run (OpenMP threads if using OpenMP execution space)
 	  -s <segments>         Number of segments to process
 	  -e <energy groups>    Number of energy groups
 	  -p <segs per thread>  Number of segments per Kokkos team
-	  -k <Kokkos backend>  Specify Kokkos backend (e.g., OpenMP, Cuda, Serial)
+	  -k <Kokkos execution space>  Specify the Kokkos execution space (e.g., OpenMP, CUDA, Serial)
 
 
 	If no options are specified, then a default set of parameters will
@@ -118,12 +118,11 @@ Advanced Compilation, Debugging, Optimization, and Profiling
 ==============================================================================
 
 There are a number of switches that can be set at the top of the makefile, along
-with more advanced compilation features.  Consult the Kokkos documentation for 
-details on optimizing for different backends.
+with more advanced compilation features.  Refer to the Kokkos documentation for advanced compilation options.
 
 Here is a sample of the control panel at the top of the makefile:
 
-KOKKOS_BACKEND ?= OpenMP  //Or Cuda, Serial, etc.
+KOKKOS_EXECUTION_SPACE ?= OpenMP  // Or CUDA, Serial, etc.
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -132,13 +131,13 @@ TABLE       ?= no
 
 Explanation of Flags:
 
-KOKKOS_BACKEND - This selects the Kokkos backend.
+KOKKOS_EXECUTION_SPACE - This selects the Kokkos execution space.
 
 OPTIMIZE - Adds compiler optimization flags.
 
 DEBUG - Adds debugging flags.
 
-PROFILE - Adds profiling flags.
+PROFILE - Adds profiling flags (requires a profiling tool).
 
 ===============================================================================
 SimpleMOC-kernel Strawman Reactor Definition

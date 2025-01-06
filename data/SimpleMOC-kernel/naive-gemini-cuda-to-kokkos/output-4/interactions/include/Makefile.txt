@@ -2,40 +2,63 @@
 cmake_minimum_required(VERSION 3.10)
 project(SimpleMOC-kernel)
 
-# Set compiler and flags
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -march=native -ffast-math") #Add optimization flags here.
-if(DEBUG)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -G")
-endif
-if(PROFILE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-endif
-
-# Find Kokkos and CUDA
+# Find Kokkos
 find_package(Kokkos REQUIRED)
-find_package(CUDA REQUIRED)
 
-# Add include directories
-include_directories(include)
+# Set compiler and other options.  These can also be set on the command line.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -Wall -Wextra -pedantic") #Example flags, adjust as needed.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17") # Add C++17 standard
+
+# Add Kokkos flags based on backend selected via command line
+if(KOKKOS_BACKEND STREQUAL "CUDA")
+  set(KOKKOS_FLAGS "-DKOKKOS_ENABLE_CUDA")
+elseif(KOKKOS_BACKEND STREQUAL "OpenMP")
+  set(KOKKOS_FLAGS "-DKOKKOS_ENABLE_OPENMP")
+elseif(KOKKOS_BACKEND STREQUAL "Serial")
+  set(KOKKOS_FLAGS "-DKOKKOS_ENABLE_SERIAL")
+# Add other backends as needed.  For example:
+elseif(KOKKOS_BACKEND STREQUAL "OpenMP")
+  set(KOKKOS_FLAGS "-DKOKKOS_ENABLE_OPENMP")
+# Add other backends as needed.
+else()
+  message(FATAL_ERROR "Unsupported Kokkos backend: ${KOKKOS_BACKEND}")
+endif
+
+# List source files
+set(SOURCES
+  main.cpp
+  kernel.cpp
+  init.cpp
+  io.cpp
+)
 
 # Add source files
-add_executable(SimpleMOC-kernel
-  include/main.cpp
-  include/kernel.cpp
-  include/init.cpp
-  include/io.cpp)
+add_executable(SimpleMOC-kernel ${SOURCES})
 
-# Link Kokkos and CUDA libraries
-target_link_libraries(SimpleMOC-kernel Kokkos::Kokkos CUDA::CUDA)
+# Link against Kokkos libraries
+target_link_libraries(SimpleMOC-kernel Kokkos::KokkosCore)
 
+# Add include directory
+target_include_directories(SimpleMOC-kernel PRIVATE include)
 
-# Add custom compile options if needed.
-#Example:  target_compile_options(SimpleMOC-kernel PRIVATE -DTABLE)  (uncomment and adjust as needed)
-
-#Check if TABLE option is set.
-if(TABLE)
-  target_compile_options(SimpleMOC-kernel PRIVATE -DTABLE)
+# Add CUDA flags if CUDA backend is selected
+if(KOKKOS_BACKEND STREQUAL "CUDA")
+  target_link_libraries(SimpleMOC-kernel CUDA::cuda)
+  target_compile_options(SimpleMOC-kernel PRIVATE ${KOKKOS_FLAGS} -arch=sm_${SM_VERSION})
+  #Add other CUDA-specific flags as needed.
 endif
+
+# Add other backend specific configurations if needed. For example:
+if(KOKKOS_BACKEND STREQUAL "OpenMP")
+    target_compile_options(SimpleMOC-kernel PRIVATE ${KOKKOS_FLAGS})
+endif
+
+# Set build type (Debug, Release, RelWithDebInfo)
+set(CMAKE_BUILD_TYPE Release) # Or Debug, RelWithDebInfo
+
+# Optionally add custom compile flags
+#target_compile_options(SimpleMOC-kernel PRIVATE -O3 -march=native)
 
 ```

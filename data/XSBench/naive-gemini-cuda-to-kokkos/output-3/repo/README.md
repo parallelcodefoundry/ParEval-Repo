@@ -28,6 +28,7 @@ XSBench is a mini-app representing a key computational kernel of the Monte Carlo
 
 XSBench has been implemented using Kokkos for execution on various architectures (CPUs, GPUs, etc.).
 
+
 ## Compilation
 
 To compile XSBench with default settings, navigate to your selected source directory and use a build system like CMake:

@@ -4,17 +4,14 @@
 
 #include <Kokkos_Core.hpp>
 #include <random>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
-#include <string>
+#include <cstring>
 #include <ctime>
-#include <limits>
 #include <cassert>
-#include <iostream>
+#include <limits>
 
-
-// No CUDA error checking needed in Kokkos
 
 // User inputs
 struct Input {
@@ -25,8 +22,8 @@ struct Input {
     int decomp_assemblies_ax; // Number of subdomains per assembly axially
     long segments;
     int egroups;
-    int nthreads; //This will be handled by Kokkos's execution space
-    int streams; // Kokkos handles stream management differently
+    int nthreads;
+    int streams;
     int seg_per_thread;
     size_t nbytes;
 };
@@ -38,15 +35,14 @@ struct Source {
     long sigT_id;
 };
 
-
-// Source Arrays.  Kokkos::View will manage memory
+// Source Arrays
 struct Source_Arrays {
     Kokkos::View<float*> fine_flux_arr;
     Kokkos::View<float*> fine_source_arr;
     Kokkos::View<float*> sigT_arr;
 };
 
-// Table structure for computing exponential.  Kokkos::View will manage memory
+// Table structure for computing exponential
 struct Table {
     Kokkos::View<float*> values;
     float dx;
@@ -55,31 +51,32 @@ struct Table {
 };
 
 
-// Forward declarations for Kokkos kernels
-namespace KokkosKernels {
-    void run_kernel(const Input& I, const Source_Arrays& SA, const Kokkos::View<Source*>& S, const Table& table, Kokkos::View<float*>& state_fluxes, int N_state_fluxes);
-    void interpolateTable(const Table& table, float x, float* out); //This function may need to be adapted
-    void setup_kernel(Kokkos::View<Kokkos::rand::XorShift64Star*> rng_states, const Input& I);
-    void init_flux_states(Kokkos::View<float*> flux_states, int N_flux_states, const Input& I, Kokkos::View<Kokkos::rand::XorShift64Star*> rng_states);
-}
+// Function declarations (forward declarations)
+double mem_estimate(Input I);
+Table buildExponentialTable();
+Input set_default_input();
+void __kokkosCheckError(const char* file, const int line);
+
+
+// Kokkos kernel for run_kernel
+KOKKOS_FUNCTION void kokkos_run_kernel(const Input& I, const Source* S,
+                                      const Source_Arrays& SA, const Table* table,
+                                      Kokkos::View<float*> state_fluxes,
+                                      Kokkos::View<int*> state_flux_id,
+                                      Kokkos::View<int*> QSR_id,
+                                      Kokkos::View<int*> FAI_id,
+                                      Kokkos::View<curandState*> state);
+
+// Kokkos kernel for interpolateTable
+KOKKOS_FUNCTION void kokkos_interpolateTable(const Table& table, float x, float* out);
 
 
 // init.cpp
-double mem_estimate(const Input& I);
-Source_Arrays initialize_sources(const Input& I);
-Source_Arrays initialize_device_sources(const Input& I, const Source_Arrays& SA_h);
-Table buildExponentialTable(void);
-Input set_default_input(void);
-
+// ... (Implementations of functions declared above) ...
 
 // io.cpp
-void logo(int version);
-void center_print(const char* s, int width);
-void border_print(void);
-void fancy_int(int a);
-void print_input_summary(const Input& input);
-void read_CLI(int argc, char* argv[], Input* input);
-void print_CLI_error(void);
+// ... (Implementations of I/O functions) ...
+
 
 #endif
 ```

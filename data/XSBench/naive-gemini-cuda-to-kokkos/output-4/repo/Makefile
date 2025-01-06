@@ -28,15 +28,18 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -I$(KOKKOS_ROOT)/include
+CFLAGS := -std=c++17 -I/path/to/Kokkos
 
 # Linker Flags
-LDFLAGS = -lm -lkokkos
+LDFLAGS = -lm -L/path/to/Kokkos -lkokkos_core
+
+# Compiler
+CC = $(COMPILER)
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -G
-  LDFLAGS  += -g -G
+  CFLAGS += -g -O0
+  LDFLAGS  += -g -O0
 endif
 
 # Profiling Flags
@@ -50,19 +53,15 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
-# Kokkos flags (replace with your Kokkos configuration)
-KOKKOS_FLAGS := $(shell $(KOKKOS_ROOT)/bin/kokkos-config --cxxflags)
-KOKKOS_LIBS := $(shell $(KOKKOS_ROOT)/bin/kokkos-config --libs)
-
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
 $(program): $(obj) XSbench_header.hpp Makefile
-	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) $(obj) -o $@ $(LDFLAGS) $(KOKKOS_LIBS)
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp XSbench_header.hpp Makefile
-	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

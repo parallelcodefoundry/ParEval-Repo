@@ -2,7 +2,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= clang++
+COMPILER    ?= g++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -28,15 +28,15 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 -I/path/to/Kokkos
+CFLAGS := -std=c++17 -I$(KOKKOS_ROOT)/include
 
 # Linker Flags
-LDFLAGS = -lm -L/path/to/Kokkos -lkokkos
+LDFLAGS = -lm -L$(KOKKOS_ROOT)/lib -lkokkos_core
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
-  CFLAGS += -g -O0
-  LDFLAGS  += -g -O0
+  CFLAGS += -g -G
+  LDFLAGS  += -g -G
 endif
 
 # Profiling Flags
@@ -50,15 +50,19 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+# Kokkos Specific Flags (Adjust as needed based on your Kokkos configuration)
+KOKKOS_FLAGS =  # Add any necessary Kokkos-specific flags here, e.g., for specific backends
+
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
 $(program): $(obj) XSbench_header.hpp Makefile
-	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) $(obj) -o $@ $(LDFLAGS)
 
 %.o: %.cpp XSbench_header.hpp Makefile
-	$(COMPILER) $(CFLAGS) -c $< -o $@
+	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)

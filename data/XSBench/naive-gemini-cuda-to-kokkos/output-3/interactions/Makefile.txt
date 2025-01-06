@@ -3,7 +3,7 @@
 # User Options
 #===============================================================================
 
-COMPILER    ?= gcc # Changed to a standard C++ compiler
+COMPILER    ?= g++
 OPTIMIZE    ?= yes
 DEBUG       ?= no
 PROFILE     ?= no
@@ -29,12 +29,10 @@ obj = $(source:.cpp=.o)
 #===============================================================================
 
 # Standard Flags
-CFLAGS := -std=c++17 #Added C++17 standard
-# Kokkos Flags
-KOKKOS_FLAGS := -I$(KOKKOS_ROOT)
+CFLAGS := -std=c++17 -I$(KOKKOS_ROOT)/include
 
 # Linker Flags
-LDFLAGS = -lm -lkokkos_core -lkokkos_kernels # Added Kokkos libraries
+LDFLAGS = -lm -lkokkos_core -L$(KOKKOS_ROOT)/lib
 
 # Debug Flags
 ifeq ($(DEBUG),yes)
@@ -53,21 +51,33 @@ ifeq ($(OPTIMIZE),yes)
   CFLAGS += -O3
 endif
 
+# Kokkos configuration
+ifeq ($(findstring CUDA,$(KOKKOS_DEVICES)),CUDA)
+  CFLAGS += -DKokkos_ENABLE_CUDA
+endif
+ifeq ($(findstring OpenMP,$(KOKKOS_DEVICES)),OpenMP)
+  CFLAGS += -DKokkos_ENABLE_OPENMP
+endif
+ifeq ($(findstring Serial,$(KOKKOS_DEVICES)),Serial)
+  CFLAGS += -DKokkos_ENABLE_SERIAL
+endif
+
+
 #===============================================================================
 # Targets to Build
 #===============================================================================
 
-$(program): $(obj) XSbench_header.hpp Makefile
-	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) $(obj) -o $@ $(LDFLAGS)
+$(program): $(obj) XSbench_header.hpp XSbench_shared_header.h Makefile
+	$(COMPILER) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
 
-%.o: %.cpp XSbench_header.hpp Makefile
-	$(COMPILER) $(CFLAGS) $(KOKKOS_FLAGS) -c $< -o $@
+%.o: %.cpp XSbench_header.hpp XSbench_shared_header.h Makefile
+	$(COMPILER) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(program) $(obj)
 
 edit:
-	vim -p $(source) XSbench_header.hpp
+	vim -p $(source) XSbench_header.hpp XSbench_shared_header.h
 
 run:
 	./$(program)

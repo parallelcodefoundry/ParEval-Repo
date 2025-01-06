@@ -44,11 +44,10 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 		lookups = in.lookups;
 	long long lookups_per_sec = (long long) ((double) lookups / runtime);
 
-	//Kokkos reduction for MPI, otherwise just print
-        long long total_lookups = lookups_per_sec;
-#ifdef USE_MPI
-        Kokkos::parallel_reduce(Kokkos::DefaultCommunicator(), lookups_per_sec, total_lookups);
-#endif
+	// If running in MPI, reduce timing statistics and calculate average
+	//  MPI is not directly supported in Kokkos, this section would need to be 
+	//  replaced with a Kokkos-compatible parallel reduction.
+
 
 	int is_invalid_result = 1;
 
@@ -61,20 +60,12 @@ int print_results( Inputs in, int mype, double runtime, int nprocs,
 
 		// Print the results
 		printf("NOTE: Timings are estimated -- use nvprof/nsys/iprof/rocprof for formal analysis\n");
-#ifdef USE_MPI
-		printf("MPI ranks:   %d\n", nprocs);
-#endif
-#ifdef USE_MPI
-		printf("Total Lookups/s:            ");
-		fancy_int(total_lookups);
-		printf("Avg Lookups/s per MPI rank: ");
-		fancy_int(total_lookups / nprocs);
-#else
+		// MPI section removed
 		printf("Runtime:     %.3lf seconds\n", runtime);
 		printf("Lookups:     "); fancy_int(lookups);
 		printf("Lookups/s:   ");
 		fancy_int(lookups_per_sec);
-#endif
+		
 	}
 
 	unsigned long long large = 0;
@@ -120,12 +111,7 @@ void print_inputs(Inputs in, int nprocs, int version )
 	center_print("INPUT SUMMARY", 79);
 	border_print();
 	printf("Programming Model:            Kokkos\n");
-        //Kokkos device information
-#ifdef USE_OPENMP
-        printf("Kokkos Execution Space:        OpenMP\n");
-#else
-        printf("Kokkos Execution Space:        Serial\n");
-#endif
+	// CUDA device information is not relevant for Kokkos.
 	if( in.simulation_method == EVENT_BASED )
 		printf("Simulation Method:            Event Based\n");
 	else
@@ -159,12 +145,7 @@ void print_inputs(Inputs in, int nprocs, int version )
 	}
 	printf("Total XS Lookups:             "); fancy_int(in.lookups);
 	printf("Total XS Iterations:          "); fancy_int(in.num_iterations);
-#ifdef USE_MPI
-	printf("MPI Ranks:                    %d\n", nprocs);
-	printf("Mem Usage per MPI Rank (MB):  "); fancy_int(mem_tot);
-#else
 	printf("Est. Memory Usage (MB):       "); fancy_int(mem_tot);
-#endif
 	printf("Binary File Mode:             ");
 	if( in.binary_mode == NONE )
 		printf("Off\n");
@@ -185,25 +166,25 @@ void border_print(void)
 }
 
 // Prints comma separated integers - for ease of reading
-void fancy_int( long long a )
+void fancy_int( long a )
 {
 	if( a < 1000 )
-		printf("%lld\n",a);
+		printf("%ld\n",a);
 
 	else if( a >= 1000 && a < 1000000 )
-		printf("%lld,%03lld\n", a / 1000, a % 1000);
+		printf("%ld,%03ld\n", a / 1000, a % 1000);
 
 	else if( a >= 1000000 && a < 1000000000 )
-		printf("%lld,%03lld,%03lld\n",a / 1000000,(a % 1000000) / 1000,a % 1000 );
+		printf("%ld,%03ld,%03ld\n",a / 1000000,(a % 1000000) / 1000,a % 1000 );
 
 	else if( a >= 1000000000 )
-		printf("%lld,%03lld,%03lld,%03lld\n",
+		printf("%ld,%03ld,%03ld,%03ld\n",
 		       a / 1000000000,
 		       (a % 1000000000) / 1000000,
 		       (a % 1000000) / 1000,
 		       a % 1000 );
 	else
-		printf("%lld\n",a);
+		printf("%ld\n",a);
 }
 
 void print_CLI_error(void)
@@ -495,12 +476,12 @@ void binary_write( Inputs in, SimulationData SD )
 	fwrite(&SD, sizeof(SimulationData), 1, fp);
 
 	// Write heap arrays in SimulationData Object
-	fwrite(SD.num_nucs.data(),       sizeof(int), SD.num_nucs.size(), fp);
-	fwrite(SD.concs.data(),          sizeof(double), SD.concs.size(), fp);
-	fwrite(SD.mats.data(),           sizeof(int), SD.mats.size(), fp);
-	fwrite(SD.nuclide_grid.data(),   sizeof(NuclideGridPoint), SD.nuclide_grid.size(), fp);
-	fwrite(SD.index_grid.data(), sizeof(int), SD.index_grid.size(), fp);
-	fwrite(SD.unionized_energy_array.data(), sizeof(double), SD.unionized_energy_array.size(), fp);
+	fwrite(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+	fwrite(SD.concs,          sizeof(double), SD.length_concs, fp);
+	fwrite(SD.mats,           sizeof(int), SD.length_mats, fp);
+	fwrite(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+	fwrite(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+	fwrite(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
 
 	fclose(fp);
 }
@@ -519,20 +500,20 @@ SimulationData binary_read( Inputs in )
 	fread(&SD, sizeof(SimulationData), 1, fp);
 
 	// Allocate space for arrays on heap
-        SD.num_nucs = Kokkos::View<int*>(Kokkos::HostSpace(), SD.num_nucs.size());
-        SD.concs = Kokkos::View<double*>(Kokkos::HostSpace(), SD.concs.size());
-        SD.mats = Kokkos::View<int*>(Kokkos::HostSpace(), SD.mats.size());
-        SD.nuclide_grid = Kokkos::View<NuclideGridPoint*>(Kokkos::HostSpace(), SD.nuclide_grid.size());
-        SD.index_grid = Kokkos::View<int*>(Kokkos::HostSpace(), SD.index_grid.size());
-        SD.unionized_energy_array = Kokkos::View<double*>(Kokkos::HostSpace(), SD.unionized_energy_array.size());
+	SD.num_nucs = (int *) malloc(SD.length_num_nucs * sizeof(int));
+	SD.concs = (double *) malloc(SD.length_concs * sizeof(double));
+	SD.mats = (int *) malloc(SD.length_mats * sizeof(int));
+	SD.nuclide_grid = (NuclideGridPoint *) malloc(SD.length_nuclide_grid * sizeof(NuclideGridPoint));
+	SD.index_grid = (int *) malloc( SD.length_index_grid * sizeof(int));
+	SD.unionized_energy_array = (double *) malloc( SD.length_unionized_energy_array * sizeof(double));
 
 	// Read heap arrays into SimulationData Object
-	fread(SD.num_nucs.data(),       sizeof(int), SD.num_nucs.size(), fp);
-	fread(SD.concs.data(),          sizeof(double), SD.concs.size(), fp);
-	fread(SD.mats.data(),           sizeof(int), SD.mats.size(), fp);
-	fread(SD.nuclide_grid.data(),   sizeof(NuclideGridPoint), SD.nuclide_grid.size(), fp);
-	fread(SD.index_grid.data(), sizeof(int), SD.index_grid.size(), fp);
-	fread(SD.unionized_energy_array.data(), sizeof(double), SD.unionized_energy_array.size(), fp);
+	fread(SD.num_nucs,       sizeof(int), SD.length_num_nucs, fp);
+	fread(SD.concs,          sizeof(double), SD.length_concs, fp);
+	fread(SD.mats,           sizeof(int), SD.length_mats, fp);
+	fread(SD.nuclide_grid,   sizeof(NuclideGridPoint), SD.length_nuclide_grid, fp);
+	fread(SD.index_grid, sizeof(int), SD.length_index_grid, fp);
+	fread(SD.unionized_energy_array, sizeof(double), SD.length_unionized_energy_array, fp);
 
 	fclose(fp);
 

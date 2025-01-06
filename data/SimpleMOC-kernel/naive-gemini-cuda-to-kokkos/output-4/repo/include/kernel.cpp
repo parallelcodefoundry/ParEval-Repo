@@ -1,0 +1,141 @@
+#include "SimpleMOC-kernel_header.hpp"
+
+/* My parallelization scheme here is to basically have a single
+ * block be a geometrical segment, with each thread within the
+ * block represent a single energy phase. On the CPU, the
+ * inner SIMD-ized loop is over energy (i.e, 100 energy groups).
+ * This should allow for each BLOCK to have:
+ * 		- A single state variable for the RNG
+ * 		- A set of __shared__ SIMD vectors, each thread id being its idx
+ */
+
+namespace KokkosKernels {
+
+KOKKOS_INLINE_FUNCTION
+void interpolateTable(const Table& table, float x, float* out) {
+    // check to ensure value is in domain
+    if (x > table.maxVal)
+        *out = 1.0f;
+    else {
+        int interval = (int)(x / table.dx + 0.5f * table.dx);
+        interval = interval * 2;
+        float slope = table.values[interval];
+        float intercept = table.values[interval + 1];
+        float val = slope * x + intercept;
+        *out = val;
+    }
+}
+
+
+struct RunKernelFunctor {
+    Input I;
+    const Source* S;
+    const Source_Arrays& SA;
+    const Table& table;
+    Kokkos::View<curandState*> state;
+    Kokkos::View<float*> state_fluxes;
+    int N_state_fluxes;
+
+    RunKernelFunctor(Input I, const Source* S, const Source_Arrays& SA, const Table& table,
+                     Kokkos::View<curandState*> state, Kokkos::View<float*> state_fluxes, int N_state_fluxes) :
+        I(I), S(S), SA(SA), table(table), state(state), state_fluxes(state_fluxes), N_state_fluxes(N_state_fluxes) {}
+
+
+    KOKKOS_FUNCTION
+    void operator()(int blockId) const {
+        if (blockId >= I.segments / I.seg_per_thread) return;
+
+        // Assign RNG state
+        curandState* localState = &(state(blockId % I.streams));
+
+
+        blockId *= I.seg_per_thread;
+        blockId--;
+
+        for (int g = 0; g < I.egroups; ++g) { // Each energy group (g) is one thread in a block
+
+            // Thread Local (i.e., specific to E group) variables
+            // Similar to SIMD vectors in CPU code
+            float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
+
+            int state_flux_id = curand(localState) % N_state_fluxes;
+            int QSR_id = curand(localState) % I.source_3D_regions;
+            int FAI_id = curand(localState) % I.fine_axial_intervals;
+
+            for (int i = 0; i < I.seg_per_thread; ++i) {
+                blockId++;
+
+                float* state_flux = &(state_fluxes(state_flux_id * I.egroups + g));
+
+
+                //////////////////////////////////////////////////////////
+                // Attenuate Segment
+                //////////////////////////////////////////////////////////
+
+                // Some placeholder constants - In the full app some of these are
+                // calculated based off position in geometry. This treatment
+                // shaves off a few FLOPS, but is not significant compared to the
+                // rest of the function.
+                float dz = 0.1f;
+                float zin = 0.3f;
+                float weight = 0.5f;
+                float mu = 0.9f;
+                float mu2 = 0.3f;
+                float ds = 0.7f;
+
+                // load fine source region flux vector
+                float* FSR_flux = &(SA.fine_flux_arr(S[QSR_id].fine_flux_id + FAI_id * I.egroups + g));
+
+                if (FAI_id == 0) {
+                    // ... (same as CUDA code) ...
+                }
+                else if (FAI_id == I.fine_axial_intervals - 1) {
+                    // ... (same as CUDA code) ...
+                }
+                else {
+                    // ... (same as CUDA code) ...
+                }
+
+                // load total cross section
+                sigT = SA.sigT_arr(S[QSR_id].sigT_id + g);
+
+                // calculate common values for efficiency
+                tau = sigT * ds;
+                sigT2 = sigT * sigT;
+
+                #ifdef TABLE
+                interpolateTable(table, tau, &expVal);
+                #else
+                expVal = 1.f - expf(-tau); // EXP function is faster than table lookup
+                #endif
+
+                // Flux Integral
+                reuse = tau * (tau - 2.f) + 2.f * expVal / (sigT * sigT2);
+
+                // add contribution to new source flux
+                flux_integral = (q0 * tau + (sigT * (*state_flux) - q0) * expVal) / sigT2 + q1 * mu * reuse +
+                                q2 * mu2 * (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) / (3.f * sigT2 * sigT2);
+
+
+                // Prepare tally
+                tally = weight * flux_integral;
+
+                Kokkos::atomic_add(&(SA.fine_flux_arr(S[QSR_id].fine_flux_id + FAI_id * I.egroups + g)), (float)tally);
+
+                // ... (rest of the calculation is the same as CUDA code) ...
+
+            }
+        }
+    }
+};
+
+} // namespace KokkosKernels
+
+
+void run_kernel(Input I, const Source* S, const Source_Arrays& SA, const Table& table,
+                 Kokkos::View<curandState*> state, Kokkos::View<float*> state_fluxes, int N_state_fluxes) {
+
+    KokkosKernels::RunKernelFunctor functor(I, S, SA, table, state, state_fluxes, N_state_fluxes);
+    Kokkos::parallel_for(Kokkos::RangePolicy<Kokkos::DefaultExecutionSpace>(0, I.segments / I.seg_per_thread), functor);
+
+}

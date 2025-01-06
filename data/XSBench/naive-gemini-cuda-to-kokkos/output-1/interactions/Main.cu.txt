@@ -6,9 +6,9 @@ int main(int argc, char *argv[]) {
     // Initialization & Command Line Read-In
     // =====================================================================
     int version = 20;
-    int mype = 0; // Kokkos doesn't inherently have MPI ranks, this will need adjustment for MPI
+    int mype = 0; // Kokkos doesn't inherently have MPI ranks, this will need adjustment for parallel runs.
     double omp_start, omp_end;
-    int nprocs = 1; // Kokkos doesn't inherently have MPI ranks, this will need adjustment for MPI
+    int nprocs = 1; // Similarly, nprocs needs adjustment for parallel Kokkos.
     unsigned long long verification;
 
     // Process CLI Fields -- store in "Inputs" structure
@@ -56,40 +56,34 @@ int main(int argc, char *argv[]) {
     // Start Simulation Timer
     omp_start = get_time();
 
-    Kokkos::Timer timer;
-
-    // Run simulation using Kokkos::parallel_for
+    // Run simulation using Kokkos
+    Kokkos::Profiling::pushRegion("XSBench Simulation");
     if (in.simulation_method == EVENT_BASED) {
-        Kokkos::View<unsigned long*, Kokkos::HostSpace> h_verification("h_verification", in.lookups);
-
-        if (in.kernel_id == 0) {
-            run_event_based_simulation_baseline(in, SD, mype, &profile, h_verification);
-        } else if (in.kernel_id == 1) {
-            run_event_based_simulation_optimization_1(in, SD, mype, h_verification);
-        } else if (in.kernel_id == 2) {
-            run_event_based_simulation_optimization_2(in, SD, mype, h_verification);
-        } else if (in.kernel_id == 3) {
-            run_event_based_simulation_optimization_3(in, SD, mype, h_verification);
-        } else if (in.kernel_id == 4) {
-            run_event_based_simulation_optimization_4(in, SD, mype, h_verification);
-        } else if (in.kernel_id == 5) {
-            run_event_based_simulation_optimization_5(in, SD, mype, h_verification);
-        } else if (in.kernel_id == 6) {
-            run_event_based_simulation_optimization_6(in, SD, mype, h_verification);
-        } else {
+        if (in.kernel_id == 0)
+            verification = run_event_based_simulation_baseline(in, SD, mype, &profile);
+        else if (in.kernel_id == 1)
+            verification = run_event_based_simulation_optimization_1(in, SD, mype);
+        else if (in.kernel_id == 2)
+            verification = run_event_based_simulation_optimization_2(in, SD, mype);
+        else if (in.kernel_id == 3)
+            verification = run_event_based_simulation_optimization_3(in, SD, mype);
+        else if (in.kernel_id == 4)
+            verification = run_event_based_simulation_optimization_4(in, SD, mype);
+        else if (in.kernel_id == 5)
+            verification = run_event_based_simulation_optimization_5(in, SD, mype);
+        else if (in.kernel_id == 6)
+            verification = run_event_based_simulation_optimization_6(in, SD, mype);
+        else {
             printf("Error: No kernel ID %d found!\n", in.kernel_id);
             exit(1);
         }
-        Kokkos::fence();
-        verification = Kokkos::Experimental::sum(h_verification);
     } else {
         printf(
-                "History-based simulation not implemented in Kokkos code. Instead,\nuse "
+                "History-based simulation not yet implemented in Kokkos code. Instead,\nuse "
                 "the event-based method with \"-m event\" argument.\n");
         exit(1);
     }
-
-    profile.kernel_time = timer.seconds();
+    Kokkos::Profiling::popRegion();
 
 
     if (mype == 0) {
@@ -97,10 +91,14 @@ int main(int argc, char *argv[]) {
         printf("Simulation complete.\n");
     }
 
+
     // End Simulation Timer
     omp_end = get_time();
 
-    // Release device memory (Kokkos handles this automatically for Views)
+    // Release Kokkos memory (adapt as needed based on Kokkos memory management)
+    // ... Kokkos memory deallocation ...
+
+    // Release device memory (this part might be handled automatically by Kokkos)
     release_memory(SD);
 
     // Final Hash Step
@@ -115,3 +113,5 @@ int main(int argc, char *argv[]) {
     return is_invalid_result;
 }
 ```
+
+**Note:**  This translation provides a skeletal structure.  The CUDA-specific functions (`cudaMalloc`, `cudaMemcpy`, `cudaFree`, `cudaDeviceSynchronize`, `cudaPeekAtLastError`) and Thrust calls must be replaced with their Kokkos equivalents.  The `SimulationData` structure may need adjustments to work with Kokkos' memory management (e.g., using Kokkos::View instead of raw pointers).  Furthermore, the parallel execution of kernels needs to be handled using Kokkos' parallel programming constructs (e.g., `Kokkos::parallel_for`).  The history-based simulation is not implemented here because a significant re-write would be needed for the proper translation.  Finally, MPI integration for multi-node runs needs a separate implementation using a Kokkos-compatible MPI library.
