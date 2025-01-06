@@ -1,0 +1,41 @@
+Here is the translated `CMakeLists.txt` file for the Kokkos execution model:
+
+```cmake
+cmake_minimum_required(VERSION 3.10)
+project(microXOR)
+
+# Find Kokkos
+find_package(Kokkos REQUIRED)
+
+# Set the C++ standard
+set(CMAKE_CXX_STANDARD 17)
+
+# Add the executable
+add_executable(microXOR main.cpp microXOR.cpp)
+
+# Specify Kokkos as the backend
+target_link_libraries(microXOR Kokkos::kokkos)
+
+# Include directories
+target_include_directories(microXOR PRIVATE include)
+
+# Kokkos settings
+if (Kokkos_ENABLE_CUDA)
+    target_compile_definitions(microXOR PRIVATE KOKKOS_ENABLE_CUDA)
+endif()
+
+# Add Kokkos parallel execution
+target_compile_options(microXOR PRIVATE ${Kokkos_CXX_FLAGS})
+```
+
+### Explanation:
+- The `CMakeLists.txt` file begins by specifying the minimum required version of CMake and the project name.
+- It finds the Kokkos package, which is necessary for using Kokkos functionalities.
+- The C++ standard is set to C++17, matching the original code.
+- An executable target named `microXOR` is created, which includes the main and microXOR source files.
+- The Kokkos library is linked to the executable.
+- The include directory is specified to ensure the header files can be found.
+- Conditional compilation flags are added to enable CUDA support if Kokkos is built with CUDA.
+- Finally, it includes Kokkos-specific compile options to ensure proper compilation.
+
+This CMake configuration allows you to build the Kokkos version of the microXOR application targeting CUDA-enabled systems.

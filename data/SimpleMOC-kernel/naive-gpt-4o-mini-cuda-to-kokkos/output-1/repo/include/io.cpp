@@ -1,0 +1,170 @@
+#include "SimpleMOC-kernel_header.hpp"
+#include <Kokkos_Core.hpp>
+#include <iostream>
+
+// Prints program logo
+void logo(int version)
+{
+    border_print();
+    std::cout <<
+"   __           __        ___        __   __           ___  __        ___     \n"
+"  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
+"  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
+"\n"
+"                         ������������������������������   ������������������������������  ������������������\n" 
+"                        ���������������������������������   ���������������������������������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ���������     ���������   ������������������  ���������������������������������\n"
+"                        ������������������������������������������������������������������������������������  ���������\n"
+"                         ��������������������� ��������������������� ��������������������� ���������  ���������\n";
+    std::cout << "\n";
+    border_print();
+    std::cout << "\n";
+
+    center_print("Developed at", 79);
+    center_print("The Massachusetts Institute of Technology", 79);
+    center_print("and", 79);
+    center_print("Argonne National Laboratory", 79);
+    std::cout << "\n";
+    char v[100];
+    sprintf(v, "Version: %d", version);
+    center_print(v, 79);
+    std::cout << "\n";
+    border_print();
+}
+
+// Prints Section titles in center of 80 char terminal
+void center_print(const char *s, int width)
+{
+    int length = strlen(s);
+    for (int i = 0; i <= (width - length) / 2; i++) {
+        fputs(" ", stdout);
+    }
+    fputs(s, stdout);
+    fputs("\n", stdout);
+}
+
+// Prints a border
+void border_print(void)
+{
+    std::cout <<
+    "==================================================================="
+    "=============\n";
+}
+
+// Prints comma separated integers - for ease of reading
+void fancy_int(int a)
+{
+    if (a < 1000)
+        std::cout << a << "\n";
+    else if (a >= 1000 && a < 1000000)
+        std::cout << a / 1000 << "," << std::setw(3) << std::setfill('0') << a % 1000 << "\n";
+    else if (a >= 1000000 && a < 1000000000)
+        std::cout << a / 1000000 << "," << std::setw(3) << std::setfill('0') << (a % 1000000) / 1000 << "," << a % 1000 << "\n";
+    else if (a >= 1000000000)
+        std::cout << a / 1000000000 << "," << std::setw(3) << std::setfill('0') << (a % 1000000000) / 1000000 << "," << (a % 1000000) / 1000 << "," << a % 1000 << "\n";
+    else
+        std::cout << a << "\n";
+}
+
+// Prints out the summary of User input
+void print_input_summary(Input I)
+{
+    center_print("INPUT SUMMARY", 79);
+    border_print();
+
+    // Print device information
+    int device;
+    cudaGetDevice(&device);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
+    std::cout << std::setw(25) << "CUDA Device: " << prop.name << "\n"; 
+    std::cout << std::setw(25) << "Energy Groups: " << I.egroups << "\n";
+    std::cout << std::setw(25) << "2D Source Regions: " << I.source_2D_regions << "\n";
+    std::cout << std::setw(25) << "Coarse Axial Intervals: " << I.coarse_axial_intervals << "\n";
+    std::cout << std::setw(25) << "Fine Axial Intervals: " << I.fine_axial_intervals << "\n";
+    std::cout << std::setw(25) << "Axial Decomposition: " << I.decomp_assemblies_ax << "\n";
+    std::cout << std::setw(25) << "3D Source Regions: " << I.source_3D_regions << "\n";
+    std::cout << std::setw(25) << "Segments: "; fancy_int(I.segments);
+    std::cout << std::setw(25) << "Random Number Streams: "; fancy_int(I.streams);
+    std::cout << std::setw(25) << "Memory Estimate (MB): " << mem_estimate(I) << "\n";
+    std::cout << std::setw(25) << "Segments per CUDA block: " << I.seg_per_thread << "\n";
+#ifdef TABLE
+    std::cout << std::setw(25) << "Exponential Table:" << "ON\n";
+#else
+    std::cout << std::setw(25) << "Exponential Table:" << "OFF\n";
+#endif
+    border_print();
+}
+
+// reads command line inputs and applies options
+void read_CLI(int argc, char * argv[], Input * input)
+{
+    // Collect Raw Input
+    for (int i = 1; i < argc; i++)
+    {
+        char * arg = argv[i];
+
+        // nthreads (-t)
+        if (strcmp(arg, "-t") == 0)
+        {
+            if (++i < argc)
+                input->nthreads = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+
+        // segments (-s)
+        else if (strcmp(arg, "-s") == 0)
+        {
+            if (++i < argc)
+                input->segments = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+
+        // egroups (-e)
+        else if (strcmp(arg, "-e") == 0)
+        {
+            if (++i < argc)
+                input->egroups = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+        // segments per thread (-p)
+        else if (strcmp(arg, "-p") == 0)
+        {
+            if (++i < argc)
+                input->seg_per_thread = atoi(argv[i]);
+            else
+                print_CLI_error();
+        }
+        // CUDA Device Number (-d)
+        else if (strcmp(arg, "-d") == 0)
+        {
+            if (++i < argc)
+            {
+                int device_id = atoi(argv[i]);
+                cudaSetDevice(device_id);
+            }
+            else
+                print_CLI_error();
+        }
+        else
+            print_CLI_error();
+    }
+}
+
+// print error to screen, inform program options
+void print_CLI_error(void)
+{
+    std::cout << "Usage: ./SimpleMOC <options>\n";
+    std::cout << "Options include:\n";
+    std::cout << "  -t <threads>          Number of OpenMP threads to run\n";
+    std::cout << "  -s <segments>         Number of segments to process\n";
+    std::cout << "  -e <energy groups>    Number of energy groups\n";
+    std::cout << "  -p <segs per thread>  Number of segments per CUDA Block\n";
+    std::cout << "  -d <CUDA device ID>   CUDA GPU device ID number\n";
+    std::cout << "See readme for full description of default run values\n";
+    exit(1);
+}

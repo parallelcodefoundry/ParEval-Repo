@@ -1,0 +1,53 @@
+Here is the `CMakeLists.txt` file translated for the Kokkos execution model:
+
+```cmake
+cmake_minimum_required(VERSION 3.10)
+project(microXOR)
+
+# Find Kokkos package
+find_package(Kokkos REQUIRED)
+
+# Set the C++ standard
+set(CMAKE_CXX_STANDARD 17)
+
+# Add the executable
+add_executable(microXOR main.cpp microXOR.cpp)
+
+# Link Kokkos to the executable
+target_link_libraries(microXOR Kokkos::kokkos)
+
+# Specify the Kokkos backend (CUDA)
+if (Kokkos_CXX11_COMPILER)
+    target_compile_definitions(microXOR PRIVATE KOKKOS_ENABLE_CUDA)
+endif()
+
+# Set Kokkos options
+set_target_properties(microXOR PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Enable Kokkos parallel execution
+Kokkos_add_library(microXOR_lib
+    SOURCES microXOR.cpp
+    HEADERS microXOR.hpp
+    OPTIONS
+        Kokkos_ENABLE_CUDA
+)
+
+# Add the executable that uses the Kokkos library
+add_executable(microXOR main.cpp)
+target_link_libraries(microXOR PRIVATE microXOR_lib)
+```
+
+### Explanation:
+- The `CMakeLists.txt` file starts by specifying the minimum required version of CMake and the project name.
+- It finds the Kokkos package, which is necessary for using Kokkos functionalities.
+- The C++ standard is set to C++17.
+- An executable target named `microXOR` is created, which includes the main and microXOR source files.
+- The Kokkos library is linked to the executable.
+- The Kokkos backend is specified to be CUDA, and the necessary compile definitions are added.
+- The properties for the target are set to ensure the C++ standard is enforced.
+- A Kokkos library is created for the microXOR functionality, which can be reused or linked against other executables if needed. 
+
+This setup allows you to compile the Kokkos code using the specified command, targeting an NVIDIA GPU.

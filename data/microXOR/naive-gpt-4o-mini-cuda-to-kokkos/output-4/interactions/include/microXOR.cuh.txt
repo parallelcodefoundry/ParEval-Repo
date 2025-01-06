@@ -1,0 +1,18 @@
+Here is the translated `microXOR.hpp` file for the Kokkos execution model:
+
+```cpp
+// microXOR header file
+
+#ifndef MICROXOR_HPP
+#define MICROXOR_HPP
+
+#include <iostream>
+#include <random>
+#include <Kokkos_Core.hpp>
+
+void cellsXOR(const Kokkos::View<const int*> &input, Kokkos::View<int*> &output, size_t N);
+
+#endif
+```
+
+In this translation, we have replaced the CUDA-specific includes and types with Kokkos equivalents. The kernel function `cellsXOR` is now declared to take Kokkos views as input and output, which allows Kokkos to manage the memory and execution across different backends.

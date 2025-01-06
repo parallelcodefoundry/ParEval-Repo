@@ -1,0 +1,88 @@
+Here is the translated Makefile for the Kokkos execution model:
+
+```makefile
+#===============================================================================
+# User Options
+#===============================================================================
+
+COMPILER    ?= g++
+OPTIMIZE    ?= yes
+DEBUG       ?= no
+PROFILE     ?= no
+KOKKOS_PATH ?= /path/to/kokkos # Set this to your Kokkos installation path
+
+#===============================================================================
+# Program name & source code list
+#===============================================================================
+
+program = XSBench
+
+source = \
+Main.cpp \
+io.cpp \
+Simulation.cpp \
+GridInit.cpp \
+XSutils.cpp \
+Materials.cpp
+
+obj = $(source:.cpp=.o)
+
+#===============================================================================
+# Sets Flags
+#===============================================================================
+
+# Standard Flags
+CFLAGS := 
+
+# Linker Flags
+LDFLAGS = -lm
+
+# Kokkos Compiler
+ifeq ($(COMPILER),g++)
+  CC = $(COMPILER)
+  CFLAGS += -Wall -O3 -std=c++14 -I$(KOKKOS_PATH)/include -DKOKKOS_ENABLE_OPENMP
+  LDFLAGS += -L$(KOKKOS_PATH)/lib -lkokkos -lpthread
+endif
+
+# Debug Flags
+ifeq ($(DEBUG),yes)
+  CFLAGS += -g
+  LDFLAGS  += -g
+endif
+
+# Profiling Flags
+ifeq ($(PROFILE),yes)
+  CFLAGS += -pg
+  LDFLAGS  += -pg
+endif
+
+# Optimization Flags
+ifeq ($(OPTIMIZE),yes)
+  CFLAGS += -O3
+endif
+
+#===============================================================================
+# Targets to Build
+#===============================================================================
+
+$(program): $(obj) XSbench_header.hpp Makefile
+	$(CC) $(CFLAGS) $(obj) -o $@ $(LDFLAGS)
+
+%.o: %.cpp XSbench_header.hpp Makefile
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(program) $(obj)
+
+edit:
+	vim -p $(source) XSbench_header.hpp
+
+run:
+	./$(program)
+```
+
+### Notes:
+- The `KOKKOS_PATH` variable should be set to the path where Kokkos is installed on your system.
+- The Kokkos library is linked with the `-lkokkos` flag, and the include path is set to the Kokkos include directory.
+- The `-DKOKKOS_ENABLE_OPENMP` flag is added to enable OpenMP support in Kokkos.
+- The file extensions have been changed from `.cu` to `.cpp` to reflect the C++ codebase.

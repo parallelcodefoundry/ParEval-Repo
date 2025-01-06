@@ -1,0 +1,77 @@
+#ifndef __SimpleMOC_header
+#define __SimpleMOC_header
+
+#include <Kokkos_Core.hpp>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <cstring>
+#include <ctime>
+#include <cassert>
+
+#define KOKKOS_ERROR_CHECK
+
+// User inputs
+struct Input {
+    int source_2D_regions;
+    int source_3D_regions;
+    int coarse_axial_intervals;
+    int fine_axial_intervals;
+    int decomp_assemblies_ax; // Number of subdomains per assembly axially
+    long segments;
+    int egroups;
+    int nthreads;
+    int streams;
+    int seg_per_thread;
+    size_t nbytes;
+};
+
+// Source Region Structure
+struct Source {
+    long fine_flux_id;
+    long fine_source_id;
+    long sigT_id;
+};
+
+// Source Arrays
+struct Source_Arrays {
+    float *fine_flux_arr;
+    float *fine_source_arr;
+    float *sigT_arr;
+};
+
+// Table structure for computing exponential
+struct Table {
+    float values[706];
+    float dx;
+    float maxVal;
+    int N;
+};
+
+// Kernel function declarations
+void run_kernel(const Input &I, const Kokkos::View<Source*> &S,
+                const Source_Arrays &SA, const Table &table,
+                Kokkos::View<float*> &state_fluxes, int N_state_fluxes);
+
+void interpolateTable(const Table &table, float x, float &out);
+
+// Init function declarations
+double mem_estimate(const Input &I);
+void setup_kernel(Kokkos::View<Kokkos::Random_XorShift64_Pool<Kokkos::DefaultExecutionSpace>> &pool, Input &I);
+void init_flux_states(Kokkos::View<float*> &flux_states, int N_flux_states, const Input &I,
+                      Kokkos::View<Kokkos::Random_XorShift64_Pool<Kokkos::DefaultExecutionSpace>> &pool);
+Source* initialize_sources(const Input &I, Source_Arrays &SA);
+Source* initialize_device_sources(const Input &I, Source_Arrays &SA_h, Source_Arrays &SA_d, Source *sources_h);
+Table buildExponentialTable(void);
+Input set_default_input(void);
+
+// I/O function declarations
+void logo(int version);
+void center_print(const char *s, int width);
+void border_print(void);
+void fancy_int(int a);
+void print_input_summary(const Input &input);
+void read_CLI(int argc, char *argv[], Input *input);
+void print_CLI_error(void);
+
+#endif
