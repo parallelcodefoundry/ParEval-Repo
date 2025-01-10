@@ -12,7 +12,6 @@ def get_args():
     parser.add_argument("--data_path", type=str, required=True, help="Path to the data file")
     parser.add_argument("--model_name", type=str, help="Name of the Ollama model to use")
     parser.add_argument("--host_url", type=str, help="URL of the Ollama server")
-    parser.add_argument("--per_instance_cost_limit", type=float, required=True, help="Cost limit per instance")
     parser.add_argument("--input_directory", type=str, required=True, help="Path to the input source directory")
     return parser.parse_args()
 
@@ -42,13 +41,12 @@ def run_swe_agent(iteration, args):
     log_file_path = os.path.join(output_dir, f"output-{iteration}-swe-agent-comments.txt")
 
     command = [
-        "docker", "run", "--rm", "-it", "-v", "/var/run/docker.sock:/var/run/docker.sock",
+        "podman-hpc", "run", "--privileged",
+        "-v", "/global/homes/i/ikhillan/SWE-agent:/global/homes/i/ikhillan/SWE-agent",
+        "-v", "/global/homes/i/ikhillan/code-translation:/global/homes/i/ikhillan/code-translation",
         "-v", f"{args.keys_cfg}:/app/keys.cfg",
         "-v", f"{args.repo_path}:{args.repo_path}",
-        "-v", "/Users/ishan/pssg/SWE-agent:/Users/ishan/pssg/SWE-agent",
-        "-v", "/Users/ishan/pssg/code-translation:/Users/ishan/pssg/code-translation",
-        "sweagent/swe-agent-run:latest",
-        "python", "/Users/ishan/pssg/SWE-agent/run.py",
+        "python", "/global/homes/i/ikhillan/SWE-agent/run.py",
         "--image_name=sweagent/swe-agent:latest",
         f"--model_name={args.model_name}",
         f"--host_url={args.host_url}",
@@ -56,8 +54,10 @@ def run_swe_agent(iteration, args):
         f"--repo_path={args.repo_path}",
         f"--config_file={args.config_file}",
         "--apply_patch_locally",
-        f"--per_instance_cost_limit={args.per_instance_cost_limit}"
+        "sweagent/swe-agent:latest"
     ]
+
+    print(' '.join(command))
 
     print(f"Running iteration {iteration}...")
 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     try:
         run_swe_agent(0, args)
     except subprocess.CalledProcessError as e:
-        print(f"Error during iteration: {e}")
+        print(f"Error during iteration 0: {e}")
     finally:
         print("Resetting repository...")
         reset_repo(args.repo_path)
