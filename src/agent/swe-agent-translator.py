@@ -41,12 +41,13 @@ def run_swe_agent(iteration, args):
     log_file_path = os.path.join(output_dir, f"output-{iteration}-swe-agent-comments.txt")
 
     command = [
-        "podman-hpc", "run", "--privileged",
+        "podman-hpc", "run", "--privileged", "--userns=keep-id", "--gpu",
         "-v", "/global/homes/i/ikhillan/SWE-agent:/global/homes/i/ikhillan/SWE-agent",
         "-v", "/global/homes/i/ikhillan/code-translation:/global/homes/i/ikhillan/code-translation",
         "-v", f"{args.keys_cfg}:/app/keys.cfg",
         "-v", f"{args.repo_path}:{args.repo_path}",
-        "python", "/global/homes/i/ikhillan/SWE-agent/run.py",
+        "sweagent/swe-agent:latest",
+        "python3", "/global/homes/i/ikhillan/SWE-agent/run.py",
         "--image_name=sweagent/swe-agent:latest",
         f"--model_name={args.model_name}",
         f"--host_url={args.host_url}",
@@ -54,7 +55,6 @@ def run_swe_agent(iteration, args):
         f"--repo_path={args.repo_path}",
         f"--config_file={args.config_file}",
         "--apply_patch_locally",
-        "sweagent/swe-agent:latest"
     ]
 
     print(' '.join(command))
