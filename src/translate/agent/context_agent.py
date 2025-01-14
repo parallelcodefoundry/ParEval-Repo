@@ -1,6 +1,6 @@
 from typing import List
 from generator_mixin import GeneratorMixin
-from dependency_agent import FileNode
+from agent.dependency_agent import FileNode
 
 class ContextAgent:
     def __init__(self, generator: GeneratorMixin):

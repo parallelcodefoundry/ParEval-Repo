@@ -18,16 +18,10 @@ from typing import List, Dict, Literal
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
 from agent.dependency_agent import DependencyAgent, FileNode
+from agent.chunk_agent import ChunkFileAgent
+from agent.context_agent import ContextAgent
 from generator_mixin import GeneratorMixin
 from repo import Repo
-
-
-
-class ChunkFileAgent:
-    pass
-
-class ContextAgent:
-    pass
 
 
 class TopDownAgentTranslator(Translator, GeneratorMixin):
@@ -67,10 +61,26 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             "backend": args.agent_backend,
             "llm_name": args.agent_llm_name
         }
+    
+
+    def _read_file(self, rel_path: str) -> str:
+        """ Read the contents of a file from the input repository.
+        """
+        input_file_path = os.path.join(self._input_repo.path, rel_path)
+        with open(input_file_path, 'r') as f:
+            return f.read()
+        
+    
+    def _write_file(self, rel_path: str, contents: str):
+        """ Write the contents to a file in the output repository.
+        """
+        output_file_path = os.path.join(self._output_fpath, rel_path)
+        with open(output_file_path, 'w') as f:
+            f.write(contents)
 
 
     # override
-    def translate(self, dry: bool = False):
+    def translate(self, dry: bool = False, log_interactions: bool = False):
         """ Use the top-down method to translate the entire repository.
         """
         dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
@@ -103,4 +113,20 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
         # write the translation to the output repo
         self._write_file(node.rel_path, translation)
+
+
+    def _get_translation(self, context: str, source_code: str) -> str:
+        """ Get the translation for a region of code using the provided context. """
+        prompt = f"""Your task is to translate the following code snippet into {self._dst_model}:
+                    ```
+                    {source_code}
+                    ```
+                    The following is context for the translation task:
+                    ```
+                    {context}
+                    ```
+                    """
+        
+        return self.generate(prompt)
+
 

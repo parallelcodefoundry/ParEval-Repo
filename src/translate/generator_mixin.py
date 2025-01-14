@@ -97,7 +97,7 @@ class GeneratorMixin:
 
         if not completion.choices:
             raise ValueError("No completions returned from OpenAI.")
-        return completion.choices[0].message.content, 0, 0
+        return completion.choices[0].message.content, completion.usage.prompt_tokens, completion.usage.completion_tokens
 
     def _generate_gemini(
         self,
@@ -171,6 +171,13 @@ class GeneratorMixin:
     @property
     def request_count(self):
         return self._request_count
+
+
+    def print_stats(self):
+        print(f"Input token count: {self._input_token_count}")
+        print(f"Output token count: {self._output_token_count}")
+        print(f"Total token count: {self._input_token_count + self._output_token_count}")
+        print(f"Request count: {self._request_count}")
 
 
     def generate(

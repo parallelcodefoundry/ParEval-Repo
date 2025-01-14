@@ -2,8 +2,11 @@ from typing import List, Tuple
 import os
 import re
 
+from generator_mixin import GeneratorMixin
+
 class ChunkFileAgent:
-    def __init__(self, max_tokens: int = 2048):
+    def __init__(self, generator: GeneratorMixin, max_tokens: int = 2048):
+        self.generator = generator
         self.max_tokens = max_tokens
 
     def is_too_long(self, source_code: str) -> bool:

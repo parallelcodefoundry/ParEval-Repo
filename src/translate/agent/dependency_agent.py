@@ -22,8 +22,8 @@ from generator_mixin import GeneratorMixin
 
 class FileNode:
     rel_path: str
-    dependencies: List['FileNode']
-    parents: List['FileNode']
+    dependencies: List['FileNode'] = []
+    parents: List['FileNode'] = []
 
     @property
     def basename(self) -> str:
@@ -80,7 +80,7 @@ class DependencyAgent:
             Give the first N lines of the file to the LLM and get back a list of files
         """
         prompt = "Here are the first {N} lines of the file {source_file}:\n\n{source_lines}\n\nHere are other source files in the same repository:\n\n{source_files}\n\n" + \
-            "Which other files in this repository does {source_file} depend on? Please list only the filenames, one per line."
+            "Which other files in this repository does {source_file} depend on? Please list only the filenames, one per line. For example: \nfoo.cpp\nbar.h\nbaz.cu\n"
         
         if source_files is None:
             logging.warning("No source files provided to LLM")
@@ -96,6 +96,7 @@ class DependencyAgent:
             return None
         
         deps = deps.strip().split("\n")
+        deps = list(map(str.strip, deps))
         print(deps)
         return deps
 

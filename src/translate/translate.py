@@ -101,6 +101,9 @@ def main():
     )
     translator.translate(dry=args.dry)
 
+    # translator implements GeneratorMixin, then call print_stats
+    if hasattr(translator, "print_stats"):
+        translator.print_stats()
 
 
 if __name__ == "__main__":
