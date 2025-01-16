@@ -47,10 +47,8 @@ class ChunkFileAgent:
     def _estimate_tokens(self, text: str) -> int:
         return len(text.split())
 
-    def process_file(self, file_path: os.PathLike) -> List[str]:
-        with open(file_path, 'r') as file:
-            source_code = file.read()
-
+    def process_file(self, source_code: str) -> List[str]:
+        print(f"Chunking file...")
         if self.is_too_long(source_code):
             return self.split_into_chunks(source_code)
         else:

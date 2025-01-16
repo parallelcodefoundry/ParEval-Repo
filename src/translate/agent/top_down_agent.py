@@ -1,7 +1,7 @@
 """ An agent-based approach to translating entire code repositories from one
-    execution model to another (i.e. CUDA to OpenMP or OpenMP to MPI). This 
+    execution model to another (i.e. CUDA to OpenMP or OpenMP to MPI). This
     approach is based on the top-down translation method. The agent will first
-    determine the dependency tree of source files and then translate them 
+    determine the dependency tree of source files and then translate them
     starting from the root. Intermediate helper agents are used to split up
     long files, incorporate context from further up the tree, and to determine
     filenames and other metadata.
@@ -31,11 +31,11 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _context_agent: ContextAgent
 
     def __init__(
-        self, 
-        input_repo: Repo, 
-        output_repo: os.PathLike, 
-        src_model: str, 
-        dst_model: str, 
+        self,
+        input_repo: Repo,
+        output_repo: os.PathLike,
+        src_model: str,
+        dst_model: str,
         llm_name: str,
         backend: Literal["openai", "gemini", "hf", "local"] = "openai",
     ):
@@ -61,7 +61,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             "backend": args.agent_backend,
             "llm_name": args.agent_llm_name
         }
-    
+
 
     def _read_file(self, rel_path: str) -> str:
         """ Read the contents of a file from the input repository.
@@ -69,11 +69,12 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         input_file_path = os.path.join(self._input_repo.path, rel_path)
         with open(input_file_path, 'r') as f:
             return f.read()
-        
-    
+
+
     def _write_file(self, rel_path: str, contents: str):
         """ Write the contents to a file in the output repository.
         """
+        print(f"Writing file {self._output_fpath}/{rel_path}...")
         output_file_path = os.path.join(self._output_fpath, rel_path)
         with open(output_file_path, 'w') as f:
             f.write(contents)
@@ -83,6 +84,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def translate(self, dry: bool = False, log_interactions: bool = False):
         """ Use the top-down method to translate the entire repository.
         """
+        print("Constructing dependency graph...")
         dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
 
         # walk down the tree and translate each file
@@ -93,12 +95,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def _translate_node(self, node: FileNode):
         """ Translate a single file node using context from its parents.
         """
+        print(f"Translating file {node.rel_path}...")
 
         # get the source code from the file
         source_code = self._read_file(node.rel_path)
 
         # get the context from the parent nodes
-        context = self._context_agent.get_context(node.parents)
+        context = self._context_agent.get_context(node.parents, node, self._dst_model)
 
         # translate the source code; if it's too long use the chunk file agent
         # to translate it in parts
@@ -126,7 +129,6 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                     {context}
                     ```
                     """
-        
+        print("Requesting file translation...")
+
         return self.generate(prompt)
-
-
