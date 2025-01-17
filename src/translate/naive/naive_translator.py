@@ -151,9 +151,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     def translate(self, dry: bool = False, log_interactions: bool = False, hide_progress: bool = False):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
-        repo_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "repo")
-        self._prompt_config_dst = json.load(open(self._dst_config, 'r'))
-        self._prompt_config_src = self._input_repo.get_meta_dict()
+        repo_fpath = os.path.join(self._output_fpath, "repo")
 
         try:
             max_cols = os.get_terminal_size().columns
@@ -175,7 +173,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             output = self._get_translation(system_prompt, prompt)
 
             if log_interactions:
-                log_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "interactions", f"{fpath}.txt")
+                log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
                 os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
                 with open(log_fpath, 'w') as f:
                     f.write(output)
@@ -191,7 +189,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
             print(f"Translated {fpath} to {output_fpath}")
 
         # Write experiment_metadata.json
-        exp_meta_fpath = os.path.join(self._output_fpath, f"output-{self._output_id}", "experiment_metadata.json")
+        exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
         with open(exp_meta_fpath, 'w') as f:
             exp_meta_dict = {

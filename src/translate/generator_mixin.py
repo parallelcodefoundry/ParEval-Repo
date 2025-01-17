@@ -126,7 +126,9 @@ class GeneratorMixin:
                 top_p=top_p,
             )
         )
-        return response.text, 0, 0
+        return response.text, \
+            response.usage_metadata.prompt_token_count, \
+            response.usage_metadata.candidates_token_count
 
 
     def _generate_hf(

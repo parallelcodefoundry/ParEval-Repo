@@ -132,7 +132,7 @@ class DependencyAgent:
                 continue
 
             node = FileNode()
-            node.rel_path = source_file
+            node.rel_path = source_file.removeprefix(repo_path + "/")
             node.dependencies = [dep for dep in deps if dep in dependencies]
             for dep in node.dependencies:
                 dependencies[dep].parents.append(node)

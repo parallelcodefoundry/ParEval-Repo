@@ -76,6 +76,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """
         print(f"Writing file {self._output_fpath}/{rel_path}...")
         output_file_path = os.path.join(self._output_fpath, rel_path)
+
+        # make parent dirs if necessary
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+
         with open(output_file_path, 'w') as f:
             f.write(contents)
 

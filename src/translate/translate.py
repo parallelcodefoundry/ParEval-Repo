@@ -72,8 +72,8 @@ def main():
         raise FileNotFoundError(f"Input directory {args.input} not found.")
 
     # check if the output directory exists and is empty
+    output_dir = os.path.join(args.output, "output-" + str(args.output_id))
     if os.path.exists(args.output):
-        output_dir = os.path.join(args.output, "output-" + str(args.output_id))
         if os.path.exists(output_dir) and not args.force_overwrite:
             raise FileExistsError(f"Output directory {output_dir} already exists. Provide --force-overwrite to overwrite.")
     else:
@@ -93,10 +93,10 @@ def main():
     translator_cls = get_translator_cls(args.method, args.naive_llm)
     translator_args = translator_cls.parse_args(args)
     translator = translator_cls(
-        input_repo=input_repo, 
-        output_repo=args.output, 
-        src_model=args.src_model, 
-        dst_model=args.dst_model, 
+        input_repo=input_repo,
+        output_repo=output_dir,
+        src_model=args.src_model,
+        dst_model=args.dst_model,
         **translator_args
     )
     translator.translate(dry=args.dry)
