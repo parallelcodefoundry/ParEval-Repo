@@ -97,9 +97,11 @@ def main():
         output_repo=output_dir,
         src_model=args.src_model,
         dst_model=args.dst_model,
+        log_interactions=args.log_interactions,
+        dry=args.dry,
         **translator_args
     )
-    translator.translate(dry=args.dry)
+    translator.translate()
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):

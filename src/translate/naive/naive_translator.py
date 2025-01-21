@@ -148,7 +148,7 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
 
-    def translate(self, dry: bool = False, log_interactions: bool = False, hide_progress: bool = False):
+    def translate(self):
         system_prompt = self.get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, "repo")
@@ -165,14 +165,14 @@ Translate the {filename} file to the {dst_model} execution model. Output the tra
 
             output_fpath = os.path.join(repo_fpath, self.update_output_file_extension(fpath, trigger_rename=trigger_rename))
 
-            if dry:
+            if self._dry:
                 print(prompt)
                 print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
                 continue
 
             output = self._get_translation(system_prompt, prompt)
 
-            if log_interactions:
+            if self._log_interactions:
                 log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
                 os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
                 with open(log_fpath, 'w') as f:

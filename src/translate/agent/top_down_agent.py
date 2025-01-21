@@ -31,20 +31,26 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _context_agent: ContextAgent
 
     def __init__(
-        self,
-        input_repo: Repo,
-        output_repo: os.PathLike,
-        src_model: str,
-        dst_model: str,
-        llm_name: str,
-        backend: Literal["openai", "gemini", "hf", "local"] = "openai",
+            self,
+            input_repo: Repo,
+            output_repo: os.PathLike,
+            src_model: str,
+            dst_model: str,
+            llm_name: str,
+            log_interactions: bool = False,
+            dry: bool = False
+            backend: Literal["openai", "gemini", "hf", "local"] = "openai",
     ):
-        super().__init__(input_repo, output_repo, src_model, dst_model)
+        super().__init__(input_repo, output_repo, src_model, dst_model,
+                         log_interactions, dry)
         GeneratorMixin.__init__(self, backend, llm_name)
 
-        self._dependency_agent = DependencyAgent(generator=self)
-        self._chunk_file_agent = ChunkFileAgent(generator=self)
-        self._context_agent = ContextAgent(generator=self)
+        interactions_path = None
+        if (self._log_interactions):
+            interactions_path = os.path.join(self._output_fpath, "interactions.txt")
+        self._dependency_agent = DependencyAgent(generator=self, interactions_path=interactions_path)
+        self._chunk_file_agent = ChunkFileAgent(generator=self, interactions_path=interactions_path)
+        self._context_agent = ContextAgent(generator=self, interactions_path=interactions_path)
 
     @staticmethod
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
@@ -85,9 +91,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
 
     # override
-    def translate(self, dry: bool = False, log_interactions: bool = False):
+    def translate(self):
         """ Use the top-down method to translate the entire repository.
         """
+
         print("Constructing dependency graph...")
         dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
 

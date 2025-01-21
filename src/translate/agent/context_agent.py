@@ -3,8 +3,9 @@ from generator_mixin import GeneratorMixin
 from agent.dependency_agent import FileNode
 
 class ContextAgent:
-    def __init__(self, generator: GeneratorMixin):
+    def __init__(self, generator: GeneratorMixin, interactions_path: os.PathLike = None):
         self._generator = generator
+        self._interactions_path = interactions_path
 
     def get_context(self, parent_nodes: List[FileNode], node: FileNode, dst_model: str) -> str:
         print("Extracting context for dependent files...")
