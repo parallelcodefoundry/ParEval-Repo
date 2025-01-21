@@ -38,7 +38,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             dst_model: str,
             llm_name: str,
             log_interactions: bool = False,
-            dry: bool = False
+            dry: bool = False,
             backend: Literal["openai", "gemini", "hf", "local"] = "openai",
     ):
         super().__init__(input_repo, output_repo, src_model, dst_model,
