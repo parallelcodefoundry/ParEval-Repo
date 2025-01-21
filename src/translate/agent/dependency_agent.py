@@ -98,9 +98,9 @@ class DependencyAgent:
 
         deps = deps.strip().split("\n")
         deps = list(map(str.strip, deps))
-        print("Dependencies of {source_file}: {deps}")
-        if interactions_path:
-            with open(interactions_path, "a") as f:
+        print(f"Dependencies of {source_file}: {deps}")
+        if self._interactions_path:
+            with open(self._interactions_path, "a") as f:
                 f.write(f"Getting dependencies of {source_file}.\n")
                 f.write(f"Prompt:\n{prompt}\n")
                 f.write(f"Dependencies:\n{deps}")

@@ -1,7 +1,7 @@
-for iter in {1..5}; do
-    python3 src/translate/translate.py \
-        --input targets/microXOR/cuda \
-        --output data/microXOR/agent-gemini-cuda-to-omp \
+for iter in {1..1}; do
+    python3 ../translate.py \
+        --input ../../../targets/microXOR/cuda \
+        --output ../../../data/microXOR/agent-gemini-cuda-to-omp \
         --output-id ${iter} \
         --app-name microxor \
         --method agent \
@@ -9,6 +9,7 @@ for iter in {1..5}; do
         --agent-llm gemini-1.5-flash \
         --src-model cuda \
         --dst-model openmp-offload \
+        --config ../../../targets/microXOR/openmp-offload \
         -f \
         --log-interactions
 
