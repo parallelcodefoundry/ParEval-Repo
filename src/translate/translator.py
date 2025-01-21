@@ -18,8 +18,10 @@ class Translator(ABC):
     _output_fpath: os.PathLike
     _src_model: str
     _dst_model: str
+    _dst_config: dict
     _log_interactions: bool
-    _dry: bool
+    _dry: bool # todo: change this to be a naive arg only
+    _hide_progress: bool
 
     def __init__(
             self,
@@ -27,15 +29,19 @@ class Translator(ABC):
             output_repo: os.PathLike,
             src_model: str,
             dst_model: str,
+            dst_config: dict,
             log_interactions: bool = False,
-            dry: bool = False
+            dry: bool = False,
+            hide_progress: bool = False
     ):
         self._input_repo = input_repo
         self._output_fpath = output_repo
         self._src_model = src_model
         self._dst_model = dst_model
+        self._dst_config = dst_config
         self._log_interactions = log_interactions
         self._dry = dry
+        self._hide_progress = hide_progress
 
     @abstractmethod
     def translate(self):

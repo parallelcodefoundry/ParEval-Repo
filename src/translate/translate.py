@@ -14,6 +14,7 @@ import json
 # local imports
 from repo import Repo
 from translator import Translator
+from naive.naive_translator import NaiveTranslator
 from naive.naive_openai_translator import NaiveOpenAITranslator
 from naive.naive_gemini_translator import NaiveGeminiTranslator
 from naive.naive_ollama_translator import NaiveOllamaTranslator
@@ -38,7 +39,7 @@ def get_args():
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
-    naive_args.add_argument("--naive-llm", choices=["gpt-3.5", "gpt-4o-mini", "gemini", "llama3.3", "llama3.2", "llama3.1", "gpt-4o", "tgi", "ollama3.3", "ollama3.2", "ollama3.1"], default="gemini", help="The LLM to use for translation.")
+    NaiveTranslator.add_args(naive_args)
 
     # subgroup for top-down agent
     agent_args = parser.add_argument_group("top-down agent")
@@ -85,20 +86,23 @@ def main():
     # add target.json to the path if it points to a directory
     if os.path.isdir(args.config):
         args.config = os.path.join(args.config, "target.json")
+    dst_config = json.load(open(args.config, "r"))
 
     # create a Repo object for the input directory
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
     # create a Translator object and translate the input repository
-    translator_cls = get_translator_cls(args.method, args.naive_llm)
+    translator_cls = get_translator_cls(args.method, args.naive_llm_name)
     translator_args = translator_cls.parse_args(args)
     translator = translator_cls(
         input_repo=input_repo,
         output_repo=output_dir,
         src_model=args.src_model,
         dst_model=args.dst_model,
+        dst_config=dst_config,
         log_interactions=args.log_interactions,
         dry=args.dry,
+        hide_progress=args.hide_progress,
         **translator_args
     )
     translator.translate()

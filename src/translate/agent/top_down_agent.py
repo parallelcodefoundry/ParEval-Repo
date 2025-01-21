@@ -36,13 +36,15 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             output_repo: os.PathLike,
             src_model: str,
             dst_model: str,
+            dst_config: dict,
             llm_name: str,
+            backend: Literal["openai", "gemini", "hf", "local"] = "openai",
             log_interactions: bool = False,
             dry: bool = False,
-            backend: Literal["openai", "gemini", "hf", "local"] = "openai",
+            hide_progress: bool = False
     ):
         super().__init__(input_repo, output_repo, src_model, dst_model,
-                         log_interactions, dry)
+                         dst_config, log_interactions, dry, hide_progress)
         GeneratorMixin.__init__(self, backend, llm_name)
 
         interactions_path = None

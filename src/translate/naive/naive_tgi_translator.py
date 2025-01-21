@@ -15,8 +15,21 @@ from repo import Repo
 
 class NaiveTGITranslator(NaiveTranslator):
 
-    def __init__(self, input_repo: Repo, output_repo: os.PathLike, src_model: str, dst_model: str, output_id: int, app_name: str, llm_name: str, dst_config: os.PathLike):
-        super().__init__(input_repo, output_repo, src_model, dst_model, output_id, app_name, llm_name, dst_config)
+    def __init__(
+            self,
+            input_repo: Repo,
+            output_repo: os.PathLike,
+            src_model: str,
+            dst_model: str,
+            dst_config: dict,
+            llm_name: str,
+            log_interactions: bool = False,
+            dry: bool = False,
+            hide_progress: bool = False
+    ):
+        super().__init__(input_repo, output_repo, src_model, dst_model,
+                         dst_config, llm_name, log_interactions, dry,
+                         hide_progress)
         self._model = OpenAI(
             base_url="http://localhost:3000/v1",
             api_key="-"
