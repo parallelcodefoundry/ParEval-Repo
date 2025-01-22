@@ -6,7 +6,7 @@ import os
 import sys
 import re
 import json
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Dict
 
 # tpl imports
@@ -126,6 +126,7 @@ class NaiveTranslator(Translator):
 
         return (base_prompt, trigger_rename)
 
+
     def _postprocess(self, output: str) -> str:
         """ make sure there's only one codeblock and extract it
         """
@@ -155,6 +156,7 @@ class NaiveTranslator(Translator):
                 return name + nc.type_to_ext[ext_category.lower()][nc.ext_to_type[current_ext]]
         return fname
 
+
     @abstractmethod
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
@@ -178,7 +180,7 @@ class NaiveTranslator(Translator):
         if self._log_interactions:
             log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
             os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
-            with open(log_fpath, 'w') as f:
+            with open(log_fpath, 'w', encoding="UTF-8") as f:
                 f.write(output)
                 print(f"Logged interaction to {log_fpath}")
 
@@ -187,7 +189,8 @@ class NaiveTranslator(Translator):
         """
         exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
-        with open(exp_meta_fpath, 'w') as f:
+
+        with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
             exp_meta_dict = {
                 "app": self._input_repo.get_meta_dict()["app"],
                 "prompt_strategy": "naive",
@@ -200,6 +203,8 @@ class NaiveTranslator(Translator):
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
 
+
+    # override
     def translate(self):
         """ Translate the entire repository.
         """
@@ -208,6 +213,7 @@ class NaiveTranslator(Translator):
         repo_fpath = os.path.join(self._output_fpath, "repo")
         max_cols = self._safe_get_columns()
 
+        # loop over all files and translate
         for fpath in alive_it(all_files,
                               title="Translating files",
                               max_cols=max_cols,
@@ -228,8 +234,9 @@ class NaiveTranslator(Translator):
             output = self._postprocess(raw_output)
 
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
-            with open(output_fpath, 'w') as f:
+            with open(output_fpath, 'w', encoding="UTF-8") as f:
                 f.write(output)
             print(f"Translated {fpath} to {output_fpath}")
 
+        # dump experiment metadata
         self._write_metadata(repo_fpath)

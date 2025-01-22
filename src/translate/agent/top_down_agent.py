@@ -12,7 +12,8 @@
 # std imports
 import os
 import sys
-from typing import List, Dict, Literal
+import json
+from typing import Dict, Literal
 
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -48,18 +49,24 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         GeneratorMixin.__init__(self, backend, llm_name)
 
         interactions_path = None
-        if (self._log_interactions):
+        if self._log_interactions:
             interactions_path = os.path.join(self._output_fpath, "interactions.txt")
-        self._dependency_agent = DependencyAgent(generator=self, interactions_path=interactions_path)
-        self._chunk_file_agent = ChunkFileAgent(generator=self, interactions_path=interactions_path)
-        self._context_agent = ContextAgent(generator=self, interactions_path=interactions_path)
+        self._dependency_agent = DependencyAgent(generator=self,
+                                                 interactions_path=interactions_path)
+        self._chunk_file_agent = ChunkFileAgent(generator=self,
+                                                interactions_path=interactions_path)
+        self._context_agent = ContextAgent(generator=self,
+                                           interactions_path=interactions_path)
 
     @staticmethod
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
         """ Add arguments for the top-down agent translation method.
         """
-        parser.add_argument("--agent-backend", choices=["openai", "gemini", "hf", "local"], default="openai", help="The backend to use for translation.")
-        parser.add_argument("--agent-llm-name", type=str, help="The name of the LLM to use for translation.")
+        parser.add_argument("--agent-backend",
+                            choices=["openai", "gemini", "hf", "local"],
+                            default="openai", help="The backend to use for translation.")
+        parser.add_argument("--agent-llm-name",
+                            type=str, help="The name of the LLM to use for translation.")
 
     @staticmethod
     def parse_args(args: 'Namespace') -> Dict[str, str]: # type: ignore # noqa: F821
@@ -75,28 +82,44 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """ Read the contents of a file from the input repository.
         """
         input_file_path = os.path.join(self._input_repo.path, rel_path)
-        with open(input_file_path, 'r') as f:
+        with open(input_file_path, 'r', encoding="UTF-8") as f:
             return f.read()
 
 
     def _write_file(self, rel_path: str, contents: str):
         """ Write the contents to a file in the output repository.
         """
-        print(f"Writing file {self._output_fpath}/{rel_path}...")
-        output_file_path = os.path.join(self._output_fpath, rel_path)
+        output_file_path = os.path.join(self._output_fpath, "repo", rel_path)
 
         # make parent dirs if necessary
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
 
-        with open(output_file_path, 'w') as f:
+        with open(output_file_path, 'w', encoding="UTF-8") as f:
             f.write(contents)
+        print(f"Wrote file {output_file_path}")
 
+    def _write_metadata(self, repo_fpath: os.PathLike):
+        """ Write out experiment_metadata.json adjacent to repo path.
+        """
+        exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
+        os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
+        with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
+            exp_meta_dict = {
+                "app": self._input_repo.get_meta_dict()["app"],
+                "prompt_strategy": "naive",
+                "llm_name": self._llm_name,
+                "source_model": self._src_model,
+                "dest_model": self._dst_model,
+                "output_number": int(repo_fpath.split("/")[-2][7:]), # todo: consider dropping this field
+                "path": repo_fpath
+            }
+            json.dump(exp_meta_dict, f, indent=4)
+        print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
 
     # override
     def translate(self):
         """ Use the top-down method to translate the entire repository.
         """
-
         print("Constructing dependency graph...")
         dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
 
@@ -104,6 +127,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         for node in dep_tree:
             self._translate_node(node)
 
+        # dump experiment metadata
+        self._write_metadata(os.path.join(self._output_fpath, "repo"))
 
     def _translate_node(self, node: FileNode):
         """ Translate a single file node using context from its parents.
@@ -125,7 +150,6 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 translation += self._get_translation(context, chunk)
         else:
             translation = self._get_translation(context, source_code)
-
 
         # write the translation to the output repo
         self._write_file(node.rel_path, translation)

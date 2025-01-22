@@ -108,7 +108,9 @@ class DependencyAgent:
 
 
     def get_source_file_dependencies(self, source_file: os.PathLike, source_files: Optional[List[os.PathLike]] = None) -> Union[List[str], None]:
-
+        """ Get the dependencies of a source file, first trying to get them statically,
+            then using an LLM to choose among the given source files.
+        """
         # first see if it's a file we can get a dependency for statically
         if self.is_cpp_source_file(source_file):
             deps = self.get_cpp_source_file_dependencies(source_file)
@@ -127,9 +129,13 @@ class DependencyAgent:
 
 
     def construct_dependency_graph(self, repo_path: os.PathLike) -> List[FileNode]:
+        """ Construct a dependency graph for the repository at the given path.
+        """
         roots = []
 
         source_files = self.get_all_source_files(repo_path)
+        #header_files = self.get_all_header_files(repo_path)
+        #build_files = self.get_all_build_files(repo_path)
         print(source_files)
         dependencies = {source_file: self.get_source_file_dependencies(source_file, source_files) for source_file in source_files}
 
