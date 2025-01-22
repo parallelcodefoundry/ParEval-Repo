@@ -18,6 +18,7 @@ from translator import Translator
 from repo import Repo
 from naive import naive_constants as nc
 
+
 class NaiveTranslator(Translator):
 
     _llm_name: str
@@ -158,13 +159,9 @@ class NaiveTranslator(Translator):
     def _get_translation(self, system_prompt: str, prompt: str) -> str:
         pass
 
-    def translate(self):
-        """ Translate the entire repository.
+    def _safe_get_columns(self) -> int:
+        """ Return get_terminal_size with exception handling.
         """
-        system_prompt = self._get_system_prompt()
-        all_files = self._input_repo.get_all_filenames(relpaths=True)
-        repo_fpath = os.path.join(self._output_fpath, "repo")
-
         try:
             max_cols = os.get_terminal_size().columns
         except OSError as error:
@@ -172,35 +169,22 @@ class NaiveTranslator(Translator):
                 max_cols = 80
             else:
                 raise error
-        for fpath in alive_it(all_files, title="Translating files", max_cols=max_cols, disable=self._hide_progress):
-            prompt, trigger_rename = self._get_prompt(fpath)
+        return max_cols
 
-            output_fpath = os.path.join(repo_fpath, self._update_output_file_extension(fpath, trigger_rename=trigger_rename))
-
-            if self._dry:
-                print(prompt)
-                print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
-                continue
-
-            output = self._get_translation(system_prompt, prompt)
-
-            if self._log_interactions:
-                log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
-                os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
-                with open(log_fpath, 'w') as f:
-                    f.write(output)
+    def _update_interaction_log(self, output: str, fpath: os.PathLike):
+        """ Write output to interaction log for the given filename if logging
+            is enabled.
+        """
+        if self._log_interactions:
+            log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
+            os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
+            with open(log_fpath, 'w') as f:
+                f.write(output)
                 print(f"Logged interaction to {log_fpath}")
 
-            output = self._postprocess(output)
-
-            # make parent dirs if necessary
-            os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
-
-            with open(output_fpath, 'w') as f:
-                f.write(output)
-            print(f"Translated {fpath} to {output_fpath}")
-
-        # Write experiment_metadata.json
+    def _write_metadata(self, repo_fpath: os.PathLike):
+        """ Write out experiment_metadata.json adjacent to repo path.
+        """
         exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
         with open(exp_meta_fpath, 'w') as f:
@@ -215,3 +199,37 @@ class NaiveTranslator(Translator):
             }
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
+
+    def translate(self):
+        """ Translate the entire repository.
+        """
+        system_prompt = self._get_system_prompt()
+        all_files = self._input_repo.get_all_filenames(relpaths=True)
+        repo_fpath = os.path.join(self._output_fpath, "repo")
+        max_cols = self._safe_get_columns()
+
+        for fpath in alive_it(all_files,
+                              title="Translating files",
+                              max_cols=max_cols,
+                              disable=self._hide_progress):
+            prompt, trigger_rename = self._get_prompt(fpath)
+
+            output_fpath = os.path.join(repo_fpath,
+                                        self._update_output_file_extension(fpath,
+                                                                           trigger_rename=trigger_rename))
+
+            if self._dry:
+                print(prompt)
+                print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
+                continue
+
+            raw_output = self._get_translation(system_prompt, prompt)
+            self._update_interaction_log(raw_output, fpath)
+            output = self._postprocess(raw_output)
+
+            os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
+            with open(output_fpath, 'w') as f:
+                f.write(output)
+            print(f"Translated {fpath} to {output_fpath}")
+
+        self._write_metadata(repo_fpath)
