@@ -26,6 +26,8 @@ from repo import Repo
 
 
 class TopDownAgentTranslator(Translator, GeneratorMixin):
+    """ A class to translate an entire repository using the top-down agent method.
+    """
 
     _dependency_agent: DependencyAgent
     _chunk_file_agent: ChunkFileAgent

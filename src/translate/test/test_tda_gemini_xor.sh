@@ -11,7 +11,8 @@ for iter in {1..1}; do
         --dst-model openmp-offload \
         --config ../../../targets/microXOR/openmp-offload \
         -f \
-        --log-interactions
+        --log-interactions \
+        --log-level DEBUG
 
     if [ $? -ne 0 ]; then
         echo "Failed at iteration ${iter}"
