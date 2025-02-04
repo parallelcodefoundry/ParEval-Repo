@@ -58,7 +58,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         self._chunk_file_agent = ChunkFileAgent(generator=self,
                                                 interactions_path=interactions_path)
         self._context_agent = ContextAgent(generator=self,
-                                           interactions_path=interactions_path)
+                                           interactions_path=interactions_path,
+                                           output_fpath=self._output_fpath)
 
     @staticmethod
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
@@ -122,7 +123,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def translate(self):
         """ Use the top-down method to translate the entire repository.
         """
-        print("Constructing dependency graph...")
+        print(f"Constructing dependency graph on {self._input_repo.path}...")
         dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
 
         # walk down the tree and translate each file

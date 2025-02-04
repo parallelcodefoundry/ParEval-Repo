@@ -4,9 +4,17 @@ from generator_mixin import GeneratorMixin
 from agent.dependency_agent import FileNode
 
 class ContextAgent:
-    def __init__(self, generator: GeneratorMixin, interactions_path: os.PathLike = None):
+
+    _generator: GeneratorMixin
+    _interactions_path: os.PathLike
+    _output_fpath: os.PathLike
+
+    def __init__(self, generator: GeneratorMixin,
+                 interactions_path: os.PathLike = None,
+                 output_fpath: os.PathLike = None):
         self._generator = generator
         self._interactions_path = interactions_path
+        self._output_fpath = output_fpath
 
     def get_context(self, parent_nodes: List[FileNode], node: FileNode, dst_model: str) -> str:
         print("Extracting context for dependent files...")
@@ -30,9 +38,8 @@ Please extract any code snippets from the above translated files that may be rel
         return context.strip() if context else ""
 
     def _read_translated_file(self, rel_path: str) -> str:
-        output_repo = self._generator.output_repo
-        output_file_path = output_repo.path / rel_path
-        if output_file_path.exists():
+        output_file_path = os.path.join(self._output_fpath, rel_path)
+        if os.path.exists(output_file_path):
             with open(output_file_path, 'r') as f:
                 return f.read()
         else:
