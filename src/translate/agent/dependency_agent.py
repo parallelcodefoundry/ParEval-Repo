@@ -172,7 +172,7 @@ class DependencyAgent:
         deps = run_result.stdout
         if deps:
             return deps.split(":")[1].strip().replace("\\", "").split()
-        return None
+        return []
 
 
     def get_source_file_dependencies_with_llm(self, source_file: os.PathLike,
