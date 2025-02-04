@@ -18,9 +18,10 @@ from typing import Dict, Literal
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
-from agent.dependency_agent import DependencyAgent, FileNode
+from agent.dependency_agent import DependencyAgent, FileNode, FileType
 from agent.chunk_agent import ChunkFileAgent
 from agent.context_agent import ContextAgent
+from agent import agent_constants as ac
 from generator_mixin import GeneratorMixin
 from repo import Repo
 
@@ -32,6 +33,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _dependency_agent: DependencyAgent
     _chunk_file_agent: ChunkFileAgent
     _context_agent: ContextAgent
+    _system_prompt: str
 
     def __init__(
             self,
@@ -48,6 +50,11 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     ):
         super().__init__(input_repo, output_repo, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
+
+        self._system_prompt = ac.SYSTEM_TEMPLATE.format(
+            src_model=self._src_model,
+            dst_model=self._dst_model)
+
         GeneratorMixin.__init__(self, backend, llm_name)
 
         interactions_path = None
@@ -113,7 +120,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": int(repo_fpath.split("/")[-2][7:]), # todo: consider dropping this field
+                "output_number": int(repo_fpath.split("/")[-2][7:]),
+                # todo: consider dropping the output_number field
                 "path": repo_fpath
             }
             json.dump(exp_meta_dict, f, indent=4)
@@ -150,25 +158,45 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             chunks = self._chunk_file_agent.process_file(source_code)
             translation = ""
             for chunk in chunks:
-                translation += self._get_translation(context, chunk)
+                translation += self._get_translation(context, chunk, node)
         else:
-            translation = self._get_translation(context, source_code)
+            translation = self._get_translation(context, source_code, node)
 
         # write the translation to the output repo
         self._write_file(node.rel_path, translation)
 
 
-    def _get_translation(self, context: str, source_code: str) -> str:
+    def _get_translation(self, context: str, source_code: str, file: FileNode) -> str:
         """ Get the translation for a region of code using the provided context. """
-        prompt = f"""Your task is to translate the following code snippet into {self._dst_model}:
-                    ```
-                    {source_code}
-                    ```
-                    The following is context for the translation task:
-                    ```
-                    {context}
-                    ```
-                    """
+        prompt_config_src = self._input_repo.get_meta_dict()
+        prompt_config_dst = self._dst_config
+        filename = file.rel_path
+        filename_desc = prompt_config_dst["filename_desc"]
+        exts_str = ", ".join(v for v in ac.type_to_ext[filename_desc.lower()].values())
+
+        prompt = ac.PROMPT_TEMPLATE.format(
+            src_model=self._src_model,
+            filename=filename,
+            dst_model=self._dst_model,
+            source_code=source_code,
+            context=context,
+            exts=exts_str,
+            filename_desc=filename_desc
+        )
+
+        if filename == prompt_config_src["main_filename"]:
+            prompt += ("\n" + ac.MAIN_ADDENDUM.format(
+                ex_run_cmd=prompt_config_dst["ex_run_cmd"],
+                ex_run_desc=prompt_config_dst["ex_run_desc"]))
+
+        if filename == prompt_config_src["build_filename"]:
+            prompt += ("\n" + ac.MAKEFILE_ADDENDUM.format(
+                dst_model=self._dst_model,
+                exts=exts_str,
+                filename_desc=filename_desc,
+                ex_build_cmd=prompt_config_dst["ex_build_cmd"],
+                ex_build_desc=prompt_config_dst["ex_build_desc"]))
+
         print("Requesting file translation...")
 
         return self.generate(prompt)

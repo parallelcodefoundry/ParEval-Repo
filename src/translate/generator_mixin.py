@@ -20,6 +20,7 @@ class GeneratorMixin:
     _input_token_count: int = 0
     _output_token_count: int = 0
     _request_count: int = 0
+    _system_prompt: Optional[str] = None
 
     _openai_client: Optional['OpenAI'] = None  # type: ignore # noqa: F821
     _gemini_client: Optional["GenerativeAI"] = None  # type: ignore # noqa: F821
@@ -34,6 +35,7 @@ class GeneratorMixin:
         max_input_tokens: Optional[int] = None,
         max_output_tokens: Optional[int] = None,
         max_requests: Optional[int] = None,
+        system_prompt: Optional[str] = None
     ):
         self._backend = backend
         self._llm_name = llm_name
@@ -42,6 +44,7 @@ class GeneratorMixin:
         self._max_input_tokens = max_input_tokens
         self._max_output_tokens = max_output_tokens
         self._max_requests = max_requests
+        self._system_prompt = system_prompt
 
         if self._backend not in ["openai", "gemini", "hf", "local"]:
             raise ValueError("Invalid backend specified.")
@@ -55,7 +58,8 @@ class GeneratorMixin:
             if not os.environ.get("GEMINI_API_KEY"):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
             genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-            self._gemini_client = genai.GenerativeModel(self._llm_name)
+            self._gemini_client = genai.GenerativeModel(self._llm_name,
+                                                        system_instruction=self._system_prompt)
             self._generator = self._generate_gemini
         elif self._backend == "hf":
             from huggingface_hub import InferenceClient
@@ -66,7 +70,9 @@ class GeneratorMixin:
         else:
             raise NotImplementedError(f"backend '{self._backend}' not implemented.")
 
-    def _format_messages_list(self, prompt: str, system_prompt: Optional[str] = None) -> List[Dict[str, str]]:
+    def _format_messages_list(self, prompt: str,
+                              system_prompt: Optional[str] = None) \
+                              -> List[Dict[str, str]]:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -84,7 +90,7 @@ class GeneratorMixin:
     ) -> Tuple[str, int, int]:
         if not self._openai_client:
             raise ValueError("OpenAI client not initialized.")
-        
+
         completion = self._openai_client.chat.completions.create(
             model=self._llm_name,
             messages=self._format_messages_list(prompt, system_prompt),
@@ -112,11 +118,11 @@ class GeneratorMixin:
         if not self._gemini_client:
             raise ValueError("Gemini client not initialized.")
 
-        if system_prompt is not None:
+        if system_prompt is not None and system_prompt != self._system_prompt:
             # system prompt can only be changed at model initialization, so we would have to reinitialize
             # the model for each generation; TODO -- we can implement this in the future if necessary
-            raise NotImplementedError("System prompt not supported by Gemini.")
-        
+            raise NotImplementedError("System prompt can only be changed at initialized with Gemini.")
+
         response = self._gemini_client.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
@@ -142,7 +148,7 @@ class GeneratorMixin:
     ) -> Tuple[str, int, int]:
         if not self._hf_inference_client:
             raise ValueError("Hugging Face Inference client not initialized.")
-        
+
         response = self._hf_inference_client.chat.completions.create(
             model=self._llm_name,
             messages=self._format_messages_list(prompt, system_prompt),
@@ -161,7 +167,7 @@ class GeneratorMixin:
     @property
     def input_token_count(self):
         return self._input_token_count
-    
+
     @property
     def output_token_count(self):
         return self._output_token_count
@@ -203,10 +209,14 @@ class GeneratorMixin:
             self._request_count != 0 and self._request_count % self._sleep_every == 0:
             time.sleep(self._sleep_time)
 
+        # set system prompt if not provided
+        if self._system_prompt is not None and system_prompt is None:
+            system_prompt = self._system_prompt
+
         if self._generator is None:
             raise RuntimeError(f"Generator not initialized. Possible illegal backend '{self._backend}'")
         response, in_tokens, out_tokens = self._generator(prompt, system_prompt, max_new_tokens, temperature, top_p, **kwargs)
-        
+
         self._input_token_count += in_tokens
         self._output_token_count += out_tokens
         self._request_count += 1
