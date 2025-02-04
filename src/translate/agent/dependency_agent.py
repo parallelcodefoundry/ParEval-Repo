@@ -269,8 +269,10 @@ class DependencyAgent:
         try:
             sorted_files = list(ts.static_order())
         except CycleError:
+            # todo: handle cycles better, for now just sort by length of
+            # dependencies. Possible solution is to remove the cycle, sort, then
+            # append removed nodes
             sorted_files = dict(sorted(dependencies.items()), key=lambda x: len(x[1]))
-
 
         # construct the graph
         for source_file in sorted_files:
