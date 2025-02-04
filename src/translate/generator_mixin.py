@@ -5,6 +5,8 @@
 """
 import os
 import time
+import pickle
+import atexit
 from typing import Optional, Literal, Callable, List, Tuple, Dict
 
 class GeneratorMixin:
@@ -23,6 +25,7 @@ class GeneratorMixin:
     _output_token_count: int = 0
     _request_count: int = 0
     _system_prompt: Optional[str] = None
+    _disable_request_cache: Optional[bool] = False
 
     _openai_client: Optional['OpenAI'] = None  # type: ignore # noqa: F821
     _gemini_client: Optional["GenerativeAI"] = None  # type: ignore # noqa: F821
@@ -36,7 +39,8 @@ class GeneratorMixin:
         max_input_tokens: Optional[int] = None,
         max_output_tokens: Optional[int] = None,
         max_requests: Optional[int] = None,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        disable_request_cache: Optional[bool] = False
     ):
         self._backend = backend
         self._llm_name = llm_name
@@ -45,6 +49,7 @@ class GeneratorMixin:
         self._max_output_tokens = max_output_tokens
         self._max_requests = max_requests
         self._system_prompt = system_prompt
+        self._disable_request_cache = disable_request_cache
 
         if self._backend not in ["openai", "gemini", "hf", "local"]:
             raise ValueError("Invalid backend specified.")
@@ -75,6 +80,24 @@ class GeneratorMixin:
         if self._rpm_limit is not None:
             self._recent_requests = []
 
+            # load recent requests from cache
+            if not disable_request_cache:
+                try:
+                    with open(f".request_cache_{self._backend}.pkl", "rb") as f:
+                        self._recent_requests = pickle.load(f)
+                except FileNotFoundError:
+                    pass
+
+                atexit.register(self._cleanup)
+
+
+    def _cleanup(self):
+        """ Save recent requests to cache on deletion.
+        """
+        if self._recent_requests and not self._disable_request_cache:
+            if time.time() - self._recent_requests[-1] <= 60:
+                with open(f".request_cache_{self._backend}.pkl", "wb") as f:
+                    pickle.dump(self._recent_requests, f)
 
     def _format_messages_list(self, prompt: str,
                               system_prompt: Optional[str] = None) \
@@ -115,6 +138,7 @@ class GeneratorMixin:
             raise ValueError("No completions returned from OpenAI.")
         return completion.choices[0].message.content, \
             completion.usage.prompt_tokens, completion.usage.completion_tokens
+
 
     def _generate_gemini(
         self,
@@ -179,6 +203,7 @@ class GeneratorMixin:
 
         return response.choices[0].message.content, 0, 0
 
+
     @property
     def input_token_count(self):
         """ Return the total number of tokens used as input to the generator.
@@ -238,6 +263,7 @@ class GeneratorMixin:
                     time.sleep(1)
                 self._recent_requests.pop(0)
             self._recent_requests.append(time.time())
+            print(f"Recent requests: {self._recent_requests}")
 
         # set system prompt if not provided
         if self._system_prompt is not None and system_prompt is None:

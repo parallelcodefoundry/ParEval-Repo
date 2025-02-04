@@ -9,3 +9,5 @@ __pycache__
 
 tmp*
 .env
+
+.request_cache_*.pkl
