@@ -25,6 +25,9 @@ from agent import agent_constants as ac
 from generator_mixin import GeneratorMixin
 from repo import Repo
 
+# tpl imports
+from alive_progress import alive_it
+
 
 class TopDownAgentTranslator(Translator, GeneratorMixin):
     """ A class to translate an entire repository using the top-down agent method.
@@ -87,6 +90,17 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             "llm_name": args.agent_llm_name
         }
 
+    def _safe_get_columns(self) -> int:
+        """ Return get_terminal_size with exception handling.
+        """
+        try:
+            max_cols = os.get_terminal_size().columns
+        except OSError as error:
+            if error.errno == 25:
+                max_cols = 80
+            else:
+                raise error
+        return max_cols
 
     def _read_file(self, rel_path: str) -> str:
         """ Read the contents of a file from the input repository.
@@ -95,11 +109,28 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         with open(input_file_path, 'r', encoding="UTF-8") as f:
             return f.read()
 
+    def _update_output_file_extension(self, fname: str) -> str:
+        """ Return the filename with updated extension based on the destination model.
+        """
+        # Check if file has an extension
+        if "." in fname:
+            name, current_ext = os.path.splitext(fname)
+
+            # Check if the extension is in the dict
+            if current_ext in ac.ext_to_type:
+                if self._dst_model == "cuda":
+                    ext_category = self._dst_model
+                else:
+                    ext_category = self._input_repo.get_meta_dict()["filename_desc"]
+                return name + ac.type_to_ext[ext_category.lower()][ac.ext_to_type[current_ext]]
+        return fname
+
 
     def _write_file(self, rel_path: str, contents: str):
         """ Write the contents to a file in the output repository.
         """
-        output_file_path = os.path.join(self._output_fpath, "repo", rel_path)
+        output_file_path = os.path.join(self._output_fpath, "repo",
+                                        self._update_output_file_extension(rel_path))
 
         # make parent dirs if necessary
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
@@ -133,9 +164,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """
         print(f"Constructing dependency graph on {self._input_repo.path}...")
         dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
+        max_cols = self._safe_get_columns()
 
         # walk down the tree and translate each file
-        for node in dep_tree:
+        for node in alive_it(dep_tree,
+                             title="Translating files",
+                             max_cols=max_cols,
+                             disable=self._hide_progress):
             self._translate_node(node)
 
         # dump experiment metadata

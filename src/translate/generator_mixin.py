@@ -263,7 +263,6 @@ class GeneratorMixin:
                     time.sleep(1)
                 self._recent_requests.pop(0)
             self._recent_requests.append(time.time())
-            print(f"Recent requests: {self._recent_requests}")
 
         # set system prompt if not provided
         if self._system_prompt is not None and system_prompt is None:
