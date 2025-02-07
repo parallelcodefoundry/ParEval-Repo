@@ -14,6 +14,7 @@ import os
 import sys
 import json
 from typing import Dict, Literal
+import re
 
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -58,11 +59,15 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             src_model=self._src_model,
             dst_model=self._dst_model)
 
-        GeneratorMixin.__init__(self, backend, llm_name)
+        GeneratorMixin.__init__(self, backend, llm_name, rpm_limit=10)
 
         interactions_path = None
         if self._log_interactions:
             interactions_path = os.path.join(self._output_fpath, "interactions.txt")
+
+            # create directories if necessary
+            os.makedirs(os.path.dirname(interactions_path), exist_ok=True)
+
         self._dependency_agent = DependencyAgent(generator=self,
                                                  interactions_path=interactions_path)
         self._chunk_file_agent = ChunkFileAgent(generator=self,
@@ -126,6 +131,16 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         return fname
 
 
+    def _postprocess(self, output: str) -> str:
+        """ make sure there's only one codeblock and extract it
+        """
+        CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
+        match = CODE_BLOCK_PATTERN.search(output)
+        if match is None:
+            raise ValueError("No code block found in output.")
+        return match.group(1)
+
+
     def _write_file(self, rel_path: str, contents: str):
         """ Write the contents to a file in the output repository.
         """
@@ -136,7 +151,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
 
         with open(output_file_path, 'w', encoding="UTF-8") as f:
-            f.write(contents)
+            f.write(self._postprocess(contents))
         print(f"Wrote file {output_file_path}")
 
     def _write_metadata(self, repo_fpath: os.PathLike):

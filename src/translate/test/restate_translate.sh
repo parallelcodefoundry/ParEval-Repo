@@ -15,7 +15,7 @@ run_restate () {
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
             --config ../../../targets/${application}/openmp-offload \
-            --output ../../../data/${application}/restate-${llm_name}-cuda-to-omp \
+            --output ../../../../code-translation-results/${application}/restate-${llm_name}-cuda-to-omp \
             --output-id ${iter} \
             --app-name ${application} \
             --method agent \
