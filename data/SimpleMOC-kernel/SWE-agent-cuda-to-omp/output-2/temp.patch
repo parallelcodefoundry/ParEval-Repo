@@ -1,0 +1,982 @@
+
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..40986c5
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,17 @@
++
++CXX = g++
++CXXFLAGS = -fopenmp -O3
++
++# Source files
++SRCS = init.cpp kernel.cpp main.cpp
++
++# Output executable
++TARGET = SimpleMOC
++
++all: $(TARGET)
++
++$(TARGET): $(SRCS)
++$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS)
++
++clean:
++rm -f $(TARGET)
+\ No newline at end of file
+diff --git a/repo/include/init.cpp b/repo/include/init.cpp
+new file mode 100644
+index 0000000..f059282
+--- /dev/null
++++ b/repo/include/init.cpp
+@@ -0,0 +1,77 @@
++
++#include <omp.h>
++#include <curand_kernel.h>
++#include "SimpleMOC-kernel_header.h"
++
++void setup_kernel(curandState *state, Input I) {
++    #pragma omp target teams distribute parallel for
++    for (int threadId = 0; threadId < I.streams; threadId++) {
++        curand_init(1234, threadId, 0, &state[threadId]);
++    }
++}
++
++// Initialize global flux states to random numbers on device
++void init_flux_states(float *flux_states, int N_flux_states, Input I, curandState *state) {
++    #pragma omp target teams distribute parallel for
++    for (int blockId = 0; blockId < N_flux_states; blockId++) {
++        // Assign RNG state
++        curandState *localState = &state[blockId % I.streams];
++
++        if (omp_get_thread_num() == 0) {
++            for (int i = 0; i < I.egroups; i++) {
++                flux_states[blockId + i] = curand_uniform(localState);
++            }
++        }
++    }
++}
++
++Input set_default_input(void) {
++    Input I;
++    I.source_2D_regions = 5000;
++    I.coarse_axial_intervals = 27;
++    I.fine_axial_intervals = 5;
++    I.decomp_assemblies_ax = 20; // Number of subdomains per assembly axially
++    I.segments = 50000000;
++    I.egroups = 128;
++    I.streams = 10000;
++    I.seg_per_thread = 100;
++    return I;
++}
++
++// Returns a memory estimate (in MB) for the program's primary data structures
++double mem_estimate(Input I) {
++    size_t nbytes = 0;
++    nbytes += I.source_3D_regions * sizeof(Source);
++    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
++    nbytes += N_fine * sizeof(float);
++    nbytes += N_fine * sizeof(float);
++    long N_sigT = I.source_3D_regions * I.egroups;
++    nbytes += N_sigT * sizeof(float);
++    return (double)nbytes / 1024.0 / 1024.0;
++}
++
++Source *initialize_sources(Input I, Source_Arrays *SA) {
++    Source *sources = (Source *)malloc(I.source_3D_regions * sizeof(Source));
++    long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
++    SA->fine_source_arr = (float *)malloc(N_fine * sizeof(float));
++    for (int i = 0; i < I.source_3D_regions; i++) {
++        sources[i].fine_source_id = i * I.fine_axial_intervals * I.egroups;
++    }
++    SA->fine_flux_arr = (float *)malloc(N_fine * sizeof(float));
++    for (int i = 0; i < I.source_3D_regions; i++) {
++        sources[i].fine_flux_id = i * I.fine_axial_intervals * I.egroups;
++    }
++    long N_sigT = I.source_3D_regions * I.egroups;
++    SA->sigT_arr = (float *)malloc(N_sigT * sizeof(float));
++    for (int i = 0; i < I.source_3D_regions; i++) {
++        sources[i].sigT_id = i * I.egroups;
++    }
++    for (long i = 0; i < N_fine; i++) {
++        SA->fine_source_arr[i] = (float)rand() / RAND_MAX;
++        SA->fine_flux_arr[i] = (float)rand() / RAND_MAX;
++    }
++    for (int i = 0; i < N_sigT; i++) {
++        SA->sigT_arr[i] = (float)rand() / RAND_MAX;
++    }
++    return sources;
++}
+\ No newline at end of file
+diff --git a/repo/include/init.cu b/repo/include/init.cu
+deleted file mode 100644
+index a3408cb..0000000
+--- a/repo/include/init.cu
++++ /dev/null
+@@ -1,185 +0,0 @@
+-#include "SimpleMOC-kernel_header.h"
+-
+-__global__ void setup_kernel(curandState *state, Input I)
+-{
+-	int threadId = blockIdx.x *blockDim.x + threadIdx.x;
+-	if( threadId >= I.streams)
+-		return;
+-	curand_init(1234, threadId, 0, &state[threadId]);
+-}
+-
+-// Initialize global flux states to random numbers on device
+-// Slow, poor use of GPU, but fine since it's just initialization code
+-__global__ void	init_flux_states( float * flux_states, int N_flux_states, Input I, curandState * state)
+-{
+-	int blockId = blockIdx.y * gridDim.x + blockIdx.x; // geometric segment	
+-	//int threadId = blockId * blockDim.x + threadIdx.x; // energy group
+-
+-	if(blockId >= N_flux_states)
+-		return;
+-
+-	// Assign RNG state
+-	curandState * localState = &state[blockId % I.streams];
+-
+-	if( threadIdx.x == 0 )
+-		for( int i = 0; i < I.egroups; i++ )
+-			flux_states[blockId +i] = curand_uniform(localState);
+-}
+-
+-// Gets I from user and sets defaults
+-Input set_default_input( void )
+-{
+-	Input I;
+-
+-	I.source_2D_regions = 5000;
+-	I.coarse_axial_intervals = 27;
+-	I.fine_axial_intervals = 5;
+-	I.decomp_assemblies_ax = 20; // Number of subdomains per assembly axially
+-	I.segments = 50000000;
+-	I.egroups = 128;
+-	I.streams = 10000;
+-	I.seg_per_thread = 100;
+-
+-	return I;
+-}
+-
+-// Returns a memory esimate (in MB) for the program's primary data structures
+-double mem_estimate( Input I )
+-{
+-	size_t nbytes = 0;
+-
+-	// Sources Array
+-	nbytes += I.source_3D_regions * sizeof(Source);
+-
+-	// Fine Source Data
+-	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+-	nbytes += N_fine * sizeof(float);
+-
+-	// Fine Flux Data
+-	nbytes += N_fine * sizeof(float);
+-
+-	// SigT Data
+-	long N_sigT = I.source_3D_regions * I.egroups;
+-	nbytes += N_sigT * sizeof(float);
+-
+-	// Return MB
+-	return (double) nbytes / 1024.0 / 1024.0;
+-}
+-
+-Source * initialize_sources( Input I, Source_Arrays * SA )
+-{
+-	// Source Data Structure Allocation
+-	Source * sources = (Source *) malloc( I.source_3D_regions * sizeof(Source));
+-
+-	// Allocate Fine Source Data
+-	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+-	SA->fine_source_arr = (float *) malloc( N_fine * sizeof(float));
+-	for( int i = 0; i < I.source_3D_regions; i++ )
+-		sources[i].fine_source_id = i*I.fine_axial_intervals*I.egroups;
+-
+-	// Allocate Fine Flux Data
+-	SA->fine_flux_arr = (float *) malloc( N_fine * sizeof(float));
+-	for( int i = 0; i < I.source_3D_regions; i++ )
+-		sources[i].fine_flux_id = i*I.fine_axial_intervals*I.egroups;
+-
+-	// Allocate SigT Data
+-	long N_sigT = I.source_3D_regions * I.egroups;
+-	SA->sigT_arr = (float *) malloc( N_sigT * sizeof(float));
+-	for( int i = 0; i < I.source_3D_regions; i++ )
+-		sources[i].sigT_id = i * I.egroups;
+-
+-	// Initialize fine source and flux to random numbers
+-	for( long i = 0; i < N_fine; i++ )
+-	{
+-		SA->fine_source_arr[i] = (float) rand() / RAND_MAX;
+-		SA->fine_flux_arr[i] = (float) rand() / RAND_MAX;
+-	}
+-
+-	// Initialize SigT Values
+-	for( int i = 0; i < N_sigT; i++ )
+-		SA->sigT_arr[i] = (float) rand() / RAND_MAX;
+-
+-	return sources;
+-}
+-
+-Source * initialize_device_sources( Input I, Source_Arrays * SA_h, Source_Arrays * SA_d, Source * sources_h )
+-{
+-	// Allocate & Copy Fine Source Data
+-	long N_fine = I.source_3D_regions * I.fine_axial_intervals * I.egroups;
+-	cudaMalloc((void **) &SA_d->fine_source_arr, N_fine * sizeof(float));
+-	cudaMemcpy(SA_d->fine_source_arr, SA_h->fine_source_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+-
+-	// Allocate & Copy Fine Flux Data
+-	cudaMalloc((void **) &SA_d->fine_flux_arr, N_fine * sizeof(float));
+-	cudaMemcpy(SA_d->fine_flux_arr, SA_h->fine_flux_arr, N_fine * sizeof(float), cudaMemcpyHostToDevice);
+-
+-	// Allocate & Copy SigT Data
+-	long N_sigT = I.source_3D_regions * I.egroups;
+-	cudaMalloc((void **) &SA_d->sigT_arr, N_sigT * sizeof(float));
+-	cudaMemcpy(SA_d->sigT_arr, SA_h->sigT_arr, N_sigT * sizeof(float), cudaMemcpyHostToDevice);
+-
+-	// Allocate & Copy Source Array Data
+-	Source * sources_d;
+-	cudaMalloc((void **) &sources_d, I.source_3D_regions * sizeof(Source));
+-	cudaMemcpy(sources_d, sources_h, I.source_3D_regions * sizeof(Source), cudaMemcpyHostToDevice);
+-
+-	return sources_d;
+-}
+-
+-// Builds a table of exponential values for linear interpolation
+-Table buildExponentialTable( void )
+-{
+-	// define table
+-	Table table;
+-
+-	//float precision = 0.01;
+-	float maxVal = 10.0;	
+-
+-	// compute number of arry values
+-	//int N = (int) ( maxVal * sqrt(1.0 / ( 8.0 * precision * 0.01 ) ) );
+-	int N = 353; 
+-
+-	// compute spacing
+-	float dx = maxVal / (float) N;
+-
+-	// store linear segment information (slope and y-intercept)
+-	for( int n = 0; n < N; n++ )
+-	{
+-		// compute slope and y-intercept for ( 1 - exp(-x) )
+-		float exponential = exp( - n * dx );
+-		table.values[ 2*n ] = - exponential;
+-		table.values[ 2*n + 1 ] = 1 + ( n * dx - 1 ) * exponential;
+-	}
+-
+-	// assign data to table
+-	table.dx = dx;
+-	table.maxVal = maxVal - table.dx;
+-	table.N = N;
+-
+-	return table;
+-}
+-
+-void __cudaCheckError( const char *file, const int line )
+-{
+-#ifdef CUDA_ERROR_CHECK
+-    cudaError err = cudaGetLastError();
+-    if ( cudaSuccess != err )
+-    {
+-        fprintf( stderr, "cudaCheckError() failed at %s:%i : %s\n",
+-                 file, line, cudaGetErrorString( err ) );
+-        exit( -1 );
+-    }
+- 
+-    // More careful checking. However, this will affect performance.
+-    // Comment away if needed.
+-    err = cudaDeviceSynchronize();
+-    if( cudaSuccess != err )
+-    {
+-        fprintf( stderr, "cudaCheckError() with sync failed at %s:%i : %s\n",
+-                 file, line, cudaGetErrorString( err ) );
+-        exit( -1 );
+-    }
+-#endif
+- 
+-    return;
+-}
+diff --git a/repo/include/io.cu b/repo/include/io.cu
+deleted file mode 100644
+index 39c835f..0000000
+--- a/repo/include/io.cu
++++ /dev/null
+@@ -1,177 +0,0 @@
+-#include "SimpleMOC-kernel_header.h"
+-
+-// Prints program logo
+-void logo(int version)
+-{
+-	border_print();
+-	printf(
+-"   __           __        ___        __   __           ___  __        ___     \n"
+-"  /__` |  |\\/| |__) |    |__   |\\/| /  \\ /  ` __ |__/ |__  |__) |\\ | |__  |   \n"
+-"  .__/ |  |  | |    |___ |___  |  | \\__/ \\__,    |  \\ |___ |  \\ | \\| |___ |___\n" 
+-"\n"
+-"                         ██████╗██╗   ██╗██████╗  █████╗\n" 
+-"                        ██╔════╝██║   ██║██╔══██╗██╔══██╗\n"
+-"                        ██║     ██║   ██║██║  ██║███████║\n"
+-"                        ██║     ██║   ██║██║  ██║██╔══██║\n"
+-"                        ╚██████╗╚██████╔╝██████╔╝██║  ██║\n"
+-"                         ╚═════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝\n"
+-	);
+-	printf("\n");
+-	border_print();
+-	printf("\n");
+-
+-	center_print("Developed at", 79);
+-	center_print("The Massachusetts Institute of Technology", 79);
+-	center_print("and", 79);
+-	center_print("Argonne National Laboratory", 79);
+-	printf("\n");
+-	char v[100];
+-	sprintf(v, "Version: %d", version);
+-	center_print(v, 79);
+-	printf("\n");
+-	border_print();
+-}
+-
+-// Prints Section titles in center of 80 char terminal
+-void center_print(const char *s, int width)
+-{
+-	int length = strlen(s);
+-	int i;
+-	for (i=0; i<=(width-length)/2; i++) {
+-		fputs(" ", stdout);
+-	}
+-	fputs(s, stdout);
+-	fputs("\n", stdout);
+-}
+-
+-// Prints a border
+-void border_print(void)
+-{
+-	printf(
+-	"==================================================================="
+-	"=============\n");
+-}
+-
+-// Prints comma separated integers - for ease of reading
+-void fancy_int( int a )
+-{
+-    if( a < 1000 )
+-        printf("%d\n",a);
+-
+-    else if( a >= 1000 && a < 1000000 )
+-        printf("%d,%03d\n", a / 1000, a % 1000);
+-
+-    else if( a >= 1000000 && a < 1000000000 )
+-        printf("%d,%03d,%03d\n", a / 1000000, (a % 1000000) / 1000, a % 1000 );
+-
+-    else if( a >= 1000000000 )
+-        printf("%d,%03d,%03d,%03d\n",
+-               a / 1000000000,
+-               (a % 1000000000) / 1000000,
+-               (a % 1000000) / 1000,
+-               a % 1000 );
+-    else
+-        printf("%d\n",a);
+-}
+-
+-// Prints out the summary of User input
+-void print_input_summary(Input I)
+-{
+-	center_print("INPUT SUMMARY", 79);
+-	border_print();
+-
+-	cudaDeviceProp prop;
+-	int device;
+-	cudaGetDevice(&device);
+-	cudaGetDeviceProperties ( &prop, device );
+-	printf("%-25s%s\n", "CUDA Device: ", prop.name); 
+-	printf("%-25s%d\n", "Energy Groups:", I.egroups);
+-	printf("%-25s%d\n", "2D Source Regions:", I.source_2D_regions);
+-	printf("%-25s%d\n", "Coarse Axial Intervals:", I.coarse_axial_intervals);
+-	printf("%-25s%d\n", "Fine Axial Intervals:", I.fine_axial_intervals);
+-	printf("%-25s%d\n", "Axial Decomposition:", I.decomp_assemblies_ax);
+-	printf("%-25s%d\n", "3D Source Regions:", I.source_3D_regions);
+-	printf("%-25s", "Segments:"); fancy_int(I.segments);
+-	printf("%-25s", "Random Number Streams:"); fancy_int(I.streams);
+-	printf("%-25s%.2f\n", "Memory Estimate (MB):", mem_estimate(I));
+-	printf("%-25s%d\n", "Segments per CUDA block:", I.seg_per_thread);
+-	#ifdef TABLE
+-	printf("%-25s%s\n", "Exponential Table:","ON");
+-	#else
+-	printf("%-25s%s\n", "Exponential Table:","OFF");
+-	#endif
+-	border_print();
+-}
+-
+-// reads command line inputs and applies options
+-void read_CLI( int argc, char * argv[], Input * input )
+-{
+-	// Collect Raw Input
+-	for( int i = 1; i < argc; i++ )
+-	{
+-		char * arg = argv[i];
+-
+-		// nthreads (-t)
+-		if( strcmp(arg, "-t") == 0 )
+-		{
+-			if( ++i < argc )
+-				input->nthreads = atoi(argv[i]);
+-			else
+-				print_CLI_error();
+-		}
+-
+-		// segments (-s)
+-		else if( strcmp(arg, "-s") == 0 )
+-		{
+-			if( ++i < argc )
+-				input->segments = atoi(argv[i]);
+-			else
+-				print_CLI_error();
+-		}
+-		
+-		// egroups (-e)
+-		else if( strcmp(arg, "-e") == 0 )
+-		{
+-			if( ++i < argc )
+-				input->egroups = atoi(argv[i]);
+-			else
+-				print_CLI_error();
+-		}
+-		// segments per thread (-p)
+-		else if( strcmp(arg, "-p") == 0 )
+-		{
+-			if( ++i < argc )
+-				input->seg_per_thread = atoi(argv[i]);
+-			else
+-				print_CLI_error();
+-		}
+-		// CUDA Device Number (-d)
+-		else if( strcmp(arg, "-d") == 0 )
+-		{
+-			if( ++i < argc )
+-			{
+-				int device_id = atoi(argv[i]);
+-				cudaSetDevice( device_id );
+-			}
+-			else
+-				print_CLI_error();
+-		}
+-		else
+-			print_CLI_error();
+-	}
+-}
+-
+-// print error to screen, inform program options
+-void print_CLI_error(void)
+-{
+-	printf("Usage: ./SimpleMOC <options>\n");
+-	printf("Options include:\n");
+-	printf("  -t <threads>          Number of OpenMP threads to run\n");
+-	printf("  -s <segments>         Number of segments to process\n");
+-	printf("  -e <energy groups>    Number of energy groups\n");
+-	printf("  -p <segs per thread>  Number of segments per CUDA Block\n");
+-	printf("  -d <CUDA device ID>   CUDA GPU device ID number\n");
+-	printf("See readme for full description of default run values\n");
+-	exit(1);
+-}
+-
+diff --git a/repo/include/kernel.cpp b/repo/include/kernel.cpp
+new file mode 100644
+index 0000000..9cd5011
+--- /dev/null
++++ b/repo/include/kernel.cpp
+@@ -0,0 +1,62 @@
++
++#include <omp.h>
++#include "SimpleMOC-kernel_header.h"
++
++void run_kernel(Input I, Source *S, Source_Arrays SA, Table *table, curandState *state, float *state_fluxes, int N_state_fluxes) {
++    #pragma omp target teams distribute parallel for
++    for (int blockId = 0; blockId < I.segments / I.seg_per_thread; blockId++) {
++        // Assign RNG state
++        curandState *localState = &state[blockId % I.streams];
++
++        blockId *= I.seg_per_thread;
++        blockId--;
++
++        int g = omp_get_thread_num(); // Each energy group (g) is one thread in a block
++
++        // Thread Local variables
++        float q0, q1, q2, sigT, tau, sigT2, expVal, reuse, flux_integral, tally, t1, t2, t3, t4;
++
++        // Randomized variables (common across all threads within block)
++        int state_flux_id[I.seg_per_thread];
++        int QSR_id[I.seg_per_thread];
++        int FAI_id[I.seg_per_thread];
++
++        if (omp_get_thread_num() == 0) {
++            for (int i = 0; i < I.seg_per_thread; i++) {
++                state_flux_id[i] = curand(localState) % N_state_fluxes;
++                QSR_id[i] = curand(localState) % I.source_3D_regions;
++                FAI_id[i] = curand(localState) % I.fine_axial_intervals;
++            }
++        }
++
++        #pragma omp barrier
++
++        for (int i = 0; i < I.seg_per_thread; i++) {
++            blockId++;
++            float *state_flux = &state_fluxes[state_flux_id[i]];
++
++            // Attenuate Segment
++            float dz = 0.1f;
++            float zin = 0.3f;
++            float weight = 0.5f;
++            float mu = 0.9f;
++            float mu2 = 0.3f;
++            float ds = 0.7f;
++
++            const int egroups = I.egroups;
++
++            // load fine source region flux vector
++            float *FSR_flux = &SA.fine_flux_arr[S[QSR_id[i]].fine_flux_id + FAI_id[i] * egroups];
++
++            if (FAI_id[i] == 0) {
++                float *f2 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i]) * egroups];
++                float *f3 = &SA.fine_source_arr[S[QSR_id[i]].fine_source_id + (FAI_id[i] + 1) * egroups];
++                // cycle over energy groups
++                // load neighboring sources
++                float y2 = f2[g];
++                float y3 = f3[g];
++                // Additional computations...
++            }
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/repo/include/kernel.cu b/repo/include/kernel.cu
+deleted file mode 100644
+index 1b9e45f..0000000
+--- a/repo/include/kernel.cu
++++ /dev/null
+@@ -1,213 +0,0 @@
+-#include "SimpleMOC-kernel_header.h"
+-
+-/* My parallelization scheme here is to basically have a single
+- * block be a geometrical segment, with each thread within the
+- * block represent a single energy phase. On the CPU, the
+- * inner SIMD-ized loop is over energy (i.e, 100 energy groups).
+- * This should allow for each BLOCK to have:
+- * 		- A single state variable for the RNG
+- * 		- A set of __shared__ SIMD vectors, each thread id being its idx
+- */
+-
+-__global__ void run_kernel( Input I, Source *  S,
+-		Source_Arrays SA, Table *  table, curandState *  state,
+-		float *  state_fluxes, int N_state_fluxes)
+-{
+-	int blockId = blockIdx.y * gridDim.x + blockIdx.x; // geometric segment	
+-
+-	if( blockId >= I.segments / I.seg_per_thread )
+-		return;
+-
+-	// Assign RNG state
+-	curandState *  localState = &state[blockId % I.streams];
+-
+-	blockId *= I.seg_per_thread;
+-	blockId--;
+-
+-	int g = threadIdx.x; // Each energy group (g) is one thread in a block
+-
+-	// Thread Local (i.e., specific to E group) variables
+-	// Similar to SIMD vectors in CPU code
+-	float q0           ;
+-	float q1           ;
+-	float q2           ;
+-	float sigT         ;
+-	float tau          ;
+-	float sigT2        ;
+-	float expVal       ;
+-	float reuse        ;
+-	float flux_integral;
+-	float tally        ;
+-	float t1           ;
+-	float t2           ;
+-	float t3           ;
+-	float t4           ;
+-
+-	// Randomized variables (common accross all thread within block)
+-	extern __shared__ int shm[];
+-	int *  state_flux_id = &shm[0];
+-	int *  QSR_id = &shm[I.seg_per_thread];
+-	int *  FAI_id = &shm[I.seg_per_thread * 2];
+-
+-	if( threadIdx.x == 0 )
+-	{
+-		for( int i = 0; i < I.seg_per_thread; i++ )
+-		{
+-			state_flux_id[i] = curand(localState) % N_state_fluxes;
+-			QSR_id[i] = curand(localState) % I.source_3D_regions;
+-			FAI_id[i] = curand(localState) % I.fine_axial_intervals;
+-		}
+-	}
+-
+-	__syncthreads();
+-
+-	for( int i = 0; i < I.seg_per_thread; i++ )
+-	{
+-		blockId++;
+-
+-		float *  state_flux = &state_fluxes[state_flux_id[i]];
+-
+-
+-		__syncthreads();
+-
+-		//////////////////////////////////////////////////////////
+-		// Attenuate Segment
+-		//////////////////////////////////////////////////////////
+-
+-		// Some placeholder constants - In the full app some of these are
+-		// calculated based off position in geometry. This treatment
+-		// shaves off a few FLOPS, but is not significant compared to the
+-		// rest of the function.
+-		float dz = 0.1f;
+-		float zin = 0.3f; 
+-		float weight = 0.5f;
+-		float mu = 0.9f;
+-		float mu2 = 0.3f;
+-		float ds = 0.7f;
+-
+-		const int egroups = I.egroups;
+-
+-		// load fine source region flux vector
+-		float *  FSR_flux = &SA.fine_flux_arr[ S[QSR_id[i]].fine_flux_id + FAI_id[i] * egroups];
+-
+-		if( FAI_id[i] == 0 )
+-		{
+-			float *   f2 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i])*egroups];
+-			float *   f3 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]+1)*egroups];
+-			// cycle over energy groups
+-			// load neighboring sources
+-			float y2 = __ldg(&f2[g]);
+-			float y3 = __ldg(&f3[g]);
+-
+-			// do linear "fitting"
+-			float c0 = y2;
+-			float c1 = (y3 - y2) / dz;
+-
+-			// calculate q0, q1, q2
+-			q0 = c0 + c1*zin;
+-			q1 = c1;
+-			q2 = 0;
+-		}
+-		else if ( FAI_id[i] == I.fine_axial_intervals - 1 )
+-		{
+-			float *   f1 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]-1)*egroups];
+-			float *   f2 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i])*egroups];
+-			// cycle over energy groups
+-			// load neighboring sources
+-			float y1 = __ldg(&f1[g]);
+-			float y2 = __ldg(&f2[g]);
+-
+-			// do linear "fitting"
+-			float c0 = y2;
+-			float c1 = (y2 - y1) / dz;
+-
+-			// calculate q0, q1, q2
+-			q0 = c0 + c1*zin;
+-			q1 = c1;
+-			q2 = 0;
+-		}
+-		else
+-		{
+-			float *   f1 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]-1)*egroups];
+-			float *   f2 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i])*egroups];
+-			float *   f3 = &SA.fine_source_arr[ S[QSR_id[i]].fine_source_id + (FAI_id[i]+1)*egroups];
+-			// cycle over energy groups
+-			// load neighboring sources
+-			float y1 = __ldg(&f1[g]); 
+-			float y2 = __ldg(&f2[g]);
+-			float y3 = __ldg(&f3[g]);
+-
+-			// do quadratic "fitting"
+-			float c0 = y2;
+-			float c1 = (y1 - y3) / (2.f*dz);
+-			float c2 = (y1 - 2.f*y2 + y3) / (2.f*dz*dz);
+-
+-			// calculate q0, q1, q2
+-			q0 = c0 + c1*zin + c2*zin*zin;
+-			q1 = c1 + 2.f*c2*zin;
+-			q2 = c2;
+-		}
+-
+-		// load total cross section
+-		sigT = __ldg(&SA.sigT_arr[ S[QSR_id[i]].sigT_id + g]);
+-
+-		// calculate common values for efficiency
+-		tau = sigT * ds;
+-		sigT2 = sigT * sigT;
+-
+-		#ifdef TABLE
+-		interpolateTable( table, tau, &expVal );  
+-		#else
+-		expVal = 1.f - expf( -tau); // EXP function is fater than table lookup
+-		#endif
+-
+-		// Flux Integral
+-
+-		// Re-used Term
+-		reuse = tau * (tau - 2.f) + 2.f * expVal
+-			/ (sigT * sigT2); 
+-
+-		// add contribution to new source flux
+-		flux_integral = (q0 * tau + (sigT * __ldg(&state_flux[g]) - q0)
+-				* expVal) / sigT2 + q1 * mu * reuse + q2 * mu2 
+-			* (tau * (tau * (tau - 3.f) + 6.f) - 6.f * expVal) 
+-			/ (3.f * sigT2 * sigT2);
+-
+-		// Prepare tally
+-		tally = weight * flux_integral;
+-
+-		// SHOULD BE ATOMIC HERE!
+-		//FSR_flux[g] += tally;
+-		atomicAdd(&FSR_flux[g], (float) tally);
+-
+-		// Term 1
+-		t1 = q0 * expVal / sigT;  
+-		// Term 2
+-		t2 = q1 * mu * (tau - expVal) / sigT2; 
+-		// Term 3
+-		t3 =	q2 * mu2 * reuse;
+-		// Term 4
+-		t4 = state_flux[g] * (1.f - expVal);
+-		// Total psi
+-		state_flux[g] = t1 + t2 + t3 + t4;
+-
+-	}
+-}	
+-
+-/* Interpolates a formed exponential table to compute ( 1- exp(-x) )
+- *  at the desired x value */
+-__device__ void interpolateTable(Table *  table, float x, float *  out)
+-{
+-	// check to ensure value is in domain
+-	if( x > table->maxVal )
+-		*out = 1.0f;
+-	else
+-	{
+-		int interval = (int) ( x / table->dx + 0.5f * table->dx );
+-		interval = interval * 2;
+-		float slope = table->values[ interval ];
+-		float intercept = table->values[ interval + 1 ];
+-		float val = slope * x + intercept;
+-		*out = val;
+-	}
+-}
+diff --git a/repo/include/main.cpp b/repo/include/main.cpp
+new file mode 100644
+index 0000000..7d83bb6
+--- /dev/null
++++ b/repo/include/main.cpp
+@@ -0,0 +1,83 @@
++
++#include <omp.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <math.h>
++#include "SimpleMOC-kernel_header.h"
++
++int main(int argc, char *argv[]) {
++    int version = 4;
++
++    srand(time(NULL));
++
++    Input I = set_default_input();
++    read_CLI(argc, argv, &I);
++
++    // Calculate Number of 3D Source Regions
++    I.source_3D_regions = (int) ceil((double)I.source_2D_regions * I.coarse_axial_intervals / I.decomp_assemblies_ax);
++
++    logo(version);
++    print_input_summary(I);
++
++    center_print("INITIALIZATION", 79);
++    border_print();
++
++    // Build Source Data
++    printf("Building Source Data Arrays...\n");
++    Source_Arrays SA_h, SA_d;
++    Source *sources_h = initialize_sources(I, &SA_h);
++    Source *sources_d = initialize_device_sources(I, &SA_h, &SA_d, sources_h);
++
++    // Build Exponential Table
++    Table *table_d = NULL;
++    #ifdef TABLE
++    printf("Building Exponential Table...\n");
++    Table table = buildExponentialTable();
++    table_d = (Table *)malloc(sizeof(Table));
++    *table_d = table;
++    #endif
++
++    // Setup OpenMP RNG
++    printf("Setting up OpenMP RNG...\n");
++    curandState *RNG_states = (curandState *)malloc(I.streams * sizeof(curandState));
++    setup_kernel(RNG_states, I);
++
++    // Allocate Some Flux State vectors to randomly pick from
++    printf("Setting up Flux State Vectors...\n");
++    float *flux_states;
++    int N_flux_states = 10000;
++    assert(I.segments >= N_flux_states);
++    flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
++    init_flux_states(flux_states, N_flux_states, I, RNG_states);
++
++    printf("Initialization Complete.\n");
++    border_print();
++    center_print("SIMULATION", 79);
++    border_print();
++
++    printf("Attenuating fluxes across segments...\n");
++
++    // Setup kernel call block parameters
++    assert(I.segments % I.seg_per_thread == 0);
++    int n_blocks = sqrt(I.segments / I.seg_per_thread);
++
++    // Run Simulation Kernel Loop
++    #pragma omp target teams distribute parallel for
++    for (int blockId = 0; blockId < n_blocks; blockId++) {
++        run_kernel(I, sources_d, SA_d, table_d, RNG_states, flux_states, N_flux_states);
++    }
++
++    float *host_flux_states = (float *)malloc(N_flux_states * I.egroups * sizeof(float));
++    memcpy(host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float));
++
++    // Cleanup
++    free(sources_h);
++    free(sources_d);
++    free(flux_states);
++    free(host_flux_states);
++    #ifdef TABLE
++    free(table_d);
++    #endif
++
++    return 0;
++}
+\ No newline at end of file
+diff --git a/repo/include/main.cu b/repo/include/main.cu
+deleted file mode 100644
+index a4ef4cd..0000000
+--- a/repo/include/main.cu
++++ /dev/null
+@@ -1,115 +0,0 @@
+-#include "SimpleMOC-kernel_header.h"
+-
+-int main( int argc, char * argv[] )
+-{
+-	int version = 4;
+-
+-	srand(time(NULL));
+-
+-	Input I = set_default_input();
+-	read_CLI( argc, argv, &I );
+-	
+-	// Calculate Number of 3D Source Regions
+-	I.source_3D_regions = (int) ceil((double)I.source_2D_regions *
+-		I.coarse_axial_intervals / I.decomp_assemblies_ax);
+-
+-	logo(version);
+-
+-	print_input_summary(I);
+-	
+-	center_print("INITIALIZATION", 79);
+-	border_print();
+-
+-	// Build Source Data
+-	printf("Building Source Data Arrays...\n");
+-	Source_Arrays SA_h, SA_d;
+-	Source * sources_h = initialize_sources(I, &SA_h); 
+-	Source * sources_d = initialize_device_sources( I, &SA_h, &SA_d, sources_h); 
+-	cudaDeviceSynchronize();
+-	
+-	// Build Exponential Table
+-	Table * table_d = NULL;
+-	#ifdef TABLE
+-	printf("Building Exponential Table...\n");
+-	Table table = buildExponentialTable();
+-	CUDA_CALL( cudaMalloc((void **) &table_d, sizeof(Table)) );
+-	CUDA_CALL( cudaMemcpy(table_d, &table, sizeof(Table), cudaMemcpyHostToDevice) );
+-	#endif
+-
+-	// Setup CUDA blocks / threads
+-	int n_blocks = sqrt(I.segments);
+-	dim3 blocks(n_blocks, n_blocks);
+-	if( blocks.x * blocks.y < I.segments )
+-		blocks.x++;
+-	if( blocks.x * blocks.y < I.segments )
+-		blocks.y++;
+-	assert( blocks.x * blocks.y >= I.segments );
+-
+-	// Setup CUDA RNG on Device
+-	printf("Setting up CUDA RNG...\n");
+-	curandState * RNG_states;
+-	CUDA_CALL( cudaMalloc((void **)&RNG_states, I.streams * sizeof(curandState)) );
+-	setup_kernel<<<I.streams/100 + 1, 100>>>(RNG_states, I);
+-	CudaCheckError();
+-	cudaDeviceSynchronize();
+-
+-	// Allocate Some Flux State vectors to randomly pick from
+-	printf("Setting up Flux State Vectors...\n");
+-	float * flux_states;
+-	int N_flux_states = 10000;
+-	assert( I.segments >= N_flux_states );
+-	CUDA_CALL( cudaMalloc((void **) &flux_states, N_flux_states * I.egroups * sizeof(float)) );
+-	init_flux_states<<< blocks, I.egroups >>> ( flux_states, N_flux_states, I, RNG_states );
+-
+-
+-	printf("Initialization Complete.\n");
+-	border_print();
+-	center_print("SIMULATION", 79);
+-	border_print();
+-	cudaDeviceSynchronize();
+-	printf("Attentuating fluxes across segments...\n");
+-
+-	// CUDA timer variables
+-	cudaEvent_t start, stop;
+-	cudaEventCreate(&start);
+-	cudaEventCreate(&stop);
+-	float time = 0;
+-	
+-	// Setup kernel call block parameters
+-	assert( I.segments % I.seg_per_thread == 0 );
+-	n_blocks = sqrt(I.segments / I.seg_per_thread);
+-	dim3 blocks_k(n_blocks, n_blocks);
+-	if( blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread )
+-		blocks_k.x++;
+-	if( blocks_k.x * blocks_k.y < I.segments / I.seg_per_thread )
+-		blocks_k.y++;
+-	assert( blocks_k.x * blocks_k.y >= I.segments / I.seg_per_thread );
+-
+-	// Run Simulation Kernel Loop
+-	cudaEventRecord(start, 0);
+-	run_kernel <<< blocks_k, I.egroups, I.seg_per_thread * 3 *sizeof(int) >>> (I, sources_d, SA_d, table_d, 
+-			RNG_states, flux_states, N_flux_states);
+-	CudaCheckError();
+-	cudaEventRecord(stop, 0);
+-	cudaEventSynchronize(start);
+-	cudaEventSynchronize(stop);
+-	cudaEventElapsedTime(&time, start, stop);
+-	cudaDeviceSynchronize();
+-
+-	float * host_flux_states = (float*) malloc(N_flux_states * I.egroups * sizeof(float));
+-	CUDA_CALL( cudaMemcpy( host_flux_states, flux_states, N_flux_states * I.egroups * sizeof(float), cudaMemcpyDeviceToHost));
+-
+-	printf("Simulation Complete.\n");
+-
+-	border_print();
+-	center_print("RESULTS SUMMARY", 79);
+-	border_print();
+-
+-	double tpi = ((double) (time/1000.0) /
+-			(double)I.segments / (double) I.egroups) * 1.0e9;
+-	printf("%-25s%.3f seconds\n", "Runtime:", time / 1000.0);
+-	printf("%-25s%.8lf ns\n", "Time per Intersection:", tpi);
+-	border_print();
+-
+-	return 0;
+-}
