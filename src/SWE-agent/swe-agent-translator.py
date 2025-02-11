@@ -115,6 +115,7 @@ def save_output(temp_repo_path, output_dir):
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
     shutil.copytree(temp_repo_path, output_dir, dirs_exist_ok=True)
+    subprocess.run(f"rm -rf {args.output_dir}/.git", shell=True, check=True)
 
 if __name__ == "__main__":
     args = get_args()
