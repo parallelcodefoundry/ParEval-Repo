@@ -1,0 +1,607 @@
+diff a/./Makefile b/./Makefile	(rejected hunks)
+@@ -1,4 +1,604 @@
+-# Makefile for CUDA microXOR
++# Makefile for OpenMP microXOR
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
++
++CXX ?= g++
++CXXFLAGS ?= -O3 -fopenmp -std=c++17
++
++SRC = src
++OBJ = obj
++
++CUFILES = $(SRC)/microXOR.cpp $(SRC)/main.cpp
++OBJS = $(CUFILES:$(SRC)/%.cpp=$(OBJ)/%.o)
++EXE = microXOR.exe
++
++$(EXE): $(OBJS)
++$(CXX) $(CXXFLAGS) $(OBJS) -o $(EXE)
++
++$(OBJ)/%.o: $(SRC)/%.cpp | obj
++$(CXX) $(CXXFLAGS) -c $< -o $@
++
++obj:
++mkdir -p $(OBJ)
++
++clean:
++rm -f $(OBJS) $(EXE)
++
++.PHONY: clean
+ 
+ NVCC ?= nvcc
+ CUDA_ARCH ?= sm_80
