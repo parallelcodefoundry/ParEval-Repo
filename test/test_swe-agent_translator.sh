@@ -1,4 +1,4 @@
-for iter in {0..0}; do
+for iter in {1..4}; do
    python3 /Users/ishan/pssg/code-translation/src/SWE-agent/swe-agent-translator.py \
        --agent_model_name gpt-4o-mini \
        --per_instance_cost_limit 0.06 \
