@@ -17,7 +17,8 @@ class GeneratorMixin:
     _llm_name: str
     _generator: Optional[Callable] = None
     _rpm_limit: Optional[int] = None
-    _recent_requests: Optional[List] = None
+    _tpm_limit: Optional[int] = None
+    _recent_requests: Optional[List[Tuple[int,int]]] = None
     _max_input_tokens: Optional[int] = None
     _max_output_tokens: Optional[int] = None
     _max_requests: Optional[int] = None
@@ -36,6 +37,7 @@ class GeneratorMixin:
         backend: Literal["openai", "gemini", "hf", "local"],
         llm_name: str,
         rpm_limit: Optional[int] = None,
+        tpm_limit: Optional[int] = None,
         max_input_tokens: Optional[int] = None,
         max_output_tokens: Optional[int] = None,
         max_requests: Optional[int] = None,
@@ -45,6 +47,7 @@ class GeneratorMixin:
         self._backend = backend
         self._llm_name = llm_name
         self._rpm_limit = rpm_limit
+        self._tpm_limit = tpm_limit
         self._max_input_tokens = max_input_tokens
         self._max_output_tokens = max_output_tokens
         self._max_requests = max_requests
@@ -58,6 +61,10 @@ class GeneratorMixin:
             from openai import OpenAI
             self._openai_client = OpenAI()
             self._generator = self._generate_openai
+            if self._rpm_limit is None:
+                self._rpm_limit = 100
+            if self._tpm_limit is None:
+                self._tpm_limit = 150000
         elif self._backend == "gemini":
             import google.generativeai as genai
             if not os.environ.get("GEMINI_API_KEY"):
@@ -68,6 +75,8 @@ class GeneratorMixin:
             self._generator = self._generate_gemini
             if self._rpm_limit is None:
                 self._rpm_limit = 15
+            if self._tpm_limit is None:
+                self._tpm_limit = 6144
         elif self._backend == "hf":
             from huggingface_hub import InferenceClient
             if not os.environ.get("HF_API_KEY"):
@@ -77,7 +86,7 @@ class GeneratorMixin:
         else:
             raise NotImplementedError(f"backend '{self._backend}' not implemented.")
 
-        if self._rpm_limit is not None:
+        if self._rpm_limit is not None or self._tpm_limit is not None:
             self._recent_requests = []
 
             # load recent requests from cache
@@ -85,6 +94,7 @@ class GeneratorMixin:
                 try:
                     with open(f".request_cache_{self._backend}.pkl", "rb") as f:
                         self._recent_requests = pickle.load(f)
+                        print(f"Loaded {len(self._recent_requests)} recent requests from cache.")
                 except FileNotFoundError:
                     pass
 
@@ -95,7 +105,7 @@ class GeneratorMixin:
         """ Save recent requests to cache on deletion.
         """
         if self._recent_requests and not self._disable_request_cache:
-            if time.time() - self._recent_requests[-1] <= 60:
+            if time.time() - self._recent_requests[-1][0] <= 60:
                 with open(f".request_cache_{self._backend}.pkl", "wb") as f:
                     pickle.dump(self._recent_requests, f)
 
@@ -258,11 +268,16 @@ class GeneratorMixin:
         # check if we need to enforce a rate limit
         if self._rpm_limit is not None:
             if len(self._recent_requests) >= self._rpm_limit:
-                while time.time() - self._recent_requests[0] < 60:
-                    print("Rate limit met, waiting...")
+                print("Request limit met, waiting...")
+                while time.time() - self._recent_requests[0][0] < 60:
                     time.sleep(1)
                 self._recent_requests.pop(0)
-            self._recent_requests.append(time.time())
+        if self._tpm_limit is not None:
+            while sum(out_tokens for _, out_tokens in self._recent_requests) >= self._tpm_limit:
+                print("Token limit met, waiting...")
+                while time.time() - self._recent_requests[0][0] < 60:
+                    time.sleep(1)
+                self._recent_requests.pop(0)
 
         # set system prompt if not provided
         if self._system_prompt is not None and system_prompt is None:
@@ -270,7 +285,17 @@ class GeneratorMixin:
 
         if self._generator is None:
             raise RuntimeError(f"Generator not initialized. Possible illegal backend '{self._backend}'")
-        response, in_tokens, out_tokens = self._generator(prompt, system_prompt, max_new_tokens, temperature, top_p, **kwargs)
+
+        start_time = time.time()
+        response, in_tokens, out_tokens = self._generator(prompt,
+                                                          system_prompt,
+                                                          max_new_tokens,
+                                                          temperature,
+                                                          top_p,
+                                                          **kwargs)
+
+        if self._rpm_limit is not None:
+            self._recent_requests.append((start_time, out_tokens))
 
         self._input_token_count += in_tokens
         self._output_token_count += out_tokens

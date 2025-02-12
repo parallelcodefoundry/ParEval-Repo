@@ -137,7 +137,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
         match = CODE_BLOCK_PATTERN.search(output)
         if match is None:
-            raise ValueError("No code block found in output.")
+            raise ValueError(f"No code block found in output:\n{output}")
         return match.group(1)
 
 
@@ -151,7 +151,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
 
         with open(output_file_path, 'w', encoding="UTF-8") as f:
-            f.write(self._postprocess(contents))
+            f.write(contents)
         print(f"Wrote file {output_file_path}")
 
     def _write_metadata(self, repo_fpath: os.PathLike):
@@ -205,12 +205,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         # translate the source code; if it's too long use the chunk file agent
         # to translate it in parts
         if len(source_code) > 4096:
-            chunks = self._chunk_file_agent.process_file(source_code)
+            node_abspath = os.path.abspath(os.path.join(self._input_repo.path, node.rel_path))
+            chunks = self._chunk_file_agent.chunk_file(source_code, node_abspath)
             translation = ""
             for chunk in chunks:
-                translation += self._get_translation(context, chunk, node)
+                translation += self._postprocess(self._get_translation(context, chunk, node))
         else:
-            translation = self._get_translation(context, source_code, node)
+            translation = self._postprocess(self._get_translation(context, source_code, node))
 
         # write the translation to the output repo
         self._write_file(node.rel_path, translation)
