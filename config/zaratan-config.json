@@ -1,0 +1,8 @@
+{
+    "gnu": "module load gcc/11.3.0",
+    "llvm": "module load llvm/gcc/11.3.0/zen2/14.0.6",
+    "cuda": "module load cuda/gcc/11.3.0/zen2/12.3.0",
+    "sm": "80",
+    "exec_check": "ncu",
+    "exec_check_fail_text": "==WARNING== No kernels were profiled."
+}
