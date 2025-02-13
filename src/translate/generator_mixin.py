@@ -8,6 +8,7 @@ import time
 import pickle
 import atexit
 from typing import Optional, Literal, Callable, List, Tuple, Dict
+from math import ceil
 
 class GeneratorMixin:
     """ Mixin class for providing a unified generative interface within other classes.
@@ -31,6 +32,8 @@ class GeneratorMixin:
     _openai_client: Optional['OpenAI'] = None  # type: ignore # noqa: F821
     _gemini_client: Optional["GenerativeAI"] = None  # type: ignore # noqa: F821
     _hf_inference_client: Optional["InferenceClient"] = None  # type: ignore # noqa: F821
+
+    MAX_ATTEMPTS = 3
 
     def __init__(
         self,
@@ -166,9 +169,10 @@ class GeneratorMixin:
             raise ValueError("Gemini client not initialized.")
 
         if system_prompt is not None and system_prompt != self._system_prompt:
-            # system prompt can only be changed at model initialization, so we would have to reinitialize
-            # the model for each generation; TODO -- we can implement this in the future if necessary
-            raise NotImplementedError("System prompt can only be changed at initialized with Gemini.")
+            # System prompt can only be changed at model initialization, so we
+            # would have to reinitialize the model for each generation.
+            # We can implement this in the future if necessary.
+            raise NotImplementedError("System prompt can only be changed at init with Gemini.")
 
         response = self._gemini_client.generate_content(
             prompt,
@@ -248,6 +252,27 @@ class GeneratorMixin:
         print(f"Request count: {self._request_count}")
 
 
+    def _enforce_limits(self):
+        """ Check if we need to enforce a rate limit and wait if so.
+        """
+        if self._rpm_limit is not None:
+            if len(self._recent_requests) >= self._rpm_limit:
+                wait_time = time.time() - self._recent_requests[0][0]
+                if wait_time < 60:
+                    print(f"Request limit met, waiting {ceil(60 - wait_time)} seconds...")
+                while time.time() - self._recent_requests[0][0] < 60:
+                    time.sleep(1)
+                self._recent_requests.pop(0)
+        if self._tpm_limit is not None:
+            while sum(out_tokens for _, out_tokens in self._recent_requests) >= self._tpm_limit:
+                wait_time = time.time() - self._recent_requests[0][0]
+                if wait_time < 60:
+                    print(f"Token limit met, waiting {ceil(60 - wait_time)} seconds...")
+                while time.time() - self._recent_requests[0][0] < 60:
+                    time.sleep(1)
+                self._recent_requests.pop(0)
+
+
     def generate(
         self,
         prompt: str,
@@ -259,25 +284,13 @@ class GeneratorMixin:
     ) -> Optional[str]:
         """ Generate text using the specified backend.
         """
+        import google.api_core.exceptions
+
         # check if early exit cause we're over a limit
         if self._max_input_tokens is not None and self._input_token_count > self._max_input_tokens \
             or self._max_output_tokens is not None and self._output_token_count > self._max_output_tokens \
             or self._max_requests is not None and self._request_count > self._max_requests:
             return None
-
-        # check if we need to enforce a rate limit
-        if self._rpm_limit is not None:
-            if len(self._recent_requests) >= self._rpm_limit:
-                print("Request limit met, waiting...")
-                while time.time() - self._recent_requests[0][0] < 60:
-                    time.sleep(1)
-                self._recent_requests.pop(0)
-        if self._tpm_limit is not None:
-            while sum(out_tokens for _, out_tokens in self._recent_requests) >= self._tpm_limit:
-                print("Token limit met, waiting...")
-                while time.time() - self._recent_requests[0][0] < 60:
-                    time.sleep(1)
-                self._recent_requests.pop(0)
 
         # set system prompt if not provided
         if self._system_prompt is not None and system_prompt is None:
@@ -285,18 +298,38 @@ class GeneratorMixin:
 
         if self._generator is None:
             raise RuntimeError(f"Generator not initialized. Possible illegal backend '{self._backend}'")
+        num_attempts = 0
+        while num_attempts < self.MAX_ATTEMPTS:
+            # wait for rate limit if needed
+            self._enforce_limits()
 
-        start_time = time.time()
-        response, in_tokens, out_tokens = self._generator(prompt,
-                                                          system_prompt,
-                                                          max_new_tokens,
-                                                          temperature,
-                                                          top_p,
-                                                          **kwargs)
+            try:
+                # generate response
+                start_time = time.time()
+                response, in_tokens, out_tokens = self._generator(prompt,
+                                                                  system_prompt,
+                                                                  max_new_tokens,
+                                                                  temperature,
+                                                                  top_p,
+                                                                  **kwargs)
+            except google.api_core.exceptions.GoogleAPIError as e:
+                # failure, wait 15 sec. and retry
+                num_attempts += 1
+                print(f"{type(e)} when generating response.")
+                print(f"Attempt {num_attempts} of {self.MAX_ATTEMPTS}.")
+                time.sleep(15)
+                if num_attempts == self.MAX_ATTEMPTS:
+                    raise RuntimeError("Max attempts reached, unable to generate response.") \
+                        from e
+            else:
+                # success, stop trying
+                break
+            finally:
+                # add request to recent requests
+                if self._rpm_limit is not None:
+                    self._recent_requests.append((start_time, out_tokens))
 
-        if self._rpm_limit is not None:
-            self._recent_requests.append((start_time, out_tokens))
-
+        # update token counts
         self._input_token_count += in_tokens
         self._output_token_count += out_tokens
         self._request_count += 1

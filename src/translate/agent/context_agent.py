@@ -16,13 +16,13 @@ class ContextAgent:
         self._interactions_path = interactions_path
         self._output_fpath = output_fpath
 
-    def get_context(self, parent_nodes: List[FileNode], node: FileNode, dst_model: str) -> str:
+    def get_context(self, dependencies: List[FileNode], node: FileNode, dst_model: str) -> str:
         print("Extracting context for dependent files...")
         translated_codes = []
-        for parent in parent_nodes:
-            translated_code = self._read_translated_file(parent.rel_path)
+        for dependency in dependencies:
+            translated_code = self._read_translated_file(dependency.rel_path)
             if translated_code:
-                translated_codes.append(f"File: {parent.rel_path}\n{translated_code}")
+                translated_codes.append(f"File: {dependency.rel_path}\n{translated_code}")
 
         if not translated_codes:
             return ""

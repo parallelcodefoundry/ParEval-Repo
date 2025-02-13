@@ -13,7 +13,7 @@
 import os
 import sys
 import json
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional, List
 import re
 
 # local imports
@@ -70,8 +70,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
         self._dependency_agent = DependencyAgent(generator=self,
                                                  interactions_path=interactions_path)
+        lang = "c" if self._dst_config["filename_desc"] == "C" else "cpp"
         self._chunk_file_agent = ChunkFileAgent(generator=self,
-                                                interactions_path=interactions_path)
+                                                interactions_path=interactions_path,
+                                                language=lang)
         self._context_agent = ContextAgent(generator=self,
                                            interactions_path=interactions_path,
                                            output_fpath=self._output_fpath)
@@ -178,21 +180,28 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """ Use the top-down method to translate the entire repository.
         """
         print(f"Constructing dependency graph on {self._input_repo.path}...")
-        dep_tree = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
-        max_cols = self._safe_get_columns()
+        dep_graph = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
 
-        # walk down the tree and translate each file
-        for node in alive_it(dep_tree,
+        # Create target version of dep_graph by renaming filenames in copy of dep_graph
+        target_dep_graph = DependencyAgent.make_target_graph(dep_graph,
+                                                             self._update_output_file_extension)
+
+        # walk down the graph and translate each file
+        max_cols = self._safe_get_columns()
+        for node in alive_it(dep_graph,
                              title="Translating files",
                              max_cols=max_cols,
                              disable=self._hide_progress):
-            self._translate_node(node)
+            if node.filetype == FileType.BUILD:
+                self._translate_node(node, graph=target_dep_graph)
+            else:
+                self._translate_node(node)
 
         # dump experiment metadata
         self._write_metadata(os.path.join(self._output_fpath, "repo"))
 
-    def _translate_node(self, node: FileNode):
-        """ Translate a single file node using context from its parents.
+    def _translate_node(self, node: FileNode, graph: Optional[List[FileNode]] = None):
+        """ Translate a single file node using context from its dependencies.
         """
         print(f"Translating file {node.rel_path}...")
 
@@ -200,25 +209,34 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         source_code = self._read_file(node.rel_path)
 
         # get the context from the parent nodes
-        context = self._context_agent.get_context(node.parents, node, self._dst_model)
+        context = self._context_agent.get_context(node.dependencies, node, self._dst_model)
 
         # translate the source code; if it's too long use the chunk file agent
         # to translate it in parts
-        if len(source_code) > 4096:
-            node_abspath = os.path.abspath(os.path.join(self._input_repo.path, node.rel_path))
-            chunks = self._chunk_file_agent.chunk_file(source_code, node_abspath)
-            translation = ""
-            for chunk in chunks:
-                translation += self._postprocess(self._get_translation(context, chunk, node))
+        chunks = self._chunk_file_agent.chunk_file(source_code)
+        if len(chunks) == 1:
+            translation = self._postprocess(self._get_translation(context, chunks[0], node, graph))
         else:
-            translation = self._postprocess(self._get_translation(context, source_code, node))
+            translation = ""
+            prev_chunk = ""
+            for chunk in chunks:
+                chunk_translation = self._postprocess(self._get_translation(context,
+                                                                            chunk,
+                                                                            node,
+                                                                            graph,
+                                                                            prev_chunk=prev_chunk))
+                translation += chunk_translation + "\n"
+                prev_chunk = chunk_translation
 
         # write the translation to the output repo
         self._write_file(node.rel_path, translation)
 
 
-    def _get_translation(self, context: str, source_code: str, file: FileNode) -> str:
-        """ Get the translation for a region of code using the provided context. """
+    def _get_translation(self, context: str, source_code: str, file: FileNode, \
+                         graph: Optional[List[FileNode]] = None, \
+                         prev_chunk: Optional[str] = "") -> str:
+        """ Get the translation for a region of code using the provided context.
+        """
         prompt_config_src = self._input_repo.get_meta_dict()
         prompt_config_dst = self._dst_config
         filename = file.rel_path
@@ -235,6 +253,12 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             filename_desc=filename_desc
         )
 
+        if prev_chunk != "":
+            prompt += ("\n" + ac.CHUNK_ADDENDUM.format(
+                prev_chunk=prev_chunk,
+                src_model=self._src_model,
+                dst_model=self._dst_model))
+
         if filename == prompt_config_src["main_filename"]:
             prompt += ("\n" + ac.MAIN_ADDENDUM.format(
                 ex_run_cmd=prompt_config_dst["ex_run_cmd"],
@@ -246,7 +270,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 exts=exts_str,
                 filename_desc=filename_desc,
                 ex_build_cmd=prompt_config_dst["ex_build_cmd"],
-                ex_build_desc=prompt_config_dst["ex_build_desc"]))
+                ex_build_desc=prompt_config_dst["ex_build_desc"],
+                dep_graph=DependencyAgent.graph_to_str(graph)))
 
         print("Requesting file translation...")
 

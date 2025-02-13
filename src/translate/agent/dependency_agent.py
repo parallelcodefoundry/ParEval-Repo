@@ -36,11 +36,11 @@ class FileNode:
     """
 
     rel_path: str
-    dependencies: List['FileNode'] = []
-    parents: List['FileNode'] = []
+    dependencies: List['FileNode'] = [] # Files this file depends on
+    dependents: List['FileNode'] = []   # Files that depend on this file
     filetype: FileType = FileType.OTHER
 
-    def __init__(self, rel_path: str = "", filetype: FileType = FileType.OTHER):
+    def __init__(self, rel_path: str = "", filetype: FileType = None):
         self.rel_path = rel_path
         if filetype:
             self.filetype = filetype
@@ -55,9 +55,11 @@ class FileNode:
             return FileType.SOURCE
         if ext in [".h", ".H", ".hh", ".hpp", ".cuh"]:
             return FileType.HEADER
-        if ext in ["Makefile", "CMakeLists.txt"]:
+        if ext in [".make"] \
+           or any(name in self.rel_path for name in ["Makefile", "CMakeLists.txt"]):
             return FileType.BUILD
-        if ext in ["README", "LICENSE"]:
+        if ext in [".txt", ".md"] \
+           or any(name in self.rel_path for name in ["README", "LICENSE", "INSTALL"]):
             return FileType.METADATA
         return FileType.OTHER
 
@@ -66,6 +68,11 @@ class FileNode:
         """ Get the basename of the file.
         """
         return os.path.basename(self.rel_path)
+
+    def format(self) -> str:
+        """ Format the file node as a string.
+        """
+        return f"{self.rel_path} depends on {[dep.rel_path for dep in self.dependencies]}"
 
 
 class DependencyAgent:
@@ -138,11 +145,13 @@ class DependencyAgent:
             return True
         return False
 
+
     def get_cpp_source_file_dependencies(self, source_file: os.PathLike,
                                          repo_path: os.PathLike) -> Union[List[str], None]:
         """ Uses clang -MM to generate a dependency file on stdout. Parse this file
             and return dependencies.
         """
+        # TODO: missing caller/callee relation!
         print(f"Getting dependencies for {source_file} using clang -MM")
         ext = os.path.splitext(source_file)[1]
 
@@ -269,7 +278,7 @@ class DependencyAgent:
         try:
             sorted_files = list(ts.static_order())
         except CycleError:
-            # todo: handle cycles better, for now just sort by length of
+            # TODO: handle cycles better, for now just sort by length of
             # dependencies. Possible solution is to remove the cycle, sort, then
             # append removed nodes
             sorted_files = dict(sorted(dependencies.items()), key=lambda x: len(x[1]))
@@ -279,9 +288,35 @@ class DependencyAgent:
             node = FileNode(source_file)
             node.dependencies = [FileNode(dep) for dep in dependencies[source_file]]
             for dep in node.dependencies:
-                dep.parents.append(node)
+                dep.dependents.append(node)
             roots.append(node)
 
         print(f"Constructed dependency graph with {len(roots)} roots")
         print(f"Roots: {[root.rel_path for root in roots]}")
         return roots
+
+
+    @staticmethod
+    def make_target_graph(old_graph: List[FileNode],
+                          path_update_fn: callable) -> List[FileNode]:
+        """ Make a new graph from the old graph using the path update function.
+        """
+        new_graph = []
+        for node in old_graph:
+            new_node = FileNode(path_update_fn(node.rel_path))
+            new_node.dependencies = [FileNode(path_update_fn(dep.rel_path))
+                                     for dep in node.dependencies]
+            for dep in new_node.dependencies:
+                dep.dependents.append(new_node)
+            new_graph.append(new_node)
+        return new_graph
+
+
+    @staticmethod
+    def graph_to_str(graph: List[FileNode]) -> str:
+        """ Format the graph using each node's format function.
+        """
+        formatted = []
+        for node in graph:
+            formatted.append(node.format())
+        return "\n".join(formatted)
