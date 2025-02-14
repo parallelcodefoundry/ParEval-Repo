@@ -4,7 +4,6 @@ import subprocess
 import time
 from argparse import ArgumentParser
 
-
 """Collect arguments from the test_swe-agent_translator.sh script"""
 def get_args():
    parser = ArgumentParser(description="Run SWE-agent with a temporary repo and output handling")
@@ -15,7 +14,6 @@ def get_args():
    parser.add_argument("--problem_statement_path", type=str, required=True, help="Path to the problem statement file")
    parser.add_argument("--output_dir", type=str, required=True, help="Path to save the translated output")
    return parser.parse_args()
-
 
 """Copy the contents of the original repository to a new temporary repository and initialize Git"""
 def initialize_temp_repo(original_repo_path, temp_repo_path):
@@ -33,7 +31,6 @@ def initialize_temp_repo(original_repo_path, temp_repo_path):
    subprocess.run(["git", "add", "."], cwd=temp_repo_path, check=True)
    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=temp_repo_path, check=True)
 
-
 """Run the SWE-agent command on the temporary repository"""
 def run_sweagent(args, temp_repo_path):
    # SWE-agent command which will use test_swe-agent_translator.sh script's arguments in terminal
@@ -46,9 +43,7 @@ def run_sweagent(args, temp_repo_path):
        f"--problem_statement.path={args.problem_statement_path}"
    ]
 
-
    print(f"Running command: {' '.join(command)}")
-
 
    try:
        # Runs the SWE-agent command
@@ -59,12 +54,10 @@ def run_sweagent(args, temp_repo_path):
            time.sleep(20)
            print("Applying patch...")
 
-
            # The trajectories folder which is created at runtime by SWE-agent. It contains the patch file.
            trajectories_dir = "/Users/ishan/pssg/tmp/temp_sweagent_repo/trajectories/ishan"
            # The new patch which the patch file will be renamed to
            new_patch_path = None
-
 
            # Finds the path of the patch file
            def find_patch_file(trajectories_dir):
@@ -78,7 +71,6 @@ def run_sweagent(args, temp_repo_path):
           
            old_patch_path = find_patch_file(trajectories_dir)
 
-
            # If the old patch path is found, rename the old patch path to the new patch path
            if old_patch_path is None:
                print("Error: No patch file found in trajectories directory.")
@@ -87,17 +79,10 @@ def run_sweagent(args, temp_repo_path):
                new_patch_path = "/Users/ishan/pssg/tmp/temp_sweagent_repo/temp.patch"
                os.rename(old_patch_path, new_patch_path)
 
-
-               # # Add the patch file to Git in the temp repo
-               # subprocess.run(["git", "add", "-A"], cwd=temp_repo_path, check=True)
-               # subprocess.run(["git", "commit", "-m", "Added patch file"], cwd=temp_repo_path, check=True)
-
-
            time.sleep(10)
            # Clears the unnecessary whitespace of the patch file
            subprocess.run(["sed", "-i", "", "s/[ \t]*$//", new_patch_path], check=True, cwd=temp_repo_path) # update regex if needed
            print('Cleared up the whitespace of the patch file')
-
 
            time.sleep(10)
           
@@ -110,7 +95,6 @@ def run_sweagent(args, temp_repo_path):
                time.sleep(20)
                return False
 
-
            return True
       
        else:
@@ -118,11 +102,9 @@ def run_sweagent(args, temp_repo_path):
            # print the subprocess return code
            return False
 
-
    except Exception as e:
        print(f"An error occurred: {e}")
        return False
-
 
 """Copy the contents of the temporary repository to the output directory"""
 def save_output(temp_repo_path, output_dir):
@@ -132,16 +114,13 @@ def save_output(temp_repo_path, output_dir):
    shutil.copytree(temp_repo_path, output_dir, dirs_exist_ok=True)
    subprocess.run(f"rm -rf {args.output_dir}/.git", shell=True, check=True)
 
-
 if __name__ == "__main__":
    args = get_args()
-
 
    temp_repo_path = "/Users/ishan/pssg/tmp/temp_sweagent_repo"
   
    print("Initializing temporary Git repository...")
    initialize_temp_repo(args.repo_path, temp_repo_path)
-
 
    try:
        if run_sweagent(args, temp_repo_path):
@@ -150,13 +129,8 @@ if __name__ == "__main__":
            print("Translation failed. No output saved.")
        save_output(temp_repo_path, args.output_dir)
 
-
    finally:
        print("Cleaning up temporary repository...")
        if os.path.exists(temp_repo_path):
            shutil.rmtree(temp_repo_path)
        print("Temporary repository cleaned up.")
-
-
-       # subprocess.run(["git", "add", "-A"], check=True)
-       # subprocess.run(["git", "commit", "-m", "Added " + args.output_dir], check=True)
