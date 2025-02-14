@@ -215,11 +215,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         # to translate it in parts
         chunks = self._chunk_file_agent.chunk_file(source_code)
         if len(chunks) == 1:
+            print("Requesting whole file translation...")
             translation = self._postprocess(self._get_translation(context, chunks[0], node, graph))
         else:
             translation = ""
             prev_chunk = ""
             for chunk in chunks:
+                print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
                 chunk_translation = self._postprocess(self._get_translation(context,
                                                                             chunk,
                                                                             node,
@@ -272,7 +274,5 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 ex_build_cmd=prompt_config_dst["ex_build_cmd"],
                 ex_build_desc=prompt_config_dst["ex_build_desc"],
                 dep_graph=DependencyAgent.graph_to_str(graph)))
-
-        print("Requesting file translation...")
 
         return self.generate(prompt)
