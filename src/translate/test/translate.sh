@@ -17,14 +17,14 @@ run_translate () {
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
             --config ../../../targets/${application}/kokkos \
-            --output ../../../../code-translation-results/${application}/${method}-${llm_version}-cuda-to-kokkos \
+            --output ../../../../code-translation-results/${application}/${method}-${llm_version}-cuda-to-omp \
             --output-id ${iter} \
             --app-name ${application} \
             --method ${method} \
             --${method}-backend ${llm_backend} \
             --${method}-llm-name ${llm_version} \
             --src-model cuda \
-            --dst-model kokkos \
+            --dst-model openmp-offload \
             --log-interactions \
             -f
     if [ $? -ne 0 ]; then
