@@ -1,9 +1,0 @@
-{
-    "app": "simplemoc-kernel",
-    "prompt_strategy": "naive",
-    "llm_name": "gemini",
-    "source_model": "cuda",
-    "target_model": "omp",
-    "output_number": "3",
-    "path": "../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-3"
-}
