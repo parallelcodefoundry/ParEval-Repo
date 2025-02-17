@@ -16,7 +16,7 @@ run_translate () {
     iter=$5
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
-            --config ../../../targets/${application}/kokkos \
+            --config ../../../targets/${application}/openmp-offload \
             --output ../../../../code-translation-results/${application}/${method}-${llm_version}-cuda-to-omp \
             --output-id ${iter} \
             --app-name ${application} \
