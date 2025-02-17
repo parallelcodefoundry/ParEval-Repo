@@ -13,7 +13,7 @@ import contextlib
 import shutil
 
 # tpl imports
-from tqdm import tqdm
+from alive_progress import alive_bar
 import pandas as pd
 import tempfile
 
@@ -29,7 +29,7 @@ def get_args():
     parser.add_argument("--scratch-dir", type=str, default="scratch", help="If provided, put scratch files here.")
     parser.add_argument("--save-temps", type=str, help="If provided, save temporary files to the provided directory.")
     parser.add_argument("-a", "--apps", nargs="+", type=str, help="List of applications to run, case-insensitive.")
-    parser.add_argument("-m", "--models", nargs="+", type=str, help="List of dest execution models to run, case-insensitive.", choices=["omp"])
+    parser.add_argument("-m", "--models", nargs="+", type=str, help="List of dest execution models to run, case-insensitive.", choices=["openmp-offload", "kokkos"])
     parser.add_argument("-y", "--yes-to-all", action="store_true", help="If provided, automatically answer yes to all prompts.")
     parser.add_argument("-d", "--dry", action="store_true", help="Dry run. Do not actually compile or run the code repositories.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="If outputs are already in DB for a given prompt, then overwrite them. Default behavior is to skip existing results.")
@@ -83,8 +83,8 @@ def gather_code_repos(args, results):
                 exp_meta_path = os.path.join(case_path, "experiment_metadata.json")
                 repo_path = os.path.join(case_path, "repo")
                 if not os.path.isfile(exp_meta_path):
-                    logging.error(f"Could not find experiment_metadata.json for {case_name} under {case_path}.")
-                    raise FileNotFoundError(f"Could not find experiment_metadata.json for {case_name} under {case_path}.")
+                    logging.info(f"Could not find experiment_metadata.json for {case_name} under {case_path}, skipping.")
+                    continue
                 if not os.path.isdir(repo_path):
                     logging.error(f"Could not find repo for {case_name} under {case_path}.")
                     raise FileNotFoundError(f"Could not find repo for {case_name} under {case_path}.")
@@ -95,6 +95,9 @@ def gather_code_repos(args, results):
                     if args.models and exp_meta["dest_model"].lower() not in [s.lower() for s in args.models]:
                         logging.debug(f"Skipping {case_path}/{case_name} because dest model {exp_meta['dest_model']} not in {args.models}.")
                         continue
+
+                    # Clean up the path in the experiment metadata
+                    exp_meta["path"] = repo_path
 
                     prompt_strategy = exp_meta["prompt_strategy"]
                     llm_name = exp_meta["llm_name"]
@@ -193,37 +196,45 @@ def main():
         "run_results_debug": [],
         "run_exec_checks_debug": [],
         "run_stdouts_debug": [],
-        "run_stderrs_debug": []
+        "run_stderrs_debug": [],
+        "tempdir_path": []
     }
 
     # Gather all the code repositories
     code_repos = gather_code_repos(args, results)
 
     # Build and run each code repository
-    pbar = tqdm(total=len(code_repos)*2, desc="Building and running code repositories", disable=args.hide_progress)
-    for code_repo in code_repos:
-        with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
-            logging.debug(f"Temporary directory created: {tempdir}")
-            setup_tempdir(tempdir, code_repo)
+    try:
+        max_cols = os.get_terminal_size().columns
+    except OSError as error:
+        if error.errno == 25:
+            max_cols = 80
+        else:
+            raise error
+    with alive_bar(len(code_repos)*2, title="Building and running code repositories", max_cols=max_cols, disable=args.hide_progress) as pbar:
+        for code_repo in code_repos:
+            with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
+                logging.debug(f"Temporary directory created: {tempdir}")
+                setup_tempdir(tempdir, code_repo)
 
-            logging.debug(f"Building code repository: {code_repo['path']}")
-            results_row = build_repo(code_repo, system_config, args, tempdir)
-            update_results(results, results_row)
-            pbar.update(1)
+                logging.debug(f"Building code repository: {code_repo['path']}")
+                results_row = build_repo(code_repo, system_config, args, tempdir)
+                update_results(results, results_row)
+                pbar()
 
-            logging.debug(f"Running code repository: {code_repo['path']}")
-            results_row = run_repo(code_repo, system_config, args, tempdir)
-            update_results(results, results_row)
+                logging.debug(f"Running code repository: {code_repo['path']}")
+                results_row = run_repo(code_repo, system_config, args, tempdir)
 
-            # Copy temporary directory to save_temps if provided
-            if args.save_temps:
-                tempdir_name = os.path.basename(tempdir)
-                tempdir_path = os.path.join(args.save_temps, tempdir_name)
-                logging.info(f"Saving temporary directory to {tempdir_path}.")
-                shutil.copytree(tempdir, tempdir_path)
+                # Copy temporary directory to save_temps if provided
+                if args.save_temps:
+                    tempdir_name = os.path.basename(tempdir)
+                    tempdir_path = os.path.join(args.save_temps, tempdir_name)
+                    logging.info(f"Saving temporary directory to {tempdir_path}.")
+                    shutil.copytree(tempdir, tempdir_path)
+                    results_row["tempdir_path"] = str(tempdir_path)
 
-            pbar.update(1)
-    pbar.close()
+                update_results(results, results_row)
+                pbar()
 
     # Convert results dict to dataframe
     results_df = pd.DataFrame.from_dict(results)

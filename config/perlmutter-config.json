@@ -2,6 +2,7 @@
     "gnu": "module load PrgEnv-gnu",
     "llvm": "module load PrgEnv-llvm",
     "cuda": "module load cudatoolkit",
+    "kokkos": "module load kokkos-gpu",
     "sm": "80",
     "exec_check": "ncu",
     "exec_check_fail_text": "==WARNING== No kernels were profiled."
