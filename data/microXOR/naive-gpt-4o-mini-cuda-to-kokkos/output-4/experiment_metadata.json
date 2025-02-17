@@ -1,9 +1,0 @@
-{
-    "app": "microXOR",
-    "prompt_strategy": "naive",
-    "llm_name": "gpt-4o-mini",
-    "source_model": "cuda",
-    "dest_model": "kokkos",
-    "output_number": 4,
-    "path": "../../../data/microXOR/naive-gpt-4o-mini-cuda-to-kokkos/output-4/repo"
-}
