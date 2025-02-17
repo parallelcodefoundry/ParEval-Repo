@@ -7,7 +7,7 @@ import sys
 import re
 import json
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Tuple, Union
 
 # tpl imports
 from alive_progress import alive_it

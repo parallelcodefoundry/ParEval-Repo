@@ -1,7 +1,7 @@
 import os
 from typing import List
 from generator_mixin import GeneratorMixin
-from agent.dependency_agent import FileNode
+from restate.dependency_agent import FileNode
 
 class ContextAgent:
 
