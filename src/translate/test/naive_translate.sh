@@ -3,7 +3,7 @@ if [ "$#" -eq 1 ]; then
     echo "Running all experiments for ${llm_version}"
     for application in "microXOR" "XSBench" "SimpleMOC-kernel" "llm.c"; do
         for iter in {1..5}; do
-            python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/kokkos --output ../../../data/${application}/naive-${llm_version}-cuda-to-kokkos --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model kokkos --log-interactions -f
+            python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/kokkos --output ../../../../code-translation-results/${application}/naive-${llm_version}-cuda-to-kokkos --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model kokkos --log-interactions -f
             sleep 15
         done
     done
@@ -12,7 +12,7 @@ elif [ "$#" -eq 2 ]; then
     application=$2
     echo "Running all experiments for ${llm_version} and ${application}"
     for iter in {1..5}; do
-        python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/kokkos --output ../../../data/${application}/naive-${llm_version}-cuda-to-kokkos --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model kokkos --log-interactions -f
+        python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/kokkos --output ../../../../code-translation-results/${application}/naive-${llm_version}-cuda-to-kokkos --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model kokkos --log-interactions -f
         sleep 15
     done
 elif [ "$#" -eq 3 ]; then
@@ -20,7 +20,7 @@ elif [ "$#" -eq 3 ]; then
     application=$2
     iter=$3
     echo "Running one experiment for ${llm_version} and ${application}, output ID ${iter}"
-    python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/kokkos --output ../../../data/${application}/naive-${llm_version}-cuda-to-kokkos --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model kokkos --log-interactions -f
+    python3 ../translate.py --input ../../../targets/${application}/cuda --config ../../../targets/${application}/kokkos --output ../../../../code-translation-results/${application}/naive-${llm_version}-cuda-to-kokkos --output-id ${iter} --app-name ${application} --method naive --naive-llm ${llm_version} --src-model cuda --dst-model kokkos --log-interactions -f
 else
     echo "Usage: naive_translate.sh [llm_version] [application] [outputid]"
     exit 1
