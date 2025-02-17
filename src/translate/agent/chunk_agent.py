@@ -17,7 +17,7 @@ class ChunkFileAgent:
 
     AVG_CHAR_PER_TOKEN = 3.5
 
-    def __init__(self, generator: GeneratorMixin, max_tokens: int = 1024,
+    def __init__(self, generator: GeneratorMixin, max_tokens: int = 2048,
                  interactions_path: os.PathLike = None, language: str = 'c'):
         self._generator = generator
         self._max_tokens = max_tokens
