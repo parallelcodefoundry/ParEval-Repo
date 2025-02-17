@@ -1,9 +1,0 @@
-{
-    "app": "SimpleMOC-kernel",
-    "prompt_strategy": "naive",
-    "llm_name": "gemini",
-    "source_model": "cuda",
-    "dest_model": "openmp-offload",
-    "output_number": 3,
-    "path": "../../../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-3/repo"
-}
