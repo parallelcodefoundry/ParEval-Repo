@@ -1,0 +1,31 @@
+{
+    "app": "simplemoc-kernel",
+    "model": "kokkos",
+    "path": "targets/SimpleMOC-kernel/kokkos/repo",
+    "dependencies": ["gnu", "cuda", "kokkos"],
+    "build_commands_debug": "cd include/ && cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -Bbuild . && cmake --build build/",
+    "build_commands_perf": "cd include/ && cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -Bbuild . && cmake --build build/",
+    "build_timeout": 30,
+    "exe_file": "include/build/SimpleMOC-kernel",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "include/build/SimpleMOC-kernel"
+    ],
+    "debug_outputs": [
+        "Simulation Complete."
+    ],
+    "run_commands_perf": [
+        "include/build/SimpleMOC-kernel"
+    ],
+    "perf_outputs": [
+        "Simulation Complete."
+    ],
+    "run_timeout": 120,
+    "ex_build_cmd": "cd include/ && cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -Bbuild . && cmake --build build/",
+    "ex_build_desc": "the Kokkos CUDA backend, targeting a system with an NVIDIA GPU, compiled with g++ as the host compiler, with Kokkos and CUDA installed and available in the environment through $PATH and $LD_LIBRARY_PATH",
+    "build_filename": "include/CMakeLists.txt",
+    "ex_run_cmd": "include/build/SimpleMOC-kernel",
+    "ex_run_desc": "a test run of the SimpleMOC-kernel on an NVIDIA GPU",
+    "main_filename": "include/main.cpp",
+    "filename_desc": "C++"
+}
