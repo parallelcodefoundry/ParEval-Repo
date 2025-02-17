@@ -60,7 +60,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             src_model=self._src_model,
             dst_model=self._dst_model)
 
-        GeneratorMixin.__init__(self, backend, llm_name, rpm_limit=10)
+        GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt)
 
         interactions_path = None
         if self._log_interactions:
@@ -83,10 +83,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
         """ Add arguments for the top-down agent translation method.
         """
-        parser.add_argument("--agent-backend",
+        parser.add_argument("--restate-backend",
                             choices=["openai", "gemini", "hf", "local"],
                             default="openai", help="The backend to use for translation.")
-        parser.add_argument("--agent-llm-name",
+        parser.add_argument("--restate-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
 
     @staticmethod
@@ -94,8 +94,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """ Parse the arguments for the top-down agent translation method.
         """
         return {
-            "backend": args.agent_backend,
-            "llm_name": args.agent_llm_name
+            "backend": args.restate_backend,
+            "llm_name": args.restate_llm_name
         }
 
     def _safe_get_columns(self) -> int:
@@ -157,6 +157,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             f.write(contents)
         print(f"Wrote file {output_file_path}")
 
+
     def _write_metadata(self, repo_fpath: os.PathLike):
         """ Write out experiment_metadata.json adjacent to repo path.
         """
@@ -176,11 +177,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
 
+
     def _log_interaction(self, response: str):
         """ Log the raw LLM output to a text file.
         """
         with open(self._interactions_path, 'a', encoding="UTF-8") as f:
             f.write(response + "\n")
+
 
     # override
     def translate(self):
@@ -206,6 +209,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
         # dump experiment metadata
         self._write_metadata(os.path.join(self._output_fpath, "repo"))
+
 
     def _translate_node(self, node: FileNode, graph: Optional[List[FileNode]] = None):
         """ Translate a single file node using context from its dependencies.

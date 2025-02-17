@@ -58,7 +58,7 @@ class GeneratorMixin:
         self._disable_request_cache = disable_request_cache
 
         if self._backend not in ["openai", "gemini", "hf", "local"]:
-            raise ValueError("Invalid backend specified.")
+            raise ValueError(f"Invalid backend specified: '{self._backend}'")
 
         if self._backend == "openai":
             from openai import OpenAI
@@ -77,7 +77,7 @@ class GeneratorMixin:
                                                         system_instruction=self._system_prompt)
             self._generator = self._generate_gemini
             if self._rpm_limit is None:
-                self._rpm_limit = 15
+                self._rpm_limit = 10
             if self._tpm_limit is None:
                 self._tpm_limit = 6144
         elif self._backend == "hf":
