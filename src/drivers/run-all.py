@@ -79,6 +79,9 @@ def parse_metadata(args: ArgumentParser, exp_meta: Dict[str, str],
         metadata_found["apps_found"].append(app)
 
     dest_model = exp_meta["dest_model"]
+    if dest_model == "omp":
+        dest_model = "openmp-offload"
+        exp_meta["dest_model"] = "openmp-offload"
     if args.models and dest_model.lower() not in [s.lower() for s in args.models]:
         logging.debug(f"Skipping {dest_model} because it is not in {args.models}.")
         return None
