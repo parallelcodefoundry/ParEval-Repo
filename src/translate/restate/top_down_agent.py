@@ -171,8 +171,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
                 "output_number": int(repo_fpath.split("/")[-2][7:]),
-                # todo: consider dropping the output_number field
-                "path": repo_fpath
+                "path": repo_fpath,
+                "inference_stats": self.get_stats()
             }
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")

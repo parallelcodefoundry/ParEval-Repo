@@ -242,6 +242,10 @@ class GeneratorMixin:
         """
         return self._request_count
 
+    def get_stats(self) -> Tuple[int, int, int]:
+        """ Return the current statistics for the generator.
+        """
+        return self._input_token_count, self._output_token_count, self._request_count
 
     def print_stats(self):
         """ Print the current statistics for the generator.
