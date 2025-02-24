@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 import time
+import json
 from argparse import ArgumentParser
 
 """Collect arguments from the test_swe-agent_translator.sh script"""
@@ -13,6 +14,7 @@ def get_args():
    parser.add_argument("--deployment_image", type=str, required=True, help="Deployment image name")
    parser.add_argument("--problem_statement_path", type=str, required=True, help="Path to the problem statement file")
    parser.add_argument("--output_dir", type=str, required=True, help="Path to save the translated output")
+   parser.add_argument("--output_id", type=int, required=True, help="Output ID for the translation task")
    return parser.parse_args()
 
 """Copy the contents of the original repository to a new temporary repository and initialize Git"""
@@ -114,6 +116,27 @@ def save_output(temp_repo_path, output_dir):
    shutil.copytree(temp_repo_path, output_dir, dirs_exist_ok=True)
    subprocess.run(f"rm -rf {args.output_dir}/.git", shell=True, check=True)
 
+"""Generates the experiment metadata JSON file"""
+def write_experiment_metadata(args):
+    exp_meta_fpath = os.path.join(args.output_dir, "experiment_metadata.json")
+    os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
+
+    app_name = os.path.basename(args.repo_path)
+
+    with open(exp_meta_fpath, 'w') as f:
+        exp_meta_dict = {
+            "app": app_name,
+            "prompt_strategy": ["SWE", "agent"],
+            "llm_name": args.agent_model_name,
+            "source_model": "cuda",
+            "dest_model": "omp",
+            "output_number": args.output_id,
+            "path": args.output_dir
+        }
+        json.dump(exp_meta_dict, f, indent=4)
+
+    print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
+
 if __name__ == "__main__":
    args = get_args()
 
@@ -128,6 +151,7 @@ if __name__ == "__main__":
        else:
            print("Translation failed. No output saved.")
        save_output(temp_repo_path, args.output_dir)
+       write_experiment_metadata(args)
 
    finally:
        print("Cleaning up temporary repository...")
