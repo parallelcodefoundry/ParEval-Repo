@@ -12,7 +12,7 @@ import logging
 import shutil
 import tempfile
 import sys
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 # tpl imports
 from alive_progress import alive_bar
@@ -42,6 +42,8 @@ def get_args() -> ArgumentParser:
                         choices=["openmp-offload", "kokkos"])
     parser.add_argument("-p", "--prompt-strategies", nargs="+", type=str,
                         help="List of prompt strategies to run, case-insensitive.")
+    parser.add_argument("--skip-build-swap", action="store_true",
+                        help="If provided, do not retry failed builds with ground truth build system file.")
     parser.add_argument("-y", "--yes-to-all", action="store_true",
                         help="If provided, automatically answer yes to all prompts.")
     parser.add_argument("-d", "--dry", action="store_true",
@@ -240,6 +242,43 @@ def startup_from_args(args: ArgumentParser) -> os.PathLike:
     return scratch
 
 
+def save_temps(tempdir: os.PathLike, args: ArgumentParser, results_row: Dict[str, str]):
+    ''' Save temporary files to the provided directory.
+    '''
+    tempdir_name = os.path.basename(tempdir)
+    tempdir_path = os.path.join(args.save_temps, tempdir_name)
+    logging.info(f"Saving temporary directory to {tempdir_path}.")
+    shutil.copytree(tempdir, tempdir_path)
+    results_row["tempdir_path"] = str(tempdir_path)
+
+
+def process_repo(code_repo: Dict[str, str], results: Dict[str, List], system_config: Dict[str, str],
+                 args: ArgumentParser, scratch: os.PathLike, pbar: alive_bar,
+                 ground_truth_build: Optional[bool] = False) -> Dict[str, str]:
+    ''' Build and run the code repository.
+    '''
+    with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
+        logging.debug(f"Temporary directory created: {tempdir}")
+        setup_tempdir(tempdir, code_repo)
+
+        logging.debug(f"Building code repository: {code_repo['path']}")
+        results_row = build_repo(code_repo, system_config, args, tempdir,
+                                 ground_truth_build=ground_truth_build)
+        update_results(results, results_row)
+        pbar()
+
+        logging.debug(f"Running code repository: {code_repo['path']}")
+        results_row = run_repo(code_repo, system_config, args, tempdir)
+
+        # Copy temporary directory to save_temps if provided
+        if args.save_temps:
+            save_temps(tempdir, args, results_row)
+
+        update_results(results, results_row)
+        pbar()
+    return results_row
+
+
 def main():
     ''' Main function.
     '''
@@ -277,29 +316,14 @@ def main():
 
     # Build and run each code repository
     max_cols = safe_get_cols()
-    with alive_bar(len(code_repos)*2, title="Building and running code repositories", max_cols=max_cols, disable=args.hide_progress) as pbar:
+    with alive_bar(len(code_repos)*4, title="Building and running code repositories", max_cols=max_cols, disable=args.hide_progress) as pbar:
         for code_repo in code_repos:
-            with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
-                logging.debug(f"Temporary directory created: {tempdir}")
-                setup_tempdir(tempdir, code_repo)
+            results_row = process_repo(code_repo, results, system_config, args, scratch, pbar)
 
-                logging.debug(f"Building code repository: {code_repo['path']}")
-                results_row = build_repo(code_repo, system_config, args, tempdir)
-                update_results(results, results_row)
+            if not args.skip_build_swap and results_row["build_result_debug"] != "0":
+                process_repo(code_repo, results, system_config, args, scratch, pbar, ground_truth_build=True)
+            else:
                 pbar()
-
-                logging.debug(f"Running code repository: {code_repo['path']}")
-                results_row = run_repo(code_repo, system_config, args, tempdir)
-
-                # Copy temporary directory to save_temps if provided
-                if args.save_temps:
-                    tempdir_name = os.path.basename(tempdir)
-                    tempdir_path = os.path.join(args.save_temps, tempdir_name)
-                    logging.info(f"Saving temporary directory to {tempdir_path}.")
-                    shutil.copytree(tempdir, tempdir_path)
-                    results_row["tempdir_path"] = str(tempdir_path)
-
-                update_results(results, results_row)
                 pbar()
 
     # Convert results dict to dataframe
