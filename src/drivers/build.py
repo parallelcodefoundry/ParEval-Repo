@@ -18,11 +18,12 @@ def run_setup(repo_data, target_config, args, tempdir):
     return setup_result
 
 
-def prepare_result_dict(repo_data, run_result):
+def prepare_result_dict(repo_data, run_result, ground_truth_build):
     ''' Create a result dict from a bash run result.
     '''
     result = {}
     result["path"] = repo_data["path"]
+    result["ground_truth_build"] = ground_truth_build
     result["build_result_debug"] = run_result.returncode
     result["build_stdout_debug"] = run_result.stdout
     result["build_stderr_debug"] = run_result.stderr
@@ -34,11 +35,12 @@ def prepare_ground_truth_build(args, tempdir, target_config):
     '''
     build_fname = target_config["build_filename"]
     gen_build_fname = os.path.join(tempdir, build_fname)
-    true_build_fname = os.path.join(args.target_path, target_config["path"],
+    true_build_fname = os.path.join(os.path.dirname(os.path.dirname(args.target_path)),
+                                    target_config["path"],
                                     build_fname)
-    shutil.copyfile(true_build_fname, gen_build_fname)
-    logging.debug(f"Rewrote build file {gen_build_fname} with ground " +
+    logging.debug(f"Rewriting build file {gen_build_fname} with ground " +
                   f"truth build file {true_build_fname}.")
+    shutil.copyfile(true_build_fname, gen_build_fname)
 
 
 def log_build_result(repo_data, build_result, args):
@@ -67,7 +69,7 @@ def build_repo(repo_data, system_config, args, tempdir, ground_truth_build = Fal
         if setup_result.returncode != 0:
             logging.error(f"Setup failed for {repo_data['app']} with model " +
                           f"{repo_data['dest_model']}.")
-            result = prepare_result_dict(repo_data, setup_result)
+            result = prepare_result_dict(repo_data, setup_result, ground_truth_build)
             return result
 
     # Get cmds from system, target config
@@ -91,6 +93,6 @@ def build_repo(repo_data, system_config, args, tempdir, ground_truth_build = Fal
     log_build_result(repo_data, build_result, args)
 
     # Create build result dict to return
-    result = prepare_result_dict(repo_data, build_result)
+    result = prepare_result_dict(repo_data, build_result, ground_truth_build)
 
     return result

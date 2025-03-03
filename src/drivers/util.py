@@ -102,7 +102,7 @@ def update_results(results, results_row):
     # Update the results dict with the results row
     for key, value in results_row.items():
         if key in results:
-            if results[key][row_idx] is None:
+            if results[key][row_idx] is None or results_row["ground_truth_build"]:
                 results[key][row_idx] = value
             elif results[key][row_idx] != value:
                 logging.error(f"Key already has a non-matching value in results, {results[key][row_idx]} != {value}.")
