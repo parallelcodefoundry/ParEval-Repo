@@ -1,5 +1,5 @@
 *.o
-microXOR.exe
+*.exe
 a.out
 *.bin
 
