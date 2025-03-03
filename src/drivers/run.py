@@ -30,6 +30,42 @@ def check_exec(repo_data, target_config, system_config, i, args, tempdir):
         logging.debug(f"No execution check specified in {args.system_config}.")
     return 0
 
+
+def prepare_result_dict(repo_data, run_results, run_exec_checks, run_stdouts, run_stderrs):
+    ''' Create a result dict from a bash run result.
+    '''
+    result = {}
+    result["path"] = repo_data['path']
+    result["run_results_debug"] = run_results
+    result["run_exec_checks_debug"] = run_exec_checks
+    result["run_stdouts_debug"] = run_stdouts
+    result["run_stderrs_debug"] = run_stderrs
+    return result
+
+
+def log_run_result(repo_data, run_result, args):
+    ''' Log the run result.
+    '''
+    if run_result.returncode != 0:
+        logging.debug(f"Run failed for {repo_data['app']} with model " +
+                      f"{repo_data['dest_model']} test {i}.")
+        if args.log_run_errors:
+            logging.info(f"Run error: {run_result.stderr}")
+    else:
+        logging.debug(f"Run succeeded for {repo_data['app']} with model " +
+                      f"{repo_data['dest_model']} test {i}.")
+
+
+def save_run_result(run_result, exec_check, run_results, run_exec_checks,
+                    run_stdouts, run_stderrs):
+    ''' Save the run result.
+    '''
+    run_results.append(run_result.returncode)
+    run_exec_checks.append(exec_check)
+    run_stdouts.append(run_result.stdout)
+    run_stderrs.append(run_result.stderr)
+
+
 def run_repo(repo_data, system_config, args, tempdir):
     # Find the target config for this repo per dest model and app name
     target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
@@ -60,25 +96,14 @@ def run_repo(repo_data, system_config, args, tempdir):
             logging.info(f"Run output: {run_result.stdout}")
 
         # Log the run result
-        if run_result.returncode != 0:
-            logging.debug(f"Run failed for {repo_data['app']} with model {repo_data['dest_model']} test {i}.")
-            if args.log_run_errors:
-                logging.info(f"Run error: {run_result.stderr}")
-        else:
-            logging.debug(f"Run succeeded for {repo_data['app']} with model {repo_data['dest_model']} test {i}.")
+        log_run_result(repo_data, run_result, args)
 
         # Save the run result
-        run_results.append(run_result.returncode)
-        run_exec_checks.append(exec_check)
-        run_stdouts.append(run_result.stdout)
-        run_stderrs.append(run_result.stderr)
+        save_run_result(run_result, exec_check, run_results, run_exec_checks,
+                        run_stdouts, run_stderrs)
 
     # Create run result dict to return
-    result = {}
-    result["path"] = repo_data['path']
-    result["run_results_debug"] = run_results
-    result["run_exec_checks_debug"] = run_exec_checks
-    result["run_stdouts_debug"] = run_stdouts
-    result["run_stderrs_debug"] = run_stderrs
+    result = prepare_result_dict(repo_data, run_results, run_exec_checks,
+                                 run_stdouts, run_stderrs)
 
     return result
