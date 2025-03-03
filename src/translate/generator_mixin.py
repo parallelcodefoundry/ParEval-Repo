@@ -303,6 +303,7 @@ class GeneratorMixin:
         if self._generator is None:
             raise RuntimeError(f"Generator not initialized. Possible illegal backend '{self._backend}'")
         num_attempts = 0
+        response, in_tokens, out_tokens = None, 0, 0
         while num_attempts < self.MAX_ATTEMPTS:
             # wait for rate limit if needed
             self._enforce_limits()
@@ -330,7 +331,7 @@ class GeneratorMixin:
                 break
             finally:
                 # add request to recent requests
-                if self._rpm_limit is not None:
+                if self._rpm_limit is not None and out_tokens > 0:
                     self._recent_requests.append((start_time, out_tokens))
 
         # update token counts

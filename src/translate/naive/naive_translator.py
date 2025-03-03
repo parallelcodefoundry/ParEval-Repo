@@ -213,6 +213,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
         repo_fpath = os.path.join(self._output_fpath, "repo")
         max_cols = self._safe_get_columns()
 
+        print(f"Beginning translation of {repo_fpath} using {self._llm_name} with NaiveTranslator.")
+        print(f"Files to translate: {all_files}")
+
         # loop over all files and translate
         for fpath in alive_it(all_files,
                               title="Translating files",
