@@ -257,26 +257,29 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List], system_con
                  ground_truth_build: Optional[bool] = False) -> Dict[str, str]:
     ''' Build and run the code repository.
     '''
+    results_row_build = {}
     with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
         logging.debug(f"Temporary directory created: {tempdir}")
         setup_tempdir(tempdir, code_repo)
 
         logging.debug(f"Building code repository: {code_repo['path']}")
-        results_row = build_repo(code_repo, system_config, args, tempdir,
-                                 ground_truth_build=ground_truth_build)
-        update_results(results, results_row)
+        results_row_build = build_repo(code_repo, system_config, args, tempdir,
+                                       ground_truth_build=ground_truth_build)
+        update_results(results, results_row_build)
         pbar()
 
-        logging.debug(f"Running code repository: {code_repo['path']}")
-        results_row = run_repo(code_repo, system_config, args, tempdir)
+        if ground_truth_build or results_row_build["build_result_debug"] == 0:
+            logging.debug(f"Running code repository: {code_repo['path']}")
+            results_row_run = run_repo(code_repo, system_config, args, tempdir)
+            results_row_run["ground_truth_build"] = ground_truth_build
 
-        # Copy temporary directory to save_temps if provided
-        if args.save_temps:
-            save_temps(tempdir, args, results_row)
+            # Copy temporary directory to save_temps if provided
+            if args.save_temps:
+                save_temps(tempdir, args, results_row_run)
 
-        update_results(results, results_row)
+            update_results(results, results_row_run)
         pbar()
-    return results_row
+    return results_row_build
 
 
 def main():
@@ -301,6 +304,7 @@ def main():
         "dest_model": [],
         "output_number": [],
         "path": [],
+        "ground_truth_build": [],
         "build_result_debug": [],
         "build_stdout_debug": [],
         "build_stderr_debug": [],
