@@ -7,7 +7,7 @@ import sys
 import re
 import json
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Tuple, Union, Literal
 
 # tpl imports
 from alive_progress import alive_it
@@ -15,13 +15,15 @@ from alive_progress import alive_it
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
+from generator_mixin import GeneratorMixin
 from repo import Repo
 from naive import naive_constants as nc
 
 
-class NaiveTranslator(Translator):
+class NaiveTranslator(Translator, GeneratorMixin):
+    """ Class to naively translate file-by-file from one repository to the other.
+    """
 
-    _llm_name: str
     _dst_config: dict
 
     def __init__(
@@ -32,44 +34,44 @@ class NaiveTranslator(Translator):
             dst_model: str,
             dst_config: dict,
             llm_name: str,
+            backend: Literal["openai", "gemini", "hf", "local"] = "openai",
             log_interactions: bool = False,
             dry: bool = False,
             hide_progress: bool = False
     ):
         super().__init__(input_repo, output_repo, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
-        self._llm_name = llm_name
+
+        GeneratorMixin.__init__(self, backend, llm_name,
+                                system_prompt=self._get_system_prompt())
+
 
     @staticmethod
     def add_args(parser: 'ArgumentParser'):  # type: ignore # noqa: F821
         """ Add arguments for the naive translation method.
         """
+        parser.add_argument("--naive-backend",
+                            choices=["openai", "gemini", "hf", "local"],
+                            default="openai", help="The backend to use for translation.")
         parser.add_argument("--naive-llm-name",
-                            choices=["gpt-3.5",
-                                     "gpt-4o-mini",
-                                     "gemini",
-                                     "llama3.3",
-                                     "llama3.2",
-                                     "llama3.1",
-                                     "gpt-4o",
-                                     "tgi",
-                                     "ollama3.3",
-                                     "ollama3.2",
-                                     "ollama3.1"],
-                            default="gemini", help="The LLM to use for translation.")
+                            type=str, help="The name of the LLM to use for translation.")
+
 
     @staticmethod
     def parse_args(args: 'Namespace') -> Dict[str, str]:  # type: ignore # noqa: F821
         """ Parse the arguments for the naive translation method.
         """
         return {
+            "backend": args.naive_backend,
             "llm_name": args.naive_llm_name
         }
+
 
     def _get_system_prompt(self):
         """ Get and format the system prompt.
         """
         return nc.SYSTEM_TEMPLATE.format(src_model=self._src_model, dst_model=self._dst_model)
+
 
     def _get_prompt(self, fname: str) -> Tuple[str, Union[str, None]]:
         """ Get and format the prompt for a specific file.
@@ -113,7 +115,7 @@ class NaiveTranslator(Translator):
                 key_filename = prompt_config_dst["build_filename"]
 
         if fname == key_filename:
-            base_prompt += ("\n" + self.BUILD_ADDENDUM.format(
+            base_prompt += ("\n" + nc.BUILD_ADDENDUM.format(
                 build_filename=key_filename,
                 new_build_filename=prompt_config_dst["build_filename"],
                 dst_model=self._dst_model,
@@ -136,6 +138,7 @@ class NaiveTranslator(Translator):
             raise ValueError("No code block found in output.")
         return match.group(1)
 
+
     def _update_output_file_extension(self, fname: str, trigger_rename: str = None) -> str:
         """ Return the filename with updated extension based on the destination model.
         """
@@ -157,10 +160,6 @@ class NaiveTranslator(Translator):
         return fname
 
 
-    @abstractmethod
-    def _get_translation(self, system_prompt: str, prompt: str) -> str:
-        pass
-
     def _safe_get_columns(self) -> int:
         """ Return get_terminal_size with exception handling.
         """
@@ -173,6 +172,7 @@ class NaiveTranslator(Translator):
                 raise error
         return max_cols
 
+
     def _update_interaction_log(self, output: str, fpath: os.PathLike):
         """ Write output to interaction log for the given filename if logging
             is enabled.
@@ -182,7 +182,7 @@ class NaiveTranslator(Translator):
             os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
             with open(log_fpath, 'w', encoding="UTF-8") as f:
                 f.write(output)
-                print(f"Logged interaction to {log_fpath}")
+
 
     def _write_metadata(self, repo_fpath: os.PathLike):
         """ Write out experiment_metadata.json adjacent to repo path.
@@ -197,8 +197,9 @@ class NaiveTranslator(Translator):
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": int(repo_fpath.split("/")[-2][7:]), # todo: consider dropping this field
-                "path": repo_fpath
+                "output_number": int(repo_fpath.split("/")[-2][7:]),
+                "path": repo_fpath,
+                "inference_stats": self.get_stats()
             }
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
@@ -208,7 +209,6 @@ class NaiveTranslator(Translator):
     def translate(self):
         """ Translate the entire repository.
         """
-        system_prompt = self._get_system_prompt()
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         repo_fpath = os.path.join(self._output_fpath, "repo")
         max_cols = self._safe_get_columns()
@@ -229,7 +229,7 @@ class NaiveTranslator(Translator):
                 print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
                 continue
 
-            raw_output = self._get_translation(system_prompt, prompt)
+            raw_output = self.generate(prompt)
             self._update_interaction_log(raw_output, fpath)
             output = self._postprocess(raw_output)
 

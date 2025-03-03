@@ -15,11 +15,6 @@ import json
 from repo import Repo
 from translator import Translator
 from naive.naive_translator import NaiveTranslator
-from naive.naive_openai_translator import NaiveOpenAITranslator
-from naive.naive_gemini_translator import NaiveGeminiTranslator
-from naive.naive_ollama_translator import NaiveOllamaTranslator
-from naive.naive_vllm_translator import NaiveVLLMTranslator
-from naive.naive_tgi_translator import NaiveTGITranslator
 from restate.top_down_agent import TopDownAgentTranslator
 
 def get_args():
@@ -28,7 +23,7 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive", "agent"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive", "restate"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
@@ -47,22 +42,12 @@ def get_args():
     return parser.parse_args()
 
 
-def get_translator_cls(method: str, naive_llm: str):
+def get_translator_cls(method: str):
     if method == "naive":
-        if naive_llm == "gemini":
-            return NaiveGeminiTranslator
-        elif naive_llm == "tgi":
-            return NaiveTGITranslator
-        elif "ollama" in naive_llm:
-            return NaiveOllamaTranslator
-        elif "llama" in naive_llm:
-            return NaiveVLLMTranslator
-        else:
-            return NaiveOpenAITranslator
-    elif method == "agent":
+        return NaiveTranslator
+    if method == "restate":
         return TopDownAgentTranslator
-    else:
-        raise ValueError(f"Translation method {method} not recognized.")
+    raise ValueError(f"Translation method {method} not recognized.")
 
 
 def main():
@@ -92,7 +77,7 @@ def main():
     input_repo = Repo.from_json(os.path.join(args.input, "target.json"))
 
     # create a Translator object and translate the input repository
-    translator_cls = get_translator_cls(args.method, args.naive_llm_name)
+    translator_cls = get_translator_cls(args.method)
     translator_args = translator_cls.parse_args(args)
     translator = translator_cls(
         input_repo=input_repo,

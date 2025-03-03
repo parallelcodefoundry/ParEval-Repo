@@ -19,10 +19,10 @@ import re
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
-from agent.dependency_agent import DependencyAgent, FileNode, FileType
-from agent.chunk_agent import ChunkFileAgent
-from agent.context_agent import ContextAgent
-from agent import agent_constants as ac
+from restate.dependency_agent import DependencyAgent, FileNode, FileType
+from restate.chunk_agent import ChunkFileAgent
+from restate.context_agent import ContextAgent
+from restate import agent_constants as ac
 from generator_mixin import GeneratorMixin
 from repo import Repo
 
@@ -38,6 +38,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _chunk_file_agent: ChunkFileAgent
     _context_agent: ContextAgent
     _system_prompt: str
+    _interactions_path: Optional[str]
 
     def __init__(
             self,
@@ -59,14 +60,14 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             src_model=self._src_model,
             dst_model=self._dst_model)
 
-        GeneratorMixin.__init__(self, backend, llm_name, rpm_limit=10)
+        GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt)
 
         interactions_path = None
         if self._log_interactions:
-            interactions_path = os.path.join(self._output_fpath, "interactions.txt")
+            self._interactions_path = os.path.join(self._output_fpath, "interactions.txt")
 
             # create directories if necessary
-            os.makedirs(os.path.dirname(interactions_path), exist_ok=True)
+            os.makedirs(os.path.dirname(self._interactions_path), exist_ok=True)
 
         self._dependency_agent = DependencyAgent(generator=self,
                                                  interactions_path=interactions_path)
@@ -82,10 +83,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
         """ Add arguments for the top-down agent translation method.
         """
-        parser.add_argument("--agent-backend",
+        parser.add_argument("--restate-backend",
                             choices=["openai", "gemini", "hf", "local"],
                             default="openai", help="The backend to use for translation.")
-        parser.add_argument("--agent-llm-name",
+        parser.add_argument("--restate-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
 
     @staticmethod
@@ -93,8 +94,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """ Parse the arguments for the top-down agent translation method.
         """
         return {
-            "backend": args.agent_backend,
-            "llm_name": args.agent_llm_name
+            "backend": args.restate_backend,
+            "llm_name": args.restate_llm_name
         }
 
     def _safe_get_columns(self) -> int:
@@ -156,6 +157,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             f.write(contents)
         print(f"Wrote file {output_file_path}")
 
+
     def _write_metadata(self, repo_fpath: os.PathLike):
         """ Write out experiment_metadata.json adjacent to repo path.
         """
@@ -164,16 +166,24 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
             exp_meta_dict = {
                 "app": self._input_repo.get_meta_dict()["app"],
-                "prompt_strategy": "naive",
+                "prompt_strategy": "restate",
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
                 "output_number": int(repo_fpath.split("/")[-2][7:]),
-                # todo: consider dropping the output_number field
-                "path": repo_fpath
+                "path": repo_fpath,
+                "inference_stats": self.get_stats()
             }
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
+
+
+    def _log_interaction(self, response: str):
+        """ Log the raw LLM output to a text file.
+        """
+        with open(self._interactions_path, 'a', encoding="UTF-8") as f:
+            f.write(response + "\n")
+
 
     # override
     def translate(self):
@@ -200,6 +210,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         # dump experiment metadata
         self._write_metadata(os.path.join(self._output_fpath, "repo"))
 
+
     def _translate_node(self, node: FileNode, graph: Optional[List[FileNode]] = None):
         """ Translate a single file node using context from its dependencies.
         """
@@ -216,17 +227,19 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         chunks = self._chunk_file_agent.chunk_file(source_code)
         if len(chunks) == 1:
             print("Requesting whole file translation...")
-            translation = self._postprocess(self._get_translation(context, chunks[0], node, graph))
+            response = self._get_translation(context, chunks[0], node, graph)
+            if self._log_interactions:
+                self._log_interaction(response)
+            translation = self._postprocess(response)
         else:
             translation = ""
             prev_chunk = ""
             for chunk in chunks:
                 print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
-                chunk_translation = self._postprocess(self._get_translation(context,
-                                                                            chunk,
-                                                                            node,
-                                                                            graph,
-                                                                            prev_chunk=prev_chunk))
+                response = self._get_translation(context, chunk, node, graph, prev_chunk=prev_chunk)
+                if self._log_interactions:
+                    self._log_interaction(response)
+                chunk_translation = self._postprocess(response)
                 translation += chunk_translation + "\n"
                 prev_chunk = chunk_translation
 
