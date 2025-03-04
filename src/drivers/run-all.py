@@ -89,6 +89,8 @@ def parse_metadata(args: ArgumentParser, exp_meta: Dict[str, str],
         metadata_found["dest_models_found"].append(dest_model)
 
     prompt_strategy = exp_meta["prompt_strategy"]
+    if isinstance(prompt_strategy, list):
+        prompt_strategy = "-".join(prompt_strategy)
     if args.prompt_strategies and prompt_strategy.lower() not in [s.lower() for s in args.prompt_strategies]:
         logging.debug(f"Skipping {prompt_strategy} because it is not in {args.prompt_strategies}.")
         return None

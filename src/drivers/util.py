@@ -42,8 +42,14 @@ def run_bash(cmds, cwd=None, timeout=None, dry=False, name=None):
         return CompletedProcess(args=cmds, returncode=0, stdout="", stderr="")
     else:
         full_cmd = shlex.split(f"bash {script_path}")
-        return subprocess.run(full_cmd, capture_output=True, text=True,
-                              timeout=timeout, cwd=cwd)
+        try:
+            result = subprocess.run(full_cmd, capture_output=True, text=True,
+                                    timeout=timeout, cwd=cwd)
+            return result
+        except subprocess.TimeoutExpired as e:
+            logging.debug(f"Timeout occurred: {e}")
+            result = CompletedProcess(args=cmds, returncode=124, stdout="", stderr=f"TIMEOUT ({timeout} sec.)")
+            return result
 
 def find_config(app, model, target_path):
     """ Find the target config for the given app and model """
@@ -72,6 +78,8 @@ def dict_merge(dct, merge_dct):
     for k, v in merge_dct.items():
         if k in dct:
             dct[k].append(v)
+        elif k == "inference_stats":
+            continue
         else:
             logging.error(f"Key {k} not found in dictionary.")
             raise ValueError(f"Key {k} not found in dictionary.")
