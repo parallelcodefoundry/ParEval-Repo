@@ -43,6 +43,18 @@ def prepare_result_dict(repo_data, run_results, run_exec_checks, run_stdouts, ru
     return result
 
 
+def make_skip_run_result(repo_data):
+    ''' Create a result dict for a skipped run.
+    '''
+    result = {}
+    result["path"] = repo_data['path']
+    result["run_results_debug"] = [1]
+    result["run_exec_checks_debug"] = [0]
+    result["run_stdouts_debug"] = [""]
+    result["run_stderrs_debug"] = ["skip due to build failure"]
+    return result
+
+
 def log_run_result(repo_data, run_result, args, i):
     ''' Log the run result.
     '''
