@@ -43,7 +43,7 @@ def prepare_result_dict(repo_data, run_results, run_exec_checks, run_stdouts, ru
     return result
 
 
-def log_run_result(repo_data, run_result, args):
+def log_run_result(repo_data, run_result, args, i):
     ''' Log the run result.
     '''
     if run_result.returncode != 0:
@@ -96,7 +96,7 @@ def run_repo(repo_data, system_config, args, tempdir):
             logging.info(f"Run output: {run_result.stdout}")
 
         # Log the run result
-        log_run_result(repo_data, run_result, args)
+        log_run_result(repo_data, run_result, args, i)
 
         # Save the run result
         save_run_result(run_result, exec_check, run_results, run_exec_checks,
