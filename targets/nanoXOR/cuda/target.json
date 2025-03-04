@@ -1,5 +1,5 @@
 {
-    "app": "microxor",
+    "app": "nanoxor",
     "model": "cuda",
     "path": "targets/nanoXOR/cuda/repo",
     "dependencies": ["cuda"],
