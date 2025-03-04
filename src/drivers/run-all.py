@@ -292,7 +292,9 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
 
         elif ground_truth_build or args.skip_build_swap:
             logging.debug(f"Skipping run for {code_repo['path']} due to build failure.")
-            update_results(results, make_skip_run_result(code_repo))
+            results_row_run = make_skip_run_result(code_repo)
+            results_row_run["ground_truth_build"] = ground_truth_build
+            update_results(results, results_row_run)
 
         # if build failed we will try again with ground truth build, so don't
         # update results yet
@@ -340,17 +342,20 @@ def main():
     # Build and run each code repository
     max_cols = safe_get_cols()
     items = len(code_repos) * (2 if args.skip_build_swap else 4)
-    with alive_bar(len(code_repos)*4,
+    with alive_bar(items,
                    title="Building and running code repositories",
                    max_cols=max_cols, disable=args.hide_progress) as pbar:
         for code_repo in code_repos:
             results_row = process_repo(code_repo, results, system_config, args,
                                        scratch, pbar)
 
-            if not args.skip_build_swap \
-               and results_row["build_result_debug"] != 0:
-                process_repo(code_repo, results, system_config, args, scratch,
-                             pbar, ground_truth_build=True)
+            if not args.skip_build_swap:
+                if results_row["build_result_debug"] != 0:
+                    process_repo(code_repo, results, system_config, args,
+                                 scratch, pbar, ground_truth_build=True)
+                else:
+                    pbar()
+                    pbar()
 
     # Convert results dict to dataframe
     results_df = pd.DataFrame.from_dict(results)
