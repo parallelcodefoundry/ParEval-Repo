@@ -14,7 +14,12 @@ def build_repo(repo_data, system_config, args, tempdir):
         setup_result = run_bash(setup_cmds, cwd=tempdir, timeout=target_config["build_timeout"], dry=args.dry)
         if setup_result.returncode != 0:
             logging.error(f"Setup failed for {repo_data['app']} with model {repo_data['dest_model']}.")
-            return
+            result = {}
+            result["path"] = repo_data["path"]
+            result["build_result_debug"] = setup_result.returncode
+            result["build_stdout_debug"] = setup_result.stdout
+            result["build_stderr_debug"] = setup_result.stderr
+            return result
 
     # Get cmds from system, target config
     cmds = list_dep_cmds(system_config, target_config)
