@@ -17,10 +17,10 @@ def await_input(prompt, is_valid_input):
 
 def list_dep_cmds(system_config, target_config):
     """ Get the dependency cmds from the system and target config """
-    cmds = []
+    cmds = [system_config["first"]]
     for dep in target_config["dependencies"]:
-        if dep in system_config:
-            cmds.append(system_config[dep])
+        if dep in system_config["dependencies"]:
+            cmds.append(system_config["dependencies"][dep])
         else:
             logging.error(f"Dependency {dep} not found in system config.")
             raise ValueError(f"Dependency {dep} not found in system config.")
