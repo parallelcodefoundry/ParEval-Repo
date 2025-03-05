@@ -1,0 +1,32 @@
+{
+    "app": "llm.c",
+    "model": "openmp-offload",
+    "path": "targets/llm.c/openmp-offload/repo",
+    "dependencies": ["cuda", "llvm"],
+    "setup_commands": ["chmod u+x ./dev/download_starter_pack.sh", "./dev/download_starter_pack.sh"],
+    "build_commands_debug": "make test_gpt2fp32cu FORCE_NVCC_O=0",
+    "build_commands_perf": "make test_gpt2fp32cu",
+    "build_timeout": 30,
+    "exe_file": "test_gpt2fp32cu",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "./test_gpt2fp32cu"
+    ],
+    "debug_outputs": [
+        "overall okay: 1"
+    ],
+    "run_commands_perf": [
+        "./test_gpt2fp32cu"
+    ],
+    "perf_outputs": [
+        "overall okay: 1"
+    ],
+    "run_timeout": 120,
+    "ex_build_cmd": "make test_gpt2fp32cu",
+    "ex_build_desc": "the GPT-2 model with FP32 precision to run on an NVIDIA GPU compiled for OpenMP offload with the clang compiler",
+    "build_filename": "Makefile",
+    "ex_run_cmd": "./test_gpt2fp32cu",
+    "ex_run_desc": "a test run of the GPT-2 model with FP32 precision on an NVIDIA GPU",
+    "main_filename": "test_gpt2_fp32.c",
+    "filename_desc": "C"
+}

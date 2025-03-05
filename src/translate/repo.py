@@ -33,6 +33,10 @@ class Repo:
         if self._exp_meta['path'] != os.path.sep.join(implicit_path.split(os.path.sep)[-len(explicit_path_steps):]):
             raise ValueError("The provided path in the exp_meta file does not match the path of the exp_meta file.")
         return self(implicit_path, self._exp_meta)
+    
+    @property
+    def path(self) -> os.PathLike:
+        return self._path
 
     def get_meta_dict(self) -> dict:
         return self._exp_meta
@@ -43,12 +47,14 @@ class Repo:
     def get_file_tree_str(self, ascii: bool = True, max_depth: Optional[int] = None) -> str:
         return "\n".join(self._get_file_tree_str(self._file_tree, ascii=ascii, max_depth=max_depth)) + "\n"
 
+
     def get_all_filenames(self, relpaths: bool = False) -> List[os.PathLike]:
         """ get all the files names in this._path as relative paths """
         all_files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self._path) for f in filenames]
         if relpaths:
             return [os.path.relpath(f, self._path) for f in all_files]
         return all_files
+
 
     def get_file_contents(self, rel_path: Optional[os.PathLike] = None, full_path: Optional[os.PathLike] = None) -> str:
         # make sure only one and at least one is provided
@@ -68,8 +74,21 @@ class Repo:
             raise FileNotFoundError("The provided path does not exist.")
 
         # read the file contents
-        with open(full_path, 'r') as f:
+        with open(full_path, 'r', encoding='ascii', errors='replace') as f:
             return f.read()
+
+
+    def _is_text_file_or_dir(self, filename):
+        # check if a file is a readable utf-8 text file or a directory
+        if os.path.isdir(filename):
+            return True
+        try:
+            with open(filename, "r", encoding="utf-8") as f:
+                f.read()
+                return True
+        except UnicodeDecodeError:
+            return False
+
 
     def _get_file_tree_dict(self, tree_root: os.PathLike) -> dict:
         # build a tree of all files in the repo
@@ -78,12 +97,15 @@ class Repo:
         if os.path.isdir(tree_root):
             # If the given path is a directory, recursively populate the tree
             tree["type"] = "directory"
-            tree["contents"] = [self._get_file_tree_dict(os.path.join(tree_root, item)) for item in os.listdir(tree_root)]
+            tree["contents"] = [self._get_file_tree_dict(os.path.join(tree_root, item)) \
+                                for item in os.listdir(tree_root) \
+                                if self._is_text_file_or_dir(os.path.join(tree_root, item))]
         else:
             # If the given path is a file, record it in the tree
             tree["type"] = "file"
 
         return tree
+
 
     def _get_file_tree_str(self, root: List[dict], prefix: str = "", ascii: bool = False, depth: int = 0, max_depth: Optional[int] = None):
         """ Get the string representation of a file tree.

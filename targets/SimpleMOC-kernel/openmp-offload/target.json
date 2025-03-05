@@ -1,0 +1,31 @@
+{
+    "app": "simplemoc-kernel",
+    "model": "openmp-offload",
+    "path": "targets/SimpleMOC-kernel/cuda/repo",
+    "dependencies": ["llvm", "cuda"],
+    "build_commands_debug": "cd include/ && make SM_VERSION=80 CFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ DEBUG=yes CXX=clang",
+    "build_commands_perf": "cd include/ && make SM_VERSION=80 CFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ CXX=clang",
+    "build_timeout": 30,
+    "exe_file": "include/SimpleMOC-kernel",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "include/SimpleMOC-kernel"
+    ],
+    "debug_outputs": [
+        "Simulation Complete."
+    ],
+    "run_commands_perf": [
+        "include/SimpleMOC-kernel"
+    ],
+    "perf_outputs": [
+        "Simulation Complete."
+    ],
+    "run_timeout": 120,
+    "ex_build_cmd": "cd include/ && make SM_VERSION=80 CFLAGS=-L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ CXX=clang",
+    "ex_build_desc": "an NVIDIA GPU with compute capability 80 and NVIDIA libraries at /opt/nvidia/hpc_sdk/Linux_x86_64/23.9/math_libs/12.2/targets/x86_64-linux/lib/ and using clang as the compiler",
+    "build_filename": "include/Makefile",
+    "ex_run_cmd": "include/SimpleMOC-kernel",
+    "ex_run_desc": "a test run of the SimpleMOC-kernel on an NVIDIA GPU",
+    "main_filename": "include/main.c",
+    "filename_desc": "C"
+}

@@ -1,0 +1,46 @@
+import os
+from typing import List
+from generator_mixin import GeneratorMixin
+from restate.dependency_agent import FileNode
+
+class ContextAgent:
+
+    _generator: GeneratorMixin
+    _interactions_path: os.PathLike
+    _output_fpath: os.PathLike
+
+    def __init__(self, generator: GeneratorMixin,
+                 interactions_path: os.PathLike = None,
+                 output_fpath: os.PathLike = None):
+        self._generator = generator
+        self._interactions_path = interactions_path
+        self._output_fpath = output_fpath
+
+    def get_context(self, dependencies: List[FileNode], node: FileNode, dst_model: str) -> str:
+        print("Extracting context for dependent files...")
+        translated_codes = []
+        for dependency in dependencies:
+            translated_code = self._read_translated_file(dependency.rel_path)
+            if translated_code:
+                translated_codes.append(f"File: {dependency.rel_path}\n{translated_code}")
+
+        if not translated_codes:
+            return ""
+
+        combined_translations = "\n\n".join(translated_codes)
+        prompt = f"""You are assisting with the translation of an application to {dst_model}. The next file in the application to translate is {node.rel_path}. Below are the files already translated:
+
+{combined_translations}
+
+Please extract any code snippets from the above translated files that may be relevant to translating {node.rel_path}. Do not provide any new code or translations, just rewrite the relevant context in the form of code snippets with some explanation."""
+
+        context = self._generator.generate(prompt)
+        return context.strip() if context else ""
+
+    def _read_translated_file(self, rel_path: str) -> str:
+        output_file_path = os.path.join(self._output_fpath, rel_path)
+        if os.path.exists(output_file_path):
+            with open(output_file_path, 'r') as f:
+                return f.read()
+        else:
+            return ""
