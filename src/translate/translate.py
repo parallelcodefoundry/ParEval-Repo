@@ -16,6 +16,7 @@ from repo import Repo
 from translator import Translator
 from naive.naive_translator import NaiveTranslator
 from restate.top_down_agent import TopDownAgentTranslator
+from swe_agent.swe_agent_translator import SWEAgentTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -23,7 +24,7 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive", "restate"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive", "restate", "swe-agent"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
@@ -41,12 +42,18 @@ def get_args():
     TopDownAgentTranslator.add_args(agent_args)
     return parser.parse_args()
 
+    # subgroup for SWE-agent translation method
+    swe_agent_args = parser.add_argument_group("SWE-agent translation")
+    SWEAgentTranslator.add_args(swe_agent_args)
+
 
 def get_translator_cls(method: str):
     if method == "naive":
         return NaiveTranslator
     if method == "restate":
         return TopDownAgentTranslator
+    if method == "swe-agent":
+        return SWEAgentTranslator
     raise ValueError(f"Translation method {method} not recognized.")
 
 
