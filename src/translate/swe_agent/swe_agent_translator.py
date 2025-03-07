@@ -42,7 +42,7 @@ class SWEAgentTranslator(Translator):
         self.swe_agent_deployment_image = swe_agent_deployment_image
         self.swe_agent_problem_statement_path = swe_agent_problem_statement_path
         self.swe_agent_output_id = swe_agent_output_id
-        self._temp_repo_path = "/tmp/temp_sweagent_repo"
+        self.temp_repo_path = "/tmp/temp_sweagent_repo"
 
     @staticmethod
     def add_args(parser):
@@ -78,7 +78,22 @@ class SWEAgentTranslator(Translator):
           6. Write experiment metadata (Done, check the repo path part since it's not a string)
           7. Cleanup (Done)
         """
-        
+    
+    def _initialize_temp_repo(self):
+        """
+        Initialize the temporary repository
+        """
+        if os.path.exists(self.temp_repo_path):
+            print("The temporary repository exists. Removing the repository...")
+            shutil.rmtree(self.temp_repo_path)
+        time.sleep(10)
+        # Copies original repo to temp repo
+        shutil.copytree(self._input_repo, self.temp_repo_path, dirs_exist_ok=True)
+
+        # Initial commits to the temp repo
+        subprocess.run(["git", "init"], cwd=self.temp_repo_path, check=True)
+        subprocess.run(["git", "add", "."], cwd=self.temp_repo_path, check=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.temp_repo_path, check=True)
 
     def _save_output(self, temp_repo_path, output_dir):
         """
@@ -119,6 +134,6 @@ class SWEAgentTranslator(Translator):
         """
         Remove the temporary repository
         """
-        if os.path.exists(self._temp_repo_path):
-            shutil.rmtree(self._temp_repo_path)
+        if os.path.exists(self.temp_repo_path):
+            shutil.rmtree(self.temp_repo_path)
         print("Temporary repository cleaned up.")
