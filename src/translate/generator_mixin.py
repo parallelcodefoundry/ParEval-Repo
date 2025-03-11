@@ -14,7 +14,7 @@ class GeneratorMixin:
     """ Mixin class for providing a unified generative interface within other classes.
     """
 
-    _backend: Literal["openai", "gemini", "hf", "local"]
+    _backend: Literal["openai", "gemini", "hf", "vllm", "local"]
     _llm_name: str
     _generator: Optional[Callable] = None
     _rpm_limit: Optional[int] = None
@@ -37,7 +37,7 @@ class GeneratorMixin:
 
     def __init__(
         self,
-        backend: Literal["openai", "gemini", "hf", "local"],
+        backend: Literal["openai", "gemini", "hf", "vllm", "local"],
         llm_name: str,
         rpm_limit: Optional[int] = None,
         tpm_limit: Optional[int] = None,
@@ -57,7 +57,7 @@ class GeneratorMixin:
         self._system_prompt = system_prompt
         self._disable_request_cache = disable_request_cache
 
-        if self._backend not in ["openai", "gemini", "hf", "local"]:
+        if self._backend not in ["openai", "gemini", "hf", "vllm", "local"]:
             raise ValueError(f"Invalid backend specified: '{self._backend}'")
 
         if self._backend == "openai":
@@ -68,6 +68,16 @@ class GeneratorMixin:
                 self._rpm_limit = 100
             if self._tpm_limit is None:
                 self._tpm_limit = 150000
+
+        elif self._backend == "vllm":
+            # Using OpenAI server API
+            from openai import OpenAI
+            self._vllm_client = OpenAI(
+                base_url="http://localhost:8000/v1",
+                api_key="token_abc123"
+            )
+            self._generator = self._generate_vllm
+
         elif self._backend == "gemini":
             import google.generativeai as genai
             if not os.environ.get("GEMINI_API_KEY"):
@@ -80,12 +90,14 @@ class GeneratorMixin:
                 self._rpm_limit = 9
             if self._tpm_limit is None:
                 self._tpm_limit = 6000
+
         elif self._backend == "hf":
             from huggingface_hub import InferenceClient
             if not os.environ.get("HF_API_KEY"):
                 raise ValueError("HF_API_KEY environment variable not set.")
             self._hf_inference_client = InferenceClient(api_key=os.environ["HF_API_KEY"])
             self._generator = self._generate_hf
+
         else:
             raise NotImplementedError(f"backend '{self._backend}' not implemented.")
 
@@ -124,13 +136,13 @@ class GeneratorMixin:
         return messages
 
     def _generate_openai(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        max_new_tokens: int = 2048,
-        temperature: Optional[float] = None,
-        top_p: Optional[float] = None,
-        **kwargs
+            self,
+            prompt: str,
+            system_prompt: Optional[str] = None,
+            max_new_tokens: int = 2048,
+            temperature: Optional[float] = None,
+            top_p: Optional[float] = None,
+            **kwargs
     ) -> Tuple[str, int, int]:
         """ Generate text using the OpenAI API.
         """
@@ -153,14 +165,42 @@ class GeneratorMixin:
             completion.usage.prompt_tokens, completion.usage.completion_tokens
 
 
+    def _generate_vllm(
+            self,
+            prompt: str,
+            system_prompt: Optional[str] = None,
+            temperature: Optional[float] = None,
+            top_p: Optional[float] = None,
+            **kwargs
+    ) -> Tuple[str, int, int]:
+        """ Generate text using the vLLM via the OpenAI server API.
+        """
+        if not self._vllm_client:
+            raise ValueError("vLLM (OpenAI) client not initialized.")
+
+        completion = self._vllm_client.chat.completions.create(
+            model=self._llm_name,
+            messages=self._format_messages_list(prompt, system_prompt),
+            temperature=temperature,
+            top_p=top_p,
+            n=1,
+            **kwargs
+        )
+
+        if not completion.choices:
+            raise ValueError("No completions returned from vLLM.")
+        return completion.choices[0].message.content, \
+            completion.usage.prompt_tokens, completion.usage.completed_tokens
+
+
     def _generate_gemini(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        max_new_tokens: int = 2048,
-        temperature: Optional[float] = None,
-        top_p: Optional[float] = None,
-        **kwargs
+            self,
+            prompt: str,
+            system_prompt: Optional[str] = None,
+            max_new_tokens: int = 2048,
+            temperature: Optional[float] = None,
+            top_p: Optional[float] = None,
+            **kwargs
     ) -> Tuple[str, int, int]:
         """ Generate text using the Gemini API.
         """
