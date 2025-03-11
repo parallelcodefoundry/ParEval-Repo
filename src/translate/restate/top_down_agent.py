@@ -48,7 +48,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             dst_model: str,
             dst_config: dict,
             llm_name: str,
-            backend: Literal["openai", "gemini", "hf", "local"] = "openai",
+            backend: Literal["openai", "gemini", "hf", "vllm", "local"] = "openai",
             log_interactions: bool = False,
             dry: bool = False,
             hide_progress: bool = False
@@ -84,7 +84,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """ Add arguments for the top-down agent translation method.
         """
         parser.add_argument("--restate-backend",
-                            choices=["openai", "gemini", "hf", "local"],
+                            choices=["openai", "gemini", "hf", "vllm", "local"],
                             default="openai", help="The backend to use for translation.")
         parser.add_argument("--restate-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
