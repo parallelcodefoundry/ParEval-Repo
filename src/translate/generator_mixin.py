@@ -77,9 +77,9 @@ class GeneratorMixin:
                                                         system_instruction=self._system_prompt)
             self._generator = self._generate_gemini
             if self._rpm_limit is None:
-                self._rpm_limit = 10
+                self._rpm_limit = 9
             if self._tpm_limit is None:
-                self._tpm_limit = 6144
+                self._tpm_limit = 6000
         elif self._backend == "hf":
             from huggingface_hub import InferenceClient
             if not os.environ.get("HF_API_KEY"):
