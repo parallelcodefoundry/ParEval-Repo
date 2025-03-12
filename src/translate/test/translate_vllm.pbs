@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -N translate_vllm
+#PBS -l select=1:system=polaris
+#PBS -l filesystems=home:eagle
+#PBS -l walltime=1:00:00
+#PBS -q debug
+#PBS -A DemocAI
+
+MODEL_NAME=Llama-3.3-70B-Instruct-Q5_K_S.gguf
+
+# Activate vLLM environment
+source /home/jhdavis/venvs/2024-04-29-vllm/bin/activate
+
+# Set environment variables
+export HTTP_PROXY="http://proxy.alcf.anl.gov:3128"
+export HTTPS_PROXY="http://proxy.alcf.anl.gov:3128"
+export LD_LIBRARY_PATH=$HOME/venvs/2024-04-29-vllm/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
+export TMPDIR=/tmp/vllm && mkdir -p $TMPDIR
+export VLLM_HOST_IP=127.0.0.1
+export NO_PROXY=127.0.0.1,localhost
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+
+# Copy model to /dev/shm/
+echo -n "Copying model to /dev/shm/... "
+cp $SCRATCH/$MODEL_NAME /dev/shm/
+echo "Done"
+
+# Start vLLM server
+echo -n "Launching vLLM server process... "
+vllm serve /dev/shm/$MODEL_NAME \
+     --tokenizer meta-llama/Llama-3.3-70B-Instruct \
+     --host 127.0.0.1 \
+     --port 8000 \
+     --api-key token_abc123 \
+     --tensor-parallel-size 2 \
+     --pipeline-parallel-size 2 \
+     --enable-prefix-caching &
+echo "Done"
+
+VLLM_PID=$!  # Capture the PID of the server process
+
+# Wait for server to start
+echo "Waiting for vLLM server to become available... "
+until curl -H "Authorization: Bearer token_abc123" -s http://127.0.0.1:8000/v1/models | grep -q "object"; do
+    sleep 5
+done
+echo "Server confirmed available."
+
+# Check memory utlization across devices
+nvidia-smi
+
+# Do translation
+cd /home/jhdavis/llms4hpc/code-translation/src/translate/test
+bash translate.sh naive /dev/shm/$MODEL_NAME vllm microXOR 1
