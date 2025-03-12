@@ -11,13 +11,15 @@ get_usage () {
 run_translate () {
     method=$1
     llm_version=$2
+    base_llm_version=$(basename -- "$llm_version")
+    llm_name="${base_llm_version%.*}"
     llm_backend=$3
     application=$4
     iter=$5
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
             --config ../../../targets/${application}/openmp-offload \
-            --output ../../../../code-translation-results/${application}/${method}-${llm_version}-cuda-to-omp \
+            --output ../../../../code-translation-results/${application}/${method}-${llm_name}-cuda-to-omp \
             --output-id ${iter} \
             --app-name ${application} \
             --method ${method} \

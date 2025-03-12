@@ -73,7 +73,7 @@ class GeneratorMixin:
             # Using OpenAI server API
             from openai import OpenAI
             self._vllm_client = OpenAI(
-                base_url="http://localhost:8000/v1",
+                base_url="http://127.0.0.1:8000/v1",
                 api_key="token_abc123"
             )
             self._generator = self._generate_vllm
@@ -169,6 +169,7 @@ class GeneratorMixin:
             self,
             prompt: str,
             system_prompt: Optional[str] = None,
+            max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
             **kwargs
