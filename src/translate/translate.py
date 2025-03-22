@@ -10,6 +10,8 @@
 from argparse import ArgumentParser
 import os
 import json
+import shutil
+import tarfile
 
 # local imports
 from repo import Repo
@@ -98,6 +100,20 @@ def main():
         **translator_args
     )
     translator.translate()
+
+    def create_tarball():
+        """ Create a tarball of the output directory. """
+        tarball_name = f"output-{args.output_id}.tar.gz"
+        tarball_path = os.path.join(args.output, tarball_name)
+
+        with tarfile.open(tarball_path, "w:gz") as tar:
+            arcname = os.path.basename(output_dir)
+            tar.add(output_dir, arcname=arcname)
+
+        # deletes output directory after creating tarball
+        shutil.rmtree(output_dir)
+
+    create_tarball()
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):
