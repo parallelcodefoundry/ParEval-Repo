@@ -73,6 +73,7 @@ def extract_tarballs(translations_root: str, remove_tarball: bool = False):
     Optionally remove the tarball if remove_tarball is True.
     """
     # Note: Need to check if corresponding output-repo already exists (need to delete it before extracting the tarball again)
+    # Idea: Could have a list of extracted repos and after running the drivers, remove those directories
     for root, _, files in os.walk(translations_root):
         for filename in files:
             if filename.endswith(".tar.gz"):
