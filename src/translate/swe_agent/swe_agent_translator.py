@@ -24,10 +24,10 @@ class SWEAgentTranslator(Translator):
         dry=False,
         hide_progress=False,
         swe_agent_model_name=None,
-        swe_agent_per_instance_cost_limit=0.10,
-        swe_agent_deployment_image=None,
+        swe_agent_per_instance_cost_limit=0.06,
+        swe_agent_deployment_image="python",
         swe_agent_problem_statement_path=None,
-        swe_agent_output_id=None,
+        swe_agent_output_id=0,
     ):
         super().__init__(
             input_repo,
@@ -95,7 +95,7 @@ class SWEAgentTranslator(Translator):
                 print("Saving translated output...")
             else:
                 print("Translation failed.")
-            self.save_output(self.output_repo)
+            self.save_output(self._output_fpath)
             self.remove_unnecessary_output_files()
             self.write_experiment_metadata()
         finally:
@@ -132,7 +132,7 @@ class SWEAgentTranslator(Translator):
             print("The temporary repository exists. Removing the repository...")
             shutil.rmtree(self.temp_repo_path)
         # Copies original repo to temp repo
-        shutil.copytree(self.input_repo, self.temp_repo_path, dirs_exist_ok=True)
+        shutil.copytree(self.input_repo.path, self.temp_repo_path, dirs_exist_ok=True)
 
         # Initial commits to the temp repo
         subprocess.run(["git", "init"], cwd=self.temp_repo_path, check=True)
@@ -163,8 +163,7 @@ class SWEAgentTranslator(Translator):
                 print("Applying patch...")
 
                 # The trajectories folder which is created at runtime by SWE-agent. It contains the patch file.
-                trajectories_dir = "/Users/ishan/pssg/tmp/temp_sweagent_repo/trajectories/ishan" # @TODO: replace with actual path (os.join(self.temp_repo_path, "trajectories"))
-                # The new patch which the patch file will be renamed to
+                trajectories_dir = os.path.join(self.temp_repo_path, "trajectories")
                 new_patch_path = None
 
                 # Finds the path of the patch file
@@ -184,7 +183,7 @@ class SWEAgentTranslator(Translator):
                     print("Error: No patch file found in trajectories directory.")
                     return False
                 else:
-                    new_patch_path = "/Users/ishan/pssg/tmp/temp_sweagent_repo/temp.patch" # @TODO: replace with actual path (os.join(self.temp_repo_path, "temp.patch"))
+                    new_patch_path = os.path.join(self.temp_repo_path, "temp.patch")
                     os.rename(old_patch_path, new_patch_path)
 
                 # Clears the unnecessary whitespace of the patch file
@@ -224,21 +223,21 @@ class SWEAgentTranslator(Translator):
         """
         Remove unnecessary files (any .cu or .cuh files)
         """
-        print(f"Cleaning the output repository: {self.output_repo}")
+        print(f"Cleaning the output repository: {self._output_fpath}")
 
-        for root, _, files in os.walk(self.output_repo):
+        for root, _, files in os.walk(self._output_fpath):
             for file in files:
                 if file.endswith(".cu") or file.endswith(".cuh"):
                     os.remove(os.path.join(root, file))
 
-        print(f"Finished cleaning the output repository: {self.output_repo}")
+        print(f"Finished cleaning the output repository: {self._output_fpath}")
     
     def write_experiment_metadata(self):
         """
         Write an experiment_metadata.json in the output directory with
         details about the translation
         """
-        exp_meta_fpath = os.path.join(self.output_repo, "experiment_metadata.json")
+        exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
 
         app_name = os.path.basename(self._input_repo.path)
@@ -251,7 +250,7 @@ class SWEAgentTranslator(Translator):
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
                 "output_number": self.swe_agent_output_id,
-                "path": self._output_repo
+                "path": self._output_fpath
             }
             json.dump(exp_meta_dict, f, indent=4) 
 

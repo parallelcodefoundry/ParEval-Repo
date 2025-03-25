@@ -42,12 +42,12 @@ def get_args():
     # subgroup for top-down agent
     agent_args = parser.add_argument_group("top-down agent")
     TopDownAgentTranslator.add_args(agent_args)
-    return parser.parse_args()
 
     # subgroup for SWE-agent translation method
     swe_agent_args = parser.add_argument_group("SWE-agent translation")
     SWEAgentTranslator.add_args(swe_agent_args)
 
+    return parser.parse_args()
 
 def get_translator_cls(method: str):
     if method == "naive":
