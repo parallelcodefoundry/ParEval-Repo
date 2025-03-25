@@ -72,36 +72,62 @@ class SWEAgentTranslator(Translator):
     
     def translate(self):
         """
-        To Do's
-          3. Run the SWE-agent command
-          4. Find/rename/cleanup/apply patch
+        1. Generate Translation Task
         """
+        self.generate_translation_task()
 
         """
-        1. Copy the original repo to a temp directory
-        2. Initialize git and commit
+        2. Copy the original repository to a temporary directory
+        3. Initialize the temporary repository and commit the initial state
         """
         self.initialize_temp_repo()
 
         """
-        5. Copy the result to the final output directory
+          4. Run the SWE-agent command
+          5. Find, rename, and apply the SWE-agent patch file
+          6. Save translated output
+          7. Remove unnecessary files
+          8. Write experiment metadata
+          9. Cleanup temporary repository
         """
-        self.save_output(self.output_repo)
+        try:
+            if self.run_swe_agent():
+                print("Saving translated output...")
+            else:
+                print("Translation failed.")
+            self.save_output(self.output_repo)
+            self.remove_unnecessary_output_files()
+            self.write_experiment_metadata()
+        finally:
+            self.cleanup_temp_repo()
 
-        """
-        6. Write experiment metadata
-        """
-        self.write_experiment_metadata()
+    def generate_translation_task(self):
+        print("Generating translation task...")
 
-        """
-        7. Cleanup
-        """
-        self.cleanup_temp_repo()
+        target_json = os.path.join(self.input_repo.path, "target.json")
+        translation_task_path = os.path.join(self.input_repo.path, "translation_task.md")
+
+        with open(target_json, "r") as f:
+            data = json.load(f)
+
+        translation_task = f"""
+        You are a helpful coding assistant.
+        You are helping a software developer translate a codebase from the {data["model"]} execution model to the {self._dst_model} execution model.
+        The codebase is called {data["app"]}. Its path is {data["path"]}.
+        Given this code repository, translate the {data["app"]} codebase's {data["model"]} files to the {self._dst_model} execution model.
+        The new files should be in {data["filename_desc"]} and all old {data["model"]} files must be deleted. A new Makefile should be made to compile accordingly with the new files.
+        """.strip()
+        
+        with open(translation_task_path, "w") as f:
+            f.write(translation_task)
+
+        print(f"Translation task generated: {translation_task_path}")
 
     def initialize_temp_repo(self):
         """
         Initialize the temporary repository
         """
+        print("Initializing temporary Git repository...")
         if os.path.exists(self.temp_repo_path):
             print("The temporary repository exists. Removing the repository...")
             shutil.rmtree(self.temp_repo_path)
@@ -112,6 +138,77 @@ class SWEAgentTranslator(Translator):
         subprocess.run(["git", "init"], cwd=self.temp_repo_path, check=True)
         subprocess.run(["git", "add", "."], cwd=self.temp_repo_path, check=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.temp_repo_path, check=True)
+    
+    def run_swe_agent(self):
+        """
+        Run the SWE-agent command
+        """
+        command = [
+            "sweagent", "run",
+            f"--agent.model.name={self.swe_agent_model_name}",
+            f"--agent.model.per_instance_cost_limit={self.swe_agent_per_instance_cost_limit}",
+            f"--env.repo.path={self.temp_repo_path}",
+            f"--env.deployment.image={self.swe_agent_deployment_image}",
+            f"--problem_statement.path={self.swe_agent_problem_statement_path}",
+        ]
+
+        print(f"Running SWE-agent command: {' '.join(command)}")
+
+        try:
+            # Runs the SWE-agent command
+            process = subprocess.run(command, text=True, cwd=self.temp_repo_path)
+            # If SWE-agent does not encounter any issues, try to apply the patch file via git apply
+            if process.returncode == 0:
+                print("SWE-agent command executed successfully.")
+                print("Applying patch...")
+
+                # The trajectories folder which is created at runtime by SWE-agent. It contains the patch file.
+                trajectories_dir = "/Users/ishan/pssg/tmp/temp_sweagent_repo/trajectories/ishan" # @TODO: replace with actual path (os.join(self.temp_repo_path, "trajectories"))
+                # The new patch which the patch file will be renamed to
+                new_patch_path = None
+
+                # Finds the path of the patch file
+                def find_patch_file(trajectories_dir):
+                    for root, dirs, files in os.walk(trajectories_dir):
+                        for file in files:
+                            if file.endswith(".patch"):
+                                return os.path.join(root, file)  # Return the full path of the .patch file
+                            
+                    print("Error: No patch file found in trajectories directory.")
+                    return None
+                
+                old_patch_path = find_patch_file(trajectories_dir)
+
+                # If the old patch path is found, rename the old patch path to the new patch path
+                if old_patch_path is None:
+                    print("Error: No patch file found in trajectories directory.")
+                    return False
+                else:
+                    new_patch_path = "/Users/ishan/pssg/tmp/temp_sweagent_repo/temp.patch" # @TODO: replace with actual path (os.join(self.temp_repo_path, "temp.patch"))
+                    os.rename(old_patch_path, new_patch_path)
+
+                # Clears the unnecessary whitespace of the patch file
+                subprocess.run(["sed", "-i", "", "s/[ \t]*$//", new_patch_path], check=True, cwd=self.temp_repo_path)
+                print('Cleared up the whitespace of the patch file')
+                
+                # Apply the patch to the temp repo
+                try:
+                    subprocess.run(["git", "apply", "--directory=.", "--reject", "--whitespace=fix", "--unsafe-paths", new_patch_path], cwd=self.temp_repo_path, check=True)
+                    print("Patch applied successfully.")
+                    
+                except subprocess.CalledProcessError as e:
+                    return False
+
+                return True
+            
+            else:
+                print(f"Command failed with return code {process.returncode}.")
+                # print the subprocess return code
+                return False
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            return False
 
     def save_output(self, output_dir):
         """
@@ -122,6 +219,19 @@ class SWEAgentTranslator(Translator):
             shutil.rmtree(output_dir)
         shutil.copytree(self.temp_repo_path, output_dir, dirs_exist_ok=True)
         subprocess.run(f"rm -rf {output_dir}/.git", shell=True, check=True)
+
+    def remove_unnecessary_output_files(self):
+        """
+        Remove unnecessary files (any .cu or .cuh files)
+        """
+        print(f"Cleaning the output repository: {self.output_repo}")
+
+        for root, _, files in os.walk(self.output_repo):
+            for file in files:
+                if file.endswith(".cu") or file.endswith(".cuh"):
+                    os.remove(os.path.join(root, file))
+
+        print(f"Finished cleaning the output repository: {self.output_repo}")
     
     def write_experiment_metadata(self):
         """
@@ -151,6 +261,7 @@ class SWEAgentTranslator(Translator):
         """
         Remove the temporary repository
         """
+        print("Cleaning up temporary repository...")
         if os.path.exists(self.temp_repo_path):
             shutil.rmtree(self.temp_repo_path)
         print("Temporary repository cleaned up.")
