@@ -109,11 +109,11 @@ def run_sweagent(args, temp_repo_path):
        return False
 
 """Copy the contents of the temporary repository to the output directory"""
-def save_output(temp_repo_path, output_dir):
+def save_output(temp_repo_path):
    # If the output repo exists, clean the repo
-   if os.path.exists(output_dir):
-       shutil.rmtree(output_dir)
-   shutil.copytree(temp_repo_path, output_dir, dirs_exist_ok=True)
+   if os.path.exists(args.output_dir):
+       shutil.rmtree(args.output_dir)
+   shutil.copytree(temp_repo_path, args.output_dir, dirs_exist_ok=True)
    subprocess.run(f"rm -rf {args.output_dir}/.git", shell=True, check=True)
 
 """Generates the experiment metadata JSON file"""

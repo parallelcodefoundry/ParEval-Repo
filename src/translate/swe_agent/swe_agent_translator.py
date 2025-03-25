@@ -1,9 +1,12 @@
+# std imports
 import os
 import shutil
 import subprocess
-import time
 import json
-from ..translator import Translator
+
+# local imports
+from translator import Translator
+from repo import Repo
 
 class SWEAgentTranslator(Translator):
     """
@@ -12,16 +15,16 @@ class SWEAgentTranslator(Translator):
 
     def __init__(
         self,
-        input_repo,
-        output_repo,
-        src_model,
-        dst_model,
-        dst_config,
+        input_repo: Repo,
+        output_repo: os.PathLike,
+        src_model: str,
+        dst_model: str,
+        dst_config: dict,
         log_interactions=False,
         dry=False,
         hide_progress=False,
         swe_agent_model_name=None,
-        swe_agent_per_instance_cost_limit=2.0,
+        swe_agent_per_instance_cost_limit=0.10,
         swe_agent_deployment_image=None,
         swe_agent_problem_statement_path=None,
         swe_agent_output_id=None,
@@ -47,7 +50,7 @@ class SWEAgentTranslator(Translator):
     @staticmethod
     def add_args(parser):
         parser.add_argument("--swe-agent-model-name", type=str, required=True,
-                            help="Name of the agent model to use (e.g. 'gpt-4').")
+                            help="Name of the agent model to use (e.g. 'gpt-4o').")
         parser.add_argument("--swe-agent-per-instance-cost-limit", type=float, required=True,
                             help="Per-instance cost limit for the agent model.")
         parser.add_argument("--swe-agent-deployment-image", type=str, required=True,
@@ -70,48 +73,62 @@ class SWEAgentTranslator(Translator):
     def translate(self):
         """
         To Do's
-          1. Copy the original repo to a temp directory
-          2. Initialize git and commit
           3. Run the SWE-agent command
           4. Find/rename/cleanup/apply patch
-          5. Copy the result to the final output directory (Partially done)
-          6. Write experiment metadata (Done, check the repo path part since it's not a string)
-          7. Cleanup (Done)
         """
-    
-    def _initialize_temp_repo(self):
+
+        """
+        1. Copy the original repo to a temp directory
+        2. Initialize git and commit
+        """
+        self.initialize_temp_repo()
+
+        """
+        5. Copy the result to the final output directory
+        """
+        self.save_output(self.output_repo)
+
+        """
+        6. Write experiment metadata
+        """
+        self.write_experiment_metadata()
+
+        """
+        7. Cleanup
+        """
+        self.cleanup_temp_repo()
+
+    def initialize_temp_repo(self):
         """
         Initialize the temporary repository
         """
         if os.path.exists(self.temp_repo_path):
             print("The temporary repository exists. Removing the repository...")
             shutil.rmtree(self.temp_repo_path)
-        time.sleep(10)
         # Copies original repo to temp repo
-        shutil.copytree(self._input_repo, self.temp_repo_path, dirs_exist_ok=True)
+        shutil.copytree(self.input_repo, self.temp_repo_path, dirs_exist_ok=True)
 
         # Initial commits to the temp repo
         subprocess.run(["git", "init"], cwd=self.temp_repo_path, check=True)
         subprocess.run(["git", "add", "."], cwd=self.temp_repo_path, check=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.temp_repo_path, check=True)
 
-    def _save_output(self, temp_repo_path, output_dir):
+    def save_output(self, output_dir):
         """
         Copy the contents of the temporary repository to the final output directory.
         Remove the .git in order to add the output to the results repository.
         """
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
-        shutil.copytree(temp_repo_path, output_dir, dirs_exist_ok=True)
-        # Remove the .git directory
-        # Change later: subprocess.run(f"rm -rf {args.output_dir}/.git", shell=True, check=True)
+        shutil.copytree(self.temp_repo_path, output_dir, dirs_exist_ok=True)
+        subprocess.run(f"rm -rf {output_dir}/.git", shell=True, check=True)
     
-    def _write_experiment_metadata(self):
+    def write_experiment_metadata(self):
         """
         Write an experiment_metadata.json in the output directory with
         details about the translation
         """
-        exp_meta_fpath = os.path.join(self._output_repo, "experiment_metadata.json")
+        exp_meta_fpath = os.path.join(self.output_repo, "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
 
         app_name = os.path.basename(self._input_repo.path)
@@ -130,7 +147,7 @@ class SWEAgentTranslator(Translator):
 
         print(f"Experiment metadata written to {exp_meta_fpath}.")    
 
-    def _cleanup_temp_repo(self):
+    def cleanup_temp_repo(self):
         """
         Remove the temporary repository
         """
