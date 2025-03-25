@@ -6,7 +6,7 @@
 #PBS -q debug
 #PBS -A DemocAI
 
-MODEL_NAME=Llama-3.3-70B-Instruct-Q5_K_S.gguf
+MODEL_NAME=Llama-3.3-70B-Instruct-Q4_K_L.gguf
 
 # Activate vLLM environment
 source /home/jhdavis/venvs/2024-04-29-vllm/bin/activate
@@ -32,8 +32,9 @@ vllm serve /dev/shm/$MODEL_NAME \
      --host 127.0.0.1 \
      --port 8000 \
      --api-key token_abc123 \
-     --tensor-parallel-size 2 \
-     --pipeline-parallel-size 2 \
+     --tensor-parallel-size 4 \
+     --gpu-memory-utilization 0.95 \
+     --enforce-eager \
      --enable-prefix-caching &
 echo "Done"
 
