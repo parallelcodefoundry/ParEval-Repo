@@ -1,7 +1,7 @@
 get_usage () {
     echo "Usage: translate.sh method llm_name llm_backend [application] [outputid]"
     echo "method: the method to use (e.g., naive, restate)"
-    echo "llm_name: the name of the LLM to use (e.g., gpt-4o-mini, gemini-1.5-flash)"
+    echo "llm_name: the name of the LLM to use (e.g., gpt-4o-mini, gemini-2.0-flash)"
     echo "llm_backend: the backend to use (e.g., openai, gemini)"
     echo "application: the name of the application to translate"
     echo "             (e.g., microXOR, XSBench, SimpleMOC-kernel, llm.c)"
@@ -13,13 +13,16 @@ run_translate () {
     llm_version=$2
     base_llm_version=$(basename -- "$llm_version")
     llm_name="${base_llm_version%.*}"
+    if [[ $llm_version == *"gemini"* ]]; then
+        llm_name=${llm_version}
+    fi
     llm_backend=$3
     application=$4
     iter=$5
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
             --config ../../../targets/${application}/openmp-offload \
-            --output ../../../../code-translation-results/${application}/${method}-${llm_name}-cuda-to-omp \
+            --output ../../../../code-translation-results/${application}/${method}-${llm_version}-cuda-to-omp \
             --output-id ${iter} \
             --app-name ${application} \
             --method ${method} \
@@ -37,31 +40,31 @@ run_translate () {
 
 if [ "$#" -eq 3 ]; then
     method=$1
-    llm_name=$2
+    llm_version=$2
     llm_backend=$3
-    echo "Running all ${method} experiments for ${llm_name} (${llm_backend})"
+    echo "Running all ${method} experiments for ${llm_version} (${llm_backend})"
     for application in "microXOR" "XSBench" "SimpleMOC-kernel" "llm.c"; do
         for iter in {1..5}; do
-            run_translate ${method} ${llm_name} ${llm_backend} ${application} ${iter}
+            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
         done
     done
 elif [ "$#" -eq 4 ]; then
     method=$1
-    llm_name=$2
+    llm_version=$2
     llm_backend=$3
     application=$4
-    echo "Running all ${method} experiments for ${llm_name} (${llm_backend}) and ${application}"
-    for iter in {1..5}; do
-        run_translate ${method} ${llm_name} ${llm_backend} ${application} ${iter}
+    echo "Running all ${method} experiments for ${llm_version} (${llm_backend}) and ${application}"
+    for iter in {1..50}; do
+        run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
     done
 elif [ "$#" -eq 5 ]; then
     method=$1
-    llm_name=$2
+    llm_version=$2
     llm_backend=$3
     application=$4
     iter=$5
-    echo "Running one ${method} experiment for ${llm_name} (${llm_backend}) and ${application}, output ID ${iter}"
-    run_translate ${method} ${llm_name} ${llm_backend} ${application} ${iter}
+    echo "Running one ${method} experiment for ${llm_version} (${llm_backend}) and ${application}, output ID ${iter}"
+    run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
 else
     get_usage
     exit 1

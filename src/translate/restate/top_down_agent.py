@@ -178,11 +178,14 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
 
 
-    def _log_interaction(self, response: str):
-        """ Log the raw LLM output to a text file.
+    def _log_interaction(self, prompt: str, response: str):
+        """ Log the prompt and raw LLM output to a text file.
         """
         with open(self._interactions_path, 'a', encoding="UTF-8") as f:
-            f.write(response + "\n")
+            f.write("PROMPT:\n")
+            f.write(prompt + "\n")
+            f.write("RESPONSE:\n")
+            f.write(response + "\n\n")
 
 
     # override
@@ -228,8 +231,6 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         if len(chunks) == 1:
             print("Requesting whole file translation...")
             response = self._get_translation(context, chunks[0], node, graph)
-            if self._log_interactions:
-                self._log_interaction(response)
             translation = self._postprocess(response)
         else:
             translation = ""
@@ -237,8 +238,6 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             for chunk in chunks:
                 print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
                 response = self._get_translation(context, chunk, node, graph, prev_chunk=prev_chunk)
-                if self._log_interactions:
-                    self._log_interaction(response)
                 chunk_translation = self._postprocess(response)
                 translation += chunk_translation + "\n"
                 prev_chunk = chunk_translation
@@ -288,4 +287,9 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 ex_build_desc=prompt_config_dst["ex_build_desc"],
                 dep_graph=DependencyAgent.graph_to_str(graph)))
 
-        return self.generate(prompt)
+        response = self.generate(prompt)
+
+        if self._log_interactions:
+            self._log_interaction(prompt, response)
+
+        return response

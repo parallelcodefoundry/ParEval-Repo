@@ -87,7 +87,7 @@ class GeneratorMixin:
                                                         system_instruction=self._system_prompt)
             self._generator = self._generate_gemini
             if self._rpm_limit is None:
-                self._rpm_limit = 9
+                self._rpm_limit = 7
             if self._tpm_limit is None:
                 self._tpm_limit = 6000
 
@@ -361,8 +361,9 @@ class GeneratorMixin:
             except google.api_core.exceptions.GoogleAPIError as e:
                 # failure, wait 15 sec. and retry
                 num_attempts += 1
-                print(f"{type(e)} when generating response.")
-                print(f"Attempt {num_attempts} of {self.MAX_ATTEMPTS}.")
+                print(f"{type(e)} when generating response:")
+                print(e)
+                print(f"Attempt {num_attempts} of {self.MAX_ATTEMPTS}, retrying in 15 seconds...")
                 time.sleep(15)
                 if num_attempts == self.MAX_ATTEMPTS:
                     raise RuntimeError("Max attempts reached, unable to generate response.") \
