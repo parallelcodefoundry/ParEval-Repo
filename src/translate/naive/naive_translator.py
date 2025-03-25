@@ -173,15 +173,18 @@ class NaiveTranslator(Translator, GeneratorMixin):
         return max_cols
 
 
-    def _update_interaction_log(self, output: str, fpath: os.PathLike):
-        """ Write output to interaction log for the given filename if logging
-            is enabled.
+    def _update_interaction_log(self, prompt: str, response: str, fpath: os.PathLike):
+        """ Write prompt and response to interaction log for the given filename
+            if logging is enabled.
         """
         if self._log_interactions:
             log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
             os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
             with open(log_fpath, 'w', encoding="UTF-8") as f:
-                f.write(output)
+                f.write("PROMPT:\n")
+                f.write(prompt + "\n")
+                f.write("RESPONSE:\n")
+                f.write(response + "\n\n")
 
 
     def _write_metadata(self, repo_fpath: os.PathLike):
@@ -233,7 +236,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
                 continue
 
             raw_output = self.generate(prompt)
-            self._update_interaction_log(raw_output, fpath)
+            self._update_interaction_log(prompt, raw_output, fpath)
             output = self._postprocess(raw_output)
 
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
