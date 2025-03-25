@@ -22,7 +22,7 @@ run_translate () {
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
             --config ../../../targets/${application}/openmp-offload \
-            --output ../../../../code-translation-results/${application}/${method}-${llm_version}-cuda-to-omp \
+            --output ../../../../code-translation-results/${application}/${method}-${llm_name}-cuda-to-omp \
             --output-id ${iter} \
             --app-name ${application} \
             --method ${method} \
