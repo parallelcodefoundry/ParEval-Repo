@@ -191,7 +191,7 @@ class GeneratorMixin:
         if not completion.choices:
             raise ValueError("No completions returned from vLLM.")
         return completion.choices[0].message.content, \
-            completion.usage.prompt_tokens, completion.usage.completed_tokens
+            completion.usage.prompt_tokens, completion.usage.completion_tokens
 
 
     def _generate_gemini(
