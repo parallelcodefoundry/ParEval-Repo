@@ -1,912 +1,659 @@
 {
     "0": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 5,
-        "path": "../../data/XSBench/naive-gemini-cuda-to-omp/output-5/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gemini-1.5-flash-cuda-to-omp/output-5/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
             0,
+            0,
             0
         ],
         "run_stdouts_debug": [
+            "THIS SHOULD NOT BE OVERWRITTEN",
             "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "1": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 4,
-        "path": "../../data/XSBench/naive-gemini-cuda-to-omp/output-4/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gemini-1.5-flash-cuda-to-omp/output-4/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "2": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 1,
-        "path": "../../data/XSBench/naive-gemini-cuda-to-omp/output-1/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gemini-1.5-flash-cuda-to-omp/output-1/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "3": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 2,
-        "path": "../../data/XSBench/naive-gemini-cuda-to-omp/output-2/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gemini-1.5-flash-cuda-to-omp/output-2/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "4": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 3,
-        "path": "../../data/XSBench/naive-gemini-cuda-to-omp/output-3/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gemini-1.5-flash-cuda-to-omp/output-3/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "5": {
-        "app": "XSBench",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 5,
-        "path": "../../data/XSBench/naive-gpt-4o-mini-cuda-to-omp/output-5/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gemini-1.5-flash-cuda-to-omp/output-5/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "6": {
-        "app": "XSBench",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 4,
-        "path": "../../data/XSBench/naive-gpt-4o-mini-cuda-to-omp/output-4/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gemini-1.5-flash-cuda-to-omp/output-4/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "7": {
-        "app": "XSBench",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 1,
-        "path": "../../data/XSBench/naive-gpt-4o-mini-cuda-to-omp/output-1/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gemini-1.5-flash-cuda-to-omp/output-1/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "8": {
-        "app": "XSBench",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 2,
-        "path": "../../data/XSBench/naive-gpt-4o-mini-cuda-to-omp/output-2/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gemini-1.5-flash-cuda-to-omp/output-2/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "9": {
-        "app": "XSBench",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gemini-1.5-flash",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 3,
-        "path": "../../data/XSBench/naive-gpt-4o-mini-cuda-to-omp/output-3/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gemini-1.5-flash-cuda-to-omp/output-3/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "10": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 5,
-        "path": "../../data/XSBench/naive-llama-3.1-cuda-to-omp/output-5/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gpt-4o-mini-cuda-to-omp/output-5/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "11": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 4,
-        "path": "../../data/XSBench/naive-llama-3.1-cuda-to-omp/output-4/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gpt-4o-mini-cuda-to-omp/output-4/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "12": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 1,
-        "path": "../../data/XSBench/naive-llama-3.1-cuda-to-omp/output-1/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gpt-4o-mini-cuda-to-omp/output-1/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "13": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 2,
-        "path": "../../data/XSBench/naive-llama-3.1-cuda-to-omp/output-2/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gpt-4o-mini-cuda-to-omp/output-2/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "14": {
-        "app": "XSBench",
+        "app": "nanoxor",
         "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 3,
-        "path": "../../data/XSBench/naive-llama-3.1-cuda-to-omp/output-3/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/naive-gpt-4o-mini-cuda-to-omp/output-3/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
             1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
             0,
             0
         ],
         "run_stdouts_debug": [
             "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
             "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "15": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 5,
-        "path": "../../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-5/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gpt-4o-mini-cuda-to-omp/output-5/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
+            1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
+            0,
             0
         ],
         "run_stdouts_debug": [
+            "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
+            "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "16": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 4,
-        "path": "../../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-4/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gpt-4o-mini-cuda-to-omp/output-4/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
+            1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
+            0,
             0
         ],
         "run_stdouts_debug": [
+            "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
+            "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "17": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 1,
-        "path": "../../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-1/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gpt-4o-mini-cuda-to-omp/output-1/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
+            1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
+            0,
             0
         ],
         "run_stdouts_debug": [
+            "ALSO THIS",
+            "",
             ""
         ],
         "run_stderrs_debug": [
+            "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "18": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
+        "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 2,
-        "path": "../../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-2/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gpt-4o-mini-cuda-to-omp/output-2/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
         "run_results_debug": [
+            1,
+            1,
             1
         ],
         "run_exec_checks_debug": [
+            0,
+            0,
             0
         ],
         "run_stdouts_debug": [
+            "",
+            "",
             ""
         ],
         "run_stderrs_debug": [
+            "",
+            "",
             ""
-        ]
+        ],
+        "tempdir_path": null
     },
     "19": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/SimpleMOC-kernel/naive-gemini-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "20": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-cuda-to-omp/output-5/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "21": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "22": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "23": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "24": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "25": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-mini-cuda-to-omp/output-5/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "26": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-mini-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "27": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-mini-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "28": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-mini-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "29": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
+        "app": "nanoxor",
+        "prompt_strategy": "restate",
         "llm_name": "gpt-4o-mini",
         "source_model": "cuda",
         "dest_model": "openmp-offload",
         "output_number": 3,
-        "path": "../../data/SimpleMOC-kernel/naive-gpt-4o-mini-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "30": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/SimpleMOC-kernel/naive-llama-3.1-cuda-to-omp/output-5/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "31": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/SimpleMOC-kernel/naive-llama-3.1-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "32": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/SimpleMOC-kernel/naive-llama-3.1-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "33": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/SimpleMOC-kernel/naive-llama-3.1-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "34": {
-        "app": "SimpleMOC-kernel",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/SimpleMOC-kernel/naive-llama-3.1-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1
-        ],
-        "run_exec_checks_debug": [
-            0
-        ],
-        "run_stdouts_debug": [
-            ""
-        ],
-        "run_stderrs_debug": [
-            ""
-        ]
-    },
-    "35": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/microXOR/naive-gemini-cuda-to-omp/output-5/repo",
+        "path": "/home/jhdavis/repos/llms4hpc/code-translation-results/outputs/nanoXOR/restate-gpt-4o-mini-cuda-to-omp/output-3/repo",
+        "ground_truth_build": false,
         "build_result_debug": 0,
         "build_stdout_debug": "",
         "build_stderr_debug": "",
@@ -929,614 +676,7 @@
             "",
             "",
             ""
-        ]
-    },
-    "36": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/microXOR/naive-gemini-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
         ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "37": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/microXOR/naive-gemini-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "38": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/microXOR/naive-gemini-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "39": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gemini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/microXOR/naive-gemini-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "40": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/microXOR/naive-gpt-4o-cuda-to-omp/output-5/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "41": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/microXOR/naive-gpt-4o-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "42": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/microXOR/naive-gpt-4o-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "43": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/microXOR/naive-gpt-4o-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "44": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/microXOR/naive-gpt-4o-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "45": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/microXOR/naive-gpt-4o-mini-cuda-to-omp/output-5/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "46": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/microXOR/naive-gpt-4o-mini-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "47": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/microXOR/naive-gpt-4o-mini-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "48": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/microXOR/naive-gpt-4o-mini-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "49": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "gpt-4o-mini",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/microXOR/naive-gpt-4o-mini-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "50": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 5,
-        "path": "../../data/microXOR/naive-llama-3.1-cuda-to-omp/output-5/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "51": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 4,
-        "path": "../../data/microXOR/naive-llama-3.1-cuda-to-omp/output-4/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "52": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 1,
-        "path": "../../data/microXOR/naive-llama-3.1-cuda-to-omp/output-1/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "53": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 2,
-        "path": "../../data/microXOR/naive-llama-3.1-cuda-to-omp/output-2/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
-    },
-    "54": {
-        "app": "microXOR",
-        "prompt_strategy": "naive",
-        "llm_name": "llama3.1",
-        "source_model": "cuda",
-        "dest_model": "openmp-offload",
-        "output_number": 3,
-        "path": "../../data/microXOR/naive-llama-3.1-cuda-to-omp/output-3/repo",
-        "build_result_debug": 0,
-        "build_stdout_debug": "",
-        "build_stderr_debug": "",
-        "run_results_debug": [
-            1,
-            1,
-            1
-        ],
-        "run_exec_checks_debug": [
-            0,
-            0,
-            0
-        ],
-        "run_stdouts_debug": [
-            "",
-            "",
-            ""
-        ],
-        "run_stderrs_debug": [
-            "",
-            "",
-            ""
-        ]
+        "tempdir_path": null
     }
 }
