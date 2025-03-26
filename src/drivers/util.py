@@ -89,24 +89,23 @@ def dict_merge(dct, merge_dct):
         if k not in merge_dct:
             dct[k].append(None)
 
-def update_results(results, results_row):
-    """ Update the results dict of lists with an individual results dictionary,
-        matching based on path """
-    # Find the row in the results dict that matches the path
-    path = results_row["path"]
-    if path not in results["path"]:
-        logging.error(f"Path {path} not found in results.")
-        raise ValueError(f"Path {path} not found in results.")
-    row_idx = results["path"].index(path)
-
-    # Update the results dict with the results row
-    for key, value in results_row.items():
-        if key in results:
-            if results[key][row_idx] is None or results_row["ground_truth_build"]:
-                results[key][row_idx] = value
-            elif results[key][row_idx] != value:
-                logging.error(f"Key already has a non-matching value in results, {results[key][row_idx]} != {value}.")
-                raise ValueError(f"Key already has a non-matching value in results, {results[key][row_idx]} != {value}.")
-        else:
-            logging.error(f"Key {key} not found in results.")
-            raise ValueError(f"Key {key} not found in results.")
+def empty_results_dict():
+    """ Create an empty results dictionary """
+    return {
+        "app": [],
+        "prompt_strategy": [],
+        "llm_name": [],
+        "source_model": [],
+        "dest_model": [],
+        "output_number": [],
+        "path": [],
+        "ground_truth_build": [],
+        "build_result_debug": [],
+        "build_stdout_debug": [],
+        "build_stderr_debug": [],
+        "run_results_debug": [],
+        "run_exec_checks_debug": [],
+        "run_stdouts_debug": [],
+        "run_stderrs_debug": [],
+        "tempdir_path": []
+    }

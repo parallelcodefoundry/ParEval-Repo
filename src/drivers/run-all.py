@@ -19,7 +19,7 @@ from alive_progress import alive_bar
 import pandas as pd
 
 # local imports
-from util import await_input, setup_tempdir, dict_merge, update_results
+from util import await_input, setup_tempdir, dict_merge, empty_results_dict
 from build import build_repo
 from run import run_repo, make_skip_run_result
 
@@ -48,6 +48,9 @@ def get_args() -> ArgumentParser:
                         help="If provided, automatically answer yes to all prompts.")
     parser.add_argument("-d", "--dry", action="store_true",
                         help="Dry run. Do not actually compile or run the code repositories.")
+    parser.add_argument("-s", "--skip-repeats", action="store_true",
+                        help="If provided, skip code repositories that have already been run, " +
+                        "appending to the output file. Takes precedence over --force-overwrite.")
     parser.add_argument("-f", "--force-overwrite", action="store_true",
                         help="If outputs are already in DB for a given prompt, overwrite them.")
     parser.add_argument("--hide-progress", action="store_true",
@@ -125,7 +128,7 @@ def log_metadata_found(metadata_found: Dict[str, List],
     logging.debug("\n" + json.dumps(code_repos, indent=4))
 
 
-def gather_code_repos(args: ArgumentParser, results: Dict[str, List]) \
+def gather_code_repos(args: ArgumentParser, results: Dict[str, List], skip_repeats: bool) \
     -> List[Dict[str, str]]:
     ''' Gather all the generated code repositories. Root directory format is:
         translations_root/app/case-name/output-number/, including
@@ -142,6 +145,7 @@ def gather_code_repos(args: ArgumentParser, results: Dict[str, List]) \
             "path": path
         }
         where all entries are read in from the experiment_metadata.json file.
+        If skip_repeats is set, skip code repositories that have already been run.
     '''
     code_repos = []
 
@@ -153,6 +157,8 @@ def gather_code_repos(args: ArgumentParser, results: Dict[str, List]) \
         "llms_found" : [],
         "prompt_strategies_found" : [],
     }
+
+    num_skipped = 0
 
     for dirpath, _, filenames in os.walk(args.translations_root):
         for filename in filenames:
@@ -176,18 +182,24 @@ def gather_code_repos(args: ArgumentParser, results: Dict[str, List]) \
                     # Parse the metadata
                     exp_meta = parse_metadata(args, exp_meta, metadata_found)
                     if exp_meta:
-                        code_repos.append(exp_meta)
+                        # Check if there is an entry in the results dict matching
+                        # the current repo path
+                        output_path = exp_meta["path"]
+                        if output_path in results["path"] and skip_repeats:
+                            num_skipped += 1
+                            logging.debug(f"Skipping duplicate code repository: {output_path}")
+                            continue
                     else:
                         continue
 
-                    # Check if there is an entry in the results dict matching
-                    # the current repo path
-                    output_path = exp_meta["path"]
-                    if output_path in results["path"]:
-                        logging.warning(f"Skipping duplicate code repository: {output_path}")
-                    else:
-                        dict_merge(results, exp_meta)
-                        logging.debug(f"Found code repository: {output_path}")
+                    # Add the metadata to the code_repos list and results dict
+                    code_repos.append(exp_meta)
+                    dict_merge(results, exp_meta)
+                    logging.debug(f"Found code repository: {output_path}")
+
+    if num_skipped > 0:
+        logging.info(f"Skipped {num_skipped} code repositories that have " +
+                     "already been run.")
 
     # Log the metadata found
     log_metadata_found(metadata_found, code_repos)
@@ -237,10 +249,16 @@ def startup_from_args(args: ArgumentParser) -> os.PathLike:
             logging.warning("Exiting.")
             sys.exit(0)
 
-    # Check that force overwrite is set if output file already exists
-    if os.path.exists(args.output) and not args.force_overwrite:
-        raise FileExistsError(f"Output file {args.output} already exists. " +
-                              "Use --force-overwrite to overwrite.")
+    # Check that force overwrite or skip repeats is set if output file already exists,
+    # and overwrite if force overwrite is set
+    if os.path.exists(args.output):
+        if not (args.force_overwrite or args.skip_repeats):
+            raise FileExistsError(f"Output file {args.output} already exists. " +
+                                  "Use --force-overwrite to overwrite or " +
+                                  "--skip-repeats to skip existing runs and append.")
+        if args.force_overwrite and not args.skip_repeats:
+            logging.warning(f"Output file {args.output} already exists. Overwriting.")
+            os.remove(args.output)
 
     # Check that the scratch directory exists
     scratch = os.path.abspath(args.scratch_dir)
@@ -262,9 +280,41 @@ def save_temps(tempdir: os.PathLike, args: ArgumentParser,
     results_row["tempdir_path"] = str(tempdir_path)
 
 
+def update_results(results, results_row, output):
+    """ Update the results dict of lists with an individual results dictionary,
+        matching based on path """
+    # Find the row in the results dict that matches the path
+    path = results_row["path"]
+    if path not in results["path"]:
+        raise ValueError(f"Path {path} not found in results.")
+    row_idx = results["path"].index(path)
+
+    # Update the results dict with the results row
+    for key, value in results_row.items():
+        if key in results:
+            if results[key][row_idx] is None or results_row["ground_truth_build"]:
+                results[key][row_idx] = value
+            elif results[key][row_idx] != value:
+                raise ValueError(f"Key already has a non-matching value in results, " +
+                                 f"{results[key][row_idx]} != {value}.")
+        else:
+            raise ValueError(f"Key {key} not found in results.")
+
+    # Todo: change below to append to existing file rather than rewriting everything
+
+    # Convert results dict to dataframe
+    results_df = pd.DataFrame.from_dict(results)
+
+    # Write the results dataframe to the output filename
+    logging.info(f"Writing results to {output}.")
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(json.loads(results_df.to_json(orient="index")), f, indent=4)
+
+
 def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
                  system_config: Dict[str, str], args: ArgumentParser,
                  scratch: os.PathLike, pbar: alive_bar,
+                 output: os.PathLike,
                  ground_truth_build: Optional[bool] = False) -> Dict[str, str]:
     ''' Build and run the code repository.
     '''
@@ -276,7 +326,7 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
         logging.debug(f"Building code repository: {code_repo['path']}")
         results_row_build = build_repo(code_repo, system_config, args, tempdir,
                                        ground_truth_build=ground_truth_build)
-        update_results(results, results_row_build)
+        update_results(results, results_row_build, output)
         pbar()
 
         if results_row_build["build_result_debug"] == 0:
@@ -288,13 +338,13 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
             if args.save_temps:
                 save_temps(tempdir, args, results_row_run)
 
-            update_results(results, results_row_run)
+            update_results(results, results_row_run, output)
 
         elif ground_truth_build or args.skip_build_swap:
             logging.debug(f"Skipping run for {code_repo['path']} due to build failure.")
             results_row_run = make_skip_run_result(code_repo)
             results_row_run["ground_truth_build"] = ground_truth_build
-            update_results(results, results_row_run)
+            update_results(results, results_row_run, output)
 
         # if build failed we will try again with ground truth build, so don't
         # update results yet
@@ -316,28 +366,19 @@ def main():
         system_config = json.load(f)
     logging.debug(f"Loaded system config: {system_config}")
 
-    # Create dict of empty lists to store results with columns for each field
-    results = {
-        "app": [],
-        "prompt_strategy": [],
-        "llm_name": [],
-        "source_model": [],
-        "dest_model": [],
-        "output_number": [],
-        "path": [],
-        "ground_truth_build": [],
-        "build_result_debug": [],
-        "build_stdout_debug": [],
-        "build_stderr_debug": [],
-        "run_results_debug": [],
-        "run_exec_checks_debug": [],
-        "run_stdouts_debug": [],
-        "run_stderrs_debug": [],
-        "tempdir_path": []
-    }
+    # Construct inital results dict from disk if skip repeats is set, otherwise
+    # create dict of empty lists to store results with columns for each field
+    if args.skip_repeats and os.path.exists(args.output):
+        with open(args.output, "r", encoding="utf-8") as f:
+            results = json.loads(pd.read_json(f, orient="index").to_json(orient="columns"))
+            # convert back to dict of lists
+            results = {k: list(v.values()) for k, v in results.items()}
+        logging.info(f"Loaded {len(results['path'])} results from {args.output}.")
+    else:
+        results = empty_results_dict()
 
     # Gather all the code repositories
-    code_repos = gather_code_repos(args, results)
+    code_repos = gather_code_repos(args, results, args.skip_repeats)
 
     # Build and run each code repository
     max_cols = safe_get_cols()
@@ -347,24 +388,16 @@ def main():
                    max_cols=max_cols, disable=args.hide_progress) as pbar:
         for code_repo in code_repos:
             results_row = process_repo(code_repo, results, system_config, args,
-                                       scratch, pbar)
+                                       scratch, pbar, args.output)
 
             if not args.skip_build_swap:
                 if results_row["build_result_debug"] != 0:
                     process_repo(code_repo, results, system_config, args,
-                                 scratch, pbar, ground_truth_build=True)
+                                 scratch, pbar, args.output,
+                                 ground_truth_build=True)
                 else:
                     pbar()
                     pbar()
-
-    # Convert results dict to dataframe
-    results_df = pd.DataFrame.from_dict(results)
-
-    # Write the results dataframe to the output filename
-    logging.info(f"Writing results to {args.output}.")
-    with open(args.output, "w", encoding="utf-8") as f:
-        json.dump(json.loads(results_df.to_json(orient="index")), f, indent=4)
-
 
 if __name__ == "__main__":
     main()
