@@ -67,7 +67,7 @@ class SWEAgentTranslator(Translator):
             "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit,
             "swe_agent_deployment_image": args.swe_agent_deployment_image,
             "swe_agent_problem_statement_path": args.swe_agent_problem_statement_path,
-            "swe_agent_output_id": args.swe_agent_output_id,
+            "swe_agent_output_id": args.swe_agent_output_id
         }
     
     def translate(self):
