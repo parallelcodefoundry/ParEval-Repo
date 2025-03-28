@@ -6,7 +6,9 @@
 #PBS -q debug
 #PBS -A DemocAI
 
-MODEL_NAME=Llama-3.3-70B-Instruct-Q4_K_L.gguf
+#MODEL_NAME=Llama-3.3-70B-Instruct-Q4_K_L.gguf
+#MODEL_PATH=/dev/shm/$MODEL_NAME
+MODEL_PATH=Qwen/QwQ-32B
 
 # Activate vLLM environment
 source /home/jhdavis/venvs/2024-04-29-vllm/bin/activate
@@ -21,21 +23,23 @@ export NO_PROXY=127.0.0.1,localhost
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 # Copy model to /dev/shm/
-echo -n "Copying model to /dev/shm/... "
-cp $SCRATCH/$MODEL_NAME /dev/shm/
-echo "Done"
+#echo -n "Copying model to /dev/shm/... "
+#cp $SCRATCH/$MODEL_NAME /dev/shm/
+#echo "Done"
 
 # Start vLLM server
 echo -n "Launching vLLM server process... "
-vllm serve /dev/shm/$MODEL_NAME \
-     --tokenizer meta-llama/Llama-3.3-70B-Instruct \
+#     --tokenizer meta-llama/Llama-3.3-70B-Instruct
+vllm serve $MODEL_PATH \
      --host 127.0.0.1 \
      --port 8000 \
      --api-key token_abc123 \
      --tensor-parallel-size 4 \
      --gpu-memory-utilization 0.95 \
      --enforce-eager \
-     --enable-prefix-caching &
+     --enable-prefix-caching \
+     --enable-reasoning \
+     --reasoning-parser deepseek_r1 &
 echo "Done"
 
 VLLM_PID=$!  # Capture the PID of the server process
@@ -54,31 +58,7 @@ nvidia-smi
 cd /home/jhdavis/llms4hpc/code-translation/src/translate/test
 module use /soft/modulefiles
 module load llvm cudatoolkit-standalone
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 0
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 1
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 2
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 3
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 4
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 5
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 6
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 7
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 8
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 9
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 10
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 11
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 12
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 13
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 14
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 15
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 16
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 17
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 18
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 19
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 20
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 21
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 22
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 23
-bash translate.sh restate /dev/shm/$MODEL_NAME vllm microXOR 24
+bash translate.sh restate $MODEL_PATH vllm microXOR 1 25
 
 # Exit when finished
 exit

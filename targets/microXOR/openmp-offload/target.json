@@ -24,7 +24,7 @@
     "perf_outputs": [
         "Validation passed."
     ],
-    "run_timeout": 120,
+    "run_timeout": 60,
     "ex_build_cmd": "make SM_VERSION=sm_80 CXX_COMPILER=clang++",
     "ex_build_desc": "a system with an NVIDIA GPU with compute capability 80 compiled with clang++",
     "build_filename": "Makefile",

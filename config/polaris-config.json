@@ -1,0 +1,9 @@
+{
+    "gnu": "module load PrgEnv-gnu",
+    "llvm": "module use /soft/modulefiles ; module load llvm",
+    "cuda": "module use /soft/modulefiles ; module load cudatoolkit-standalone",
+    "kokkos": "module use /soft/modulefiles ; module load kokkos",
+    "sm": "80",
+    "exec_check": "ncu",
+    "exec_check_fail_text": "==WARNING== No kernels were profiled."
+}

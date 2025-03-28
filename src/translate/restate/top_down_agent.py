@@ -287,7 +287,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 ex_build_desc=prompt_config_dst["ex_build_desc"],
                 dep_graph=DependencyAgent.graph_to_str(graph)))
 
-        response = self.generate(prompt)
+        response = self.generate(prompt, temperature=0.2, top_p=0.95)
 
         if self._log_interactions:
             self._log_interaction(prompt, response)
