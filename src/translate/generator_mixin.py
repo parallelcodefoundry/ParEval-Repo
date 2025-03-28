@@ -179,9 +179,18 @@ class GeneratorMixin:
         if not self._vllm_client:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
+        if system_prompt is not None and "QwQ" in self._llm_name:
+            # Merge system prompt into main prompt if using reasoning model
+            text = self._format_messages_list(system_prompt + "\n" + prompt)
+            # Also adjust temp and top_p
+            temperature = 0.6
+            top_p = 0.95
+        else:
+            text = self._format_messages_list(prompt, system_prompt)
+
         completion = self._vllm_client.chat.completions.create(
             model=self._llm_name,
-            messages=self._format_messages_list(prompt, system_prompt),
+            messages=text,
             temperature=temperature,
             top_p=top_p,
             n=1,

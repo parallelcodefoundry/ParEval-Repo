@@ -235,7 +235,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
                 print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
                 continue
 
-            raw_output = self.generate(prompt)
+            raw_output = self.generate(prompt, temperature=0.2, top_p=0.95)
             self._update_interaction_log(prompt, raw_output, fpath)
             output = self._postprocess(raw_output)
 

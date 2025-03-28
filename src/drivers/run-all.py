@@ -19,7 +19,7 @@ from alive_progress import alive_bar
 import pandas as pd
 
 # local imports
-from util import await_input, setup_tempdir, dict_merge, empty_results_dict
+from util import await_input, setup_tempdir, dict_merge, empty_results_dict, empty_other_keys_at_idx
 from build import build_repo
 from run import run_repo, make_skip_run_result
 
@@ -181,20 +181,29 @@ def gather_code_repos(args: ArgumentParser, results: Dict[str, List], skip_repea
 
                     # Parse the metadata
                     exp_meta = parse_metadata(args, exp_meta, metadata_found)
-                    if exp_meta:
-                        # Check if there is an entry in the results dict matching
-                        # the current repo path
-                        output_path = exp_meta["path"]
-                        if output_path in results["path"] and skip_repeats:
+
+                    # Go to next iter if parse_metadata decided to skip due to filters
+                    if exp_meta is None:
+                        continue
+
+                    # Check if there is an entry in the results dict matching
+                    # the current repo path
+                    output_path = exp_meta["path"]
+                    if output_path in results["path"] and skip_repeats:
+                        idx = results["path"].index(output_path)
+                        # Only skip if result found has complete data
+                        if results["run_stdouts_debug"][idx] is not None:
                             num_skipped += 1
                             logging.debug(f"Skipping duplicate code repository: {output_path}")
                             continue
+                        # Need to set non-metadata keys' values to None if found incomplete data
+                        empty_other_keys_at_idx(results, exp_meta, idx)
                     else:
-                        continue
+                        # Only need to add metadata to the results if not present
+                        dict_merge(results, exp_meta)
 
-                    # Add the metadata to the code_repos list and results dict
+                    # Always add the metadata to the code_repos list if not skipped
                     code_repos.append(exp_meta)
-                    dict_merge(results, exp_meta)
                     logging.debug(f"Found code repository: {output_path}")
 
     if num_skipped > 0:
@@ -281,8 +290,9 @@ def save_temps(tempdir: os.PathLike, args: ArgumentParser,
 
 
 def update_results(results, results_row, output):
-    """ Update the results dict of lists with an individual results dictionary,
-        matching based on path """
+    ''' Update the results dict of lists with an individual results dictionary,
+        matching based on path.
+    '''
     # Find the row in the results dict that matches the path
     path = results_row["path"]
     if path not in results["path"]:
