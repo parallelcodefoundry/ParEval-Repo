@@ -72,7 +72,7 @@ elif [ "$#" -eq 6 ]; then
     llm_backend=$3
     application=$4
     fiter=$5
-    lfiter=$6
+    liter=$6
     echo "Running ${fiter} thru ${liter} ${method} experiments for ${llm_version} (${llm_backend}) and ${application}"
     for iter in $(seq ${fiter} ${liter}); do
         run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
