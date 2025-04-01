@@ -340,7 +340,7 @@ class GeneratorMixin:
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         **kwargs
-    ) -> Tuple[Union[str, None], Union[str, None]]:
+    ) -> Tuple[str, Union[str, None]]:
         """ Generate text using the specified backend.
         """
         import google.api_core.exceptions
@@ -349,7 +349,7 @@ class GeneratorMixin:
         if self._max_input_tokens is not None and self._input_token_count > self._max_input_tokens \
             or self._max_output_tokens is not None and self._output_token_count > self._max_output_tokens \
             or self._max_requests is not None and self._request_count > self._max_requests:
-            return None
+            raise RuntimeError("Generator limits reached.")
 
         # set system prompt if not provided
         if self._system_prompt is not None and system_prompt is None:
@@ -358,7 +358,7 @@ class GeneratorMixin:
         if self._generator is None:
             raise RuntimeError(f"Generator not initialized. Possible illegal backend '{self._backend}'")
         num_attempts = 0
-        response, reasoning, in_tokens, out_tokens = None, None, 0, 0
+        response, reasoning, in_tokens, out_tokens = "", None, 0, 0
         while num_attempts < self.MAX_ATTEMPTS:
             # wait for rate limit if needed
             self._enforce_limits()
