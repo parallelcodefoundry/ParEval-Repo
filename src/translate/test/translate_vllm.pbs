@@ -1,64 +1,49 @@
 #!/bin/bash
 #PBS -N translate_vllm
-#PBS -l select=1:system=polaris
+#PBS -l select=2:system=polaris
 #PBS -l filesystems=home:eagle
-#PBS -l walltime=1:00:00
+#PBS -l walltime=0:20:00
 #PBS -q debug
 #PBS -A DemocAI
 
-#MODEL_NAME=Llama-3.3-70B-Instruct-Q4_K_L.gguf
-#MODEL_PATH=/dev/shm/$MODEL_NAME
-MODEL_PATH=Qwen/QwQ-32B
+# Array of translate instance args
+Arglist=('_' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 1 2' \
+             'naive Qwen/QwQ-32B nanoXOR 1 2' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 13 25' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 26 38' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 39 50' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 1 12' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 13 25' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 26 38' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 39 50' \
+             'naive Qwen/QwQ-32B nanoXOR 1 6' \
+             'naive Qwen/QwQ-32B nanoXOR 7 12' \
+             'naive Qwen/QwQ-32B nanoXOR 13 18' \
+             'naive Qwen/QwQ-32B nanoXOR 19 30' \
+             'restate Qwen/QwQ-32B nanoXOR 1 6' \
+             'restate Qwen/QwQ-32B nanoXOR 7 12' \
+             'restate Qwen/QwQ-32B nanoXOR 13 18' \
+             'restate Qwen/QwQ-32B nanoXOR 19 30' \
+        )
 
-# Activate vLLM environment
-source /home/jhdavis/venvs/2024-04-29-vllm/bin/activate
+# Setup working directory for the ensemble
+SCRIPTDIR=/home/jhdavis/llms4hpc/code-translation/src/translate/test
+WORKDIR=/home/jhdavis/llms4hpc/code-translation/src/translate/test/trns-ensemble-${PBS_JOBID%%.*}
+mkdir $WORKDIR
+cd $WORKDIR
 
-# Set environment variables
-export HTTP_PROXY="http://proxy.alcf.anl.gov:3128"
-export HTTPS_PROXY="http://proxy.alcf.anl.gov:3128"
-export LD_LIBRARY_PATH=$HOME/venvs/2024-04-29-vllm/lib64/python3.11/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
-export TMPDIR=/tmp/vllm && mkdir -p $TMPDIR
-export VLLM_HOST_IP=127.0.0.1
-export NO_PROXY=127.0.0.1,localhost
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+# Get number of nodes
+NNODES=`wc -l < $PBS_NODEFILE`
 
-# Copy model to /dev/shm/
-#echo -n "Copying model to /dev/shm/... "
-#cp $SCRATCH/$MODEL_NAME /dev/shm/
-#echo "Done"
+# Create hostfiles
+split --lines=1 --numeric-suffixes=1 --suffix-length=2 $PBS_NODEFILE local_hostfile.
 
-# Start vLLM server
-echo -n "Launching vLLM server process... "
-#     --tokenizer meta-llama/Llama-3.3-70B-Instruct
-vllm serve $MODEL_PATH \
-     --host 127.0.0.1 \
-     --port 8000 \
-     --api-key token_abc123 \
-     --tensor-parallel-size 4 \
-     --gpu-memory-utilization 0.95 \
-     --enforce-eager \
-     --enable-prefix-caching \
-     --enable-reasoning \
-     --reasoning-parser deepseek_r1 &
-echo "Done"
-
-VLLM_PID=$!  # Capture the PID of the server process
-
-# Wait for server to start
-echo "Waiting for vLLM server to become available... "
-until curl -H "Authorization: Bearer token_abc123" -s http://127.0.0.1:8000/v1/models | grep -q "object"; do
-    sleep 5
+for iter in $(seq -f %02.0f 1 $NNODES); do
+    echo "Launching translate instance on local_hostfile.$iter: ${Arglist[$iter]}"
+    cd $SCRIPTDIR
+    mpiexec -n 1 --ppn 1 --hostfile $WORKDIR/local_hostfile.$iter bash translate_vllm_instance.sh ${Arglist[$iter]} $WORKDIR/out.$iter &
+    sleep 1s
 done
-echo "Server confirmed available."
 
-# Check memory utlization across devices
-nvidia-smi
-
-# Do translation
-cd /home/jhdavis/llms4hpc/code-translation/src/translate/test
-module use /soft/modulefiles
-module load llvm cudatoolkit-standalone
-bash translate.sh restate $MODEL_PATH vllm microXOR 1 25
-
-# Exit when finished
-exit
+wait
