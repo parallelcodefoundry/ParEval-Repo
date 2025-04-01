@@ -1,3 +1,4 @@
+#!/bin/bash
 get_usage () {
     echo "Usage: translate.sh method llm_name llm_backend [application] [outputid] [finid]"
     echo "method: the method to use (e.g., naive, restate)"
