@@ -173,7 +173,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
         return max_cols
 
 
-    def _update_interaction_log(self, prompt: str, response: str, fpath: os.PathLike):
+    def _update_interaction_log(self, prompt: str, response: str,
+                                reasoning: Union[str, None],
+                                fpath: os.PathLike):
         """ Write prompt and response to interaction log for the given filename
             if logging is enabled.
         """
@@ -183,6 +185,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
             with open(log_fpath, 'w', encoding="UTF-8") as f:
                 f.write("PROMPT:\n")
                 f.write(prompt + "\n")
+                if reasoning is not None:
+                    f.write("REASONING:\n")
+                    f.write(reasoning + "\n")
                 f.write("RESPONSE:\n")
                 f.write(response + "\n\n")
 
@@ -235,8 +240,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
                 print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
                 continue
 
-            raw_output = self.generate(prompt, temperature=0.2, top_p=0.95)
-            self._update_interaction_log(prompt, raw_output, fpath)
+            raw_output, reasoning = self.generate(prompt, temperature=0.2, top_p=0.95)
+            self._update_interaction_log(prompt, raw_output, reasoning, fpath)
             output = self._postprocess(raw_output)
 
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)

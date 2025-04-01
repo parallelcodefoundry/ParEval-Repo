@@ -34,7 +34,7 @@ class ContextAgent:
 
 Please extract any code snippets from the above translated files that may be relevant to translating {node.rel_path}. Do not provide any new code or translations, just rewrite the relevant context in the form of code snippets with some explanation."""
 
-        context = self._generator.generate(prompt)
+        context, _ = self._generator.generate(prompt)
         return context.strip() if context else ""
 
     def _read_translated_file(self, rel_path: str) -> str:

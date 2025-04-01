@@ -13,7 +13,7 @@
 import os
 import sys
 import json
-from typing import Dict, Literal, Optional, List
+from typing import Dict, Literal, Optional, List, Union
 import re
 
 # local imports
@@ -178,12 +178,15 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
 
 
-    def _log_interaction(self, prompt: str, response: str):
+    def _log_interaction(self, prompt: str, response: str, reasoning: Union[str, None]):
         """ Log the prompt and raw LLM output to a text file.
         """
         with open(self._interactions_path, 'a', encoding="UTF-8") as f:
             f.write("PROMPT:\n")
             f.write(prompt + "\n")
+            if reasoning is not None:
+                f.write("REASONING:\n")
+                f.write(reasoning + "\n")
             f.write("RESPONSE:\n")
             f.write(response + "\n\n")
 
@@ -287,9 +290,9 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 ex_build_desc=prompt_config_dst["ex_build_desc"],
                 dep_graph=DependencyAgent.graph_to_str(graph)))
 
-        response = self.generate(prompt, temperature=0.2, top_p=0.95)
+        response, reasoning = self.generate(prompt, temperature=0.2, top_p=0.95)
 
         if self._log_interactions:
-            self._log_interaction(prompt, response)
+            self._log_interaction(prompt, response, reasoning)
 
         return response

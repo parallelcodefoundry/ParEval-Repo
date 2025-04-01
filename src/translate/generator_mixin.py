@@ -7,7 +7,7 @@ import os
 import time
 import pickle
 import atexit
-from typing import Optional, Literal, Callable, List, Tuple, Dict
+from typing import Optional, Literal, Callable, List, Tuple, Dict, Union
 from math import ceil
 
 class GeneratorMixin:
@@ -143,7 +143,7 @@ class GeneratorMixin:
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
             **kwargs
-    ) -> Tuple[str, int, int]:
+    ) -> Tuple[str, Optional[str], int, int]:
         """ Generate text using the OpenAI API.
         """
         if not self._openai_client:
@@ -161,7 +161,7 @@ class GeneratorMixin:
 
         if not completion.choices:
             raise ValueError("No completions returned from OpenAI.")
-        return completion.choices[0].message.content, \
+        return completion.choices[0].message.content, None, \
             completion.usage.prompt_tokens, completion.usage.completion_tokens
 
 
@@ -173,18 +173,20 @@ class GeneratorMixin:
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
             **kwargs
-    ) -> Tuple[str, int, int]:
+    ) -> Tuple[str, Union[str, None], int, int]:
         """ Generate text using the vLLM via the OpenAI server API.
         """
         if not self._vllm_client:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
+        is_reasoning = False
         if system_prompt is not None and "QwQ" in self._llm_name:
             # Merge system prompt into main prompt if using reasoning model
             text = self._format_messages_list(system_prompt + "\n" + prompt)
             # Also adjust temp and top_p
             temperature = 0.6
             top_p = 0.95
+            is_reasoning = True
         else:
             text = self._format_messages_list(prompt, system_prompt)
 
@@ -199,7 +201,10 @@ class GeneratorMixin:
 
         if not completion.choices:
             raise ValueError("No completions returned from vLLM.")
-        return completion.choices[0].message.content, \
+        reasoning = None
+        if is_reasoning:
+            reasoning = completion.choices[0].message.reasoning_content
+        return completion.choices[0].message.content, reasoning, \
             completion.usage.prompt_tokens, completion.usage.completion_tokens
 
 
@@ -211,7 +216,7 @@ class GeneratorMixin:
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
             **kwargs
-    ) -> Tuple[str, int, int]:
+    ) -> Tuple[str, Union[str, None], int, int]:
         """ Generate text using the Gemini API.
         """
         import google.generativeai as genai
@@ -233,7 +238,7 @@ class GeneratorMixin:
                 top_p=top_p,
             )
         )
-        return response.text, \
+        return response.text, None, \
             response.usage_metadata.prompt_token_count, \
             response.usage_metadata.candidates_token_count
 
@@ -246,7 +251,7 @@ class GeneratorMixin:
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         **kwargs
-    ) -> Tuple[str, int, int]:
+    ) -> Tuple[str, Union[str, None], int, int]:
         """ Generate text using the Hugging Face API.
         """
         if not self._hf_inference_client:
@@ -265,7 +270,7 @@ class GeneratorMixin:
         if not response.choices:
             raise ValueError("No completions returned from Hugging Face.")
 
-        return response.choices[0].message.content, 0, 0
+        return response.choices[0].message.content, None, 0, 0
 
 
     @property
@@ -335,7 +340,7 @@ class GeneratorMixin:
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         **kwargs
-    ) -> Optional[str]:
+    ) -> Tuple[Union[str, None], Union[str, None]]:
         """ Generate text using the specified backend.
         """
         import google.api_core.exceptions
@@ -353,7 +358,7 @@ class GeneratorMixin:
         if self._generator is None:
             raise RuntimeError(f"Generator not initialized. Possible illegal backend '{self._backend}'")
         num_attempts = 0
-        response, in_tokens, out_tokens = None, 0, 0
+        response, reasoning, in_tokens, out_tokens = None, None, 0, 0
         while num_attempts < self.MAX_ATTEMPTS:
             # wait for rate limit if needed
             self._enforce_limits()
@@ -361,12 +366,12 @@ class GeneratorMixin:
             try:
                 # generate response
                 start_time = time.time()
-                response, in_tokens, out_tokens = self._generator(prompt,
-                                                                  system_prompt,
-                                                                  max_new_tokens,
-                                                                  temperature,
-                                                                  top_p,
-                                                                  **kwargs)
+                response, reasoning, in_tokens, out_tokens = self._generator(prompt,
+                                                                             system_prompt,
+                                                                             max_new_tokens,
+                                                                             temperature,
+                                                                             top_p,
+                                                                             **kwargs)
             except google.api_core.exceptions.GoogleAPIError as e:
                 # failure, wait 15 sec. and retry
                 num_attempts += 1
@@ -390,4 +395,4 @@ class GeneratorMixin:
         self._output_token_count += out_tokens
         self._request_count += 1
 
-        return response
+        return response, reasoning
