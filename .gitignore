@@ -2,6 +2,7 @@
 *.exe
 a.out
 *.bin
+*.out
 
 .ipynb_checkpoints
 __pycache__
