@@ -351,13 +351,16 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
             update_results(results, results_row_run, output)
 
         elif ground_truth_build or args.skip_build_swap:
+            # build failed and this is the ground truth build or we're skipping
+            # ground truth
             logging.debug(f"Skipping run for {code_repo['path']} due to build failure.")
             results_row_run = make_skip_run_result(code_repo)
             results_row_run["ground_truth_build"] = ground_truth_build
             update_results(results, results_row_run, output)
 
-        # if build failed we will try again with ground truth build, so don't
-        # update results yet
+        # otherwise, build failed, but this is not the ground truth build and we
+        # are going to try again
+
         pbar()
 
     return results_row_build

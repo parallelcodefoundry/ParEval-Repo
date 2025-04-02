@@ -125,6 +125,8 @@ def empty_results_dict():
         "build_result_debug": [],
         "build_stdout_debug": [],
         "build_stderr_debug": [],
+        "gen_build_stdout_debug": [],
+        "gen_build_stderr_debug": [],
         "run_results_debug": [],
         "run_exec_checks_debug": [],
         "run_stdouts_debug": [],

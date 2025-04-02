@@ -70,6 +70,8 @@ def build_repo(repo_data, system_config, args, tempdir, ground_truth_build = Fal
             logging.error(f"Setup failed for {repo_data['app']} with model " +
                           f"{repo_data['dest_model']}.")
             result = prepare_result_dict(repo_data, setup_result, ground_truth_build)
+            result["gen_build_stdout_debug"] = result["build_stdout_debug"]
+            result["gen_build_stderr_debug"] = result["build_stderr_debug"]
             return result
 
     # Get cmds from system, target config

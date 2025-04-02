@@ -78,7 +78,9 @@ run_vllm_translation () {
     echo "Done"
 }
 
-stamp () { echo "[$$ | $(date '+%Y-%m-%d %H:%M:%S')]" }
+stamp () {
+    echo "[$$ | $(date '+%Y-%m-%d %H:%M:%S')]"
+}
 
 if [ "$#" -eq 6 ]; then
     echo "$(stamp) Starting vLLM translation instance, writing to $6"
