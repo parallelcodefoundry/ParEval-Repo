@@ -7,7 +7,7 @@ import sys
 import re
 import json
 from abc import abstractmethod
-from typing import Dict, Tuple, Union, Literal
+from typing import Dict, Tuple, Union, Literal, List
 
 # tpl imports
 from alive_progress import alive_it
@@ -15,7 +15,7 @@ from alive_progress import alive_it
 # local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
-from generator_mixin import GeneratorMixin
+from generator_mixin import GeneratorMixin, GenericResponse
 from repo import Repo
 from naive import naive_constants as nc
 
@@ -29,7 +29,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
     def __init__(
             self,
             input_repo: Repo,
-            output_repo: os.PathLike,
+            output_repos: List[os.PathLike],
             src_model: str,
             dst_model: str,
             dst_config: dict,
@@ -39,7 +39,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             dry: bool = False,
             hide_progress: bool = False
     ):
-        super().__init__(input_repo, output_repo, src_model, dst_model,
+        super().__init__(input_repo, output_repos, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
 
         GeneratorMixin.__init__(self, backend, llm_name,
@@ -80,7 +80,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
         all_fpaths = self._input_repo.get_all_filenames(relpaths=True)
         all_files_str = "\n\n".join(
             map(lambda fpath:
-                fpath + ":\n"
+                str(fpath) + ":\n"
                 + self._input_repo.get_file_contents(rel_path=fpath),
                 all_fpaths))
         prompt_config_src = self._input_repo.get_meta_dict()
@@ -175,12 +175,13 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
     def _update_interaction_log(self, prompt: str, response: str,
                                 reasoning: Union[str, None],
-                                fpath: os.PathLike):
+                                fpath: os.PathLike,
+                                repo_path: os.PathLike):
         """ Write prompt and response to interaction log for the given filename
             if logging is enabled.
         """
         if self._log_interactions:
-            log_fpath = os.path.join(self._output_fpath, "interactions", f"{fpath}.txt")
+            log_fpath = os.path.join(repo_path, "interactions", f"{fpath}.txt")
             os.makedirs(os.path.dirname(log_fpath), exist_ok=True)
             with open(log_fpath, 'w', encoding="UTF-8") as f:
                 f.write("PROMPT:\n")
@@ -218,10 +219,13 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """ Translate the entire repository.
         """
         all_files = self._input_repo.get_all_filenames(relpaths=True)
-        repo_fpath = os.path.join(self._output_fpath, "repo")
+        num_translations = len(self._output_fpaths)
+        repo_paths = [os.path.join(self._output_fpaths[i], f"output-{i}") \
+                       for i in range(num_translations)]
         max_cols = self._safe_get_columns()
 
-        print(f"Beginning translation of {repo_fpath} using {self._llm_name} with NaiveTranslator.")
+        print(f"Beginning {num_translations} batched translation(s) " +
+              "starting from {repo_fpath} using {self._llm_name} with NaiveTranslator.")
         print(f"Files to translate: {all_files}")
 
         # loop over all files and translate
@@ -231,23 +235,29 @@ class NaiveTranslator(Translator, GeneratorMixin):
                               disable=self._hide_progress):
             prompt, trigger_rename = self._get_prompt(fpath)
 
-            output_fpath = os.path.join(repo_fpath,
-                                        self._update_output_file_extension(fpath,
-                                                                           trigger_rename=trigger_rename))
+            updated_fname = self._update_output_file_extension(fpath,
+                                                               trigger_rename=trigger_rename)
+            output_fpaths = [os.path.join(rp, updated_fname) for rp in repo_paths]
 
             if self._dry:
                 print(prompt)
-                print(f"Skipped translation of {fpath} to {output_fpath} for dry run.")
+                print(f"Skipped translation of {fpath} to " +
+                      f"{output_fpaths[0]}..{output_fpaths[-1]} for dry run.")
                 continue
 
-            raw_output, reasoning = self.generate(prompt, temperature=0.2, top_p=0.95)
-            self._update_interaction_log(prompt, raw_output, reasoning, fpath)
-            output = self._postprocess(raw_output)
+            responses = self.generate(prompt, temperature=0.2, top_p=0.95)
+            for i, response in enumerate(responses):
+                output_fpath, repo_path = output_fpaths[i], repo_paths[i]
+                raw_output, reasoning = response.response, response.reasoning
+                self._update_interaction_log(prompt, raw_output, reasoning,
+                                             fpath, repo_path)
+                output = self._postprocess(raw_output)
 
-            os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
-            with open(output_fpath, 'w', encoding="UTF-8") as f:
-                f.write(output)
-            print(f"Translated {fpath} to {output_fpath}")
+                os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
+                with open(output_fpath, 'w', encoding="UTF-8") as f:
+                    f.write(output)
+                print(f"Translated {fpath} to {output_fpath}")
+
 
         # dump experiment metadata
         self._write_metadata(repo_fpath)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ Translating repositories from one execution model to another using LLMs.
-    For example, this script can take a CUDA application as input and 
+    For example, this script can take a CUDA application as input and
     translate it to an OpenMP version of the same application.
 
     author: Daniel Nichols
@@ -29,7 +29,8 @@ def get_args():
     parser.add_argument("--method", choices=["naive", "restate", "swe-agent"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
-    parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
+    parser.add_argument("--output-id", type=int, required=True, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
+    parser.add_argument("-n", "--num-translations", type=int, default=1, help="The number of translations to generate. Currently only supported for OpenAI and vLLM with naive, will write to directories numbered from output-id through output-id + num-translations - 1.")
     parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", "-d", action="store_true", help="Dry run the translation.")
     parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
@@ -66,11 +67,19 @@ def main():
     if not os.path.exists(args.input):
         raise FileNotFoundError(f"Input directory {args.input} not found.")
 
-    # check if the output directory exists and is empty
-    output_dir = os.path.join(args.output, "output-" + str(args.output_id))
+    # Exit if trying to run top-down agent with more than one translation
+    if args.method == "restate" and args.num_translations > 1:
+        raise ValueError("Top-down agent only supports a single translation at a time.")
+
+    # check if the output directories exist and are empty
+    output_dirs = [os.path.join(args.output, "output-" + str(i)) \
+                   for i in range(args.output_id, args.output_id + args.num_translations)]
     if os.path.exists(args.output):
-        if os.path.exists(output_dir) and not args.force_overwrite:
-            raise FileExistsError(f"Output directory {output_dir} already exists. Provide --force-overwrite to overwrite.")
+        if not args.force_overwrite:
+            for d in output_dirs:
+                if os.path.exists(d):
+                    raise FileExistsError(f"Output directory {d} already exists. " +
+                                          "Provide --force-overwrite to overwrite.")
     else:
         os.mkdir(args.output)
 
@@ -90,7 +99,7 @@ def main():
     translator_args = translator_cls.parse_args(args)
     translator = translator_cls(
         input_repo=input_repo,
-        output_repo=output_dir,
+        output_repos=output_dirs,
         src_model=args.src_model,
         dst_model=args.dst_model,
         dst_config=dst_config,
