@@ -92,10 +92,7 @@ class SWEAgentTranslator(Translator):
     def generate_translation_task(self):
         print("Generating translation task...")
 
-        target_json = os.path.join(self.input_repo.path, "target.json")
-
-        with open(target_json, "r") as f:
-            data = json.load(f)
+        data = self._dst_config
 
         translation_task = f"""
         You are a helpful coding assistant.
