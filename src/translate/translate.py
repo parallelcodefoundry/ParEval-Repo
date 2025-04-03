@@ -97,6 +97,7 @@ def main():
         log_interactions=args.log_interactions,
         dry=args.dry,
         hide_progress=args.hide_progress,
+        output_id=args.output_id,
         **translator_args
     )
     translator.translate()

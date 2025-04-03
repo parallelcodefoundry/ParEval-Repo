@@ -25,9 +25,7 @@ class SWEAgentTranslator(Translator):
         hide_progress=False,
         swe_agent_model_name=None,
         swe_agent_per_instance_cost_limit=0.06,
-        swe_agent_deployment_image="python",
-        swe_agent_problem_statement_path=None,
-        swe_agent_output_id=0,
+        output_id=0
     ):
         super().__init__(
             input_repo,
@@ -42,10 +40,9 @@ class SWEAgentTranslator(Translator):
 
         self.swe_agent_model_name = swe_agent_model_name
         self.swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
-        self.swe_agent_deployment_image = swe_agent_deployment_image
-        self.swe_agent_problem_statement_path = swe_agent_problem_statement_path
-        self.swe_agent_output_id = swe_agent_output_id
+        self.output_id = output_id
         self.temp_repo_path = "/tmp/temp_sweagent_repo"
+        self.translation_task_path = os.path.join(self.input_repo.path, "translation_task.md")
 
     @staticmethod
     def add_args(parser):
@@ -53,21 +50,12 @@ class SWEAgentTranslator(Translator):
                             help="Name of the agent model to use (e.g. 'gpt-4o').")
         parser.add_argument("--swe-agent-per-instance-cost-limit", type=float, required=True,
                             help="Per-instance cost limit for the agent model.")
-        parser.add_argument("--swe-agent-deployment-image", type=str, required=True,
-                            help="Deployment image name for the environment.")
-        parser.add_argument("--swe-agent-problem-statement-path", type=str, required=True,
-                            help="Path to the problem statement file for the agent.")
-        parser.add_argument("--swe-agent-output-id", type=int, required=True,
-                            help="Integer ID for this run (used in experiment metadata).")
     
     @staticmethod
     def parse_args(args):
         return {
             "swe_agent_model_name": args.swe_agent_model_name,
-            "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit,
-            "swe_agent_deployment_image": args.swe_agent_deployment_image,
-            "swe_agent_problem_statement_path": args.swe_agent_problem_statement_path,
-            "swe_agent_output_id": args.swe_agent_output_id
+            "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit
         }
     
     def translate(self):
@@ -105,7 +93,6 @@ class SWEAgentTranslator(Translator):
         print("Generating translation task...")
 
         target_json = os.path.join(self.input_repo.path, "target.json")
-        translation_task_path = os.path.join(self.input_repo.path, "translation_task.md")
 
         with open(target_json, "r") as f:
             data = json.load(f)
@@ -118,10 +105,10 @@ class SWEAgentTranslator(Translator):
         The new files should be in {data["filename_desc"]} and all old {data["model"]} files must be deleted. A new Makefile should be made to compile accordingly with the new files.
         """.strip()
         
-        with open(translation_task_path, "w") as f:
+        with open(self.translation_task_path, "w") as f:
             f.write(translation_task)
 
-        print(f"Translation task generated: {translation_task_path}")
+        print(f"Translation task generated: {self.translation_task_path}")
 
     def initialize_temp_repo(self):
         """
@@ -148,8 +135,8 @@ class SWEAgentTranslator(Translator):
             f"--agent.model.name={self.swe_agent_model_name}",
             f"--agent.model.per_instance_cost_limit={self.swe_agent_per_instance_cost_limit}",
             f"--env.repo.path={self.temp_repo_path}",
-            f"--env.deployment.image={self.swe_agent_deployment_image}",
-            f"--problem_statement.path={self.swe_agent_problem_statement_path}",
+            f"--env.deployment.image=python",
+            f"--problem_statement.path={self.translation_task_path}",
         ]
 
         print(f"Running SWE-agent command: {' '.join(command)}")
@@ -249,7 +236,7 @@ class SWEAgentTranslator(Translator):
                 "llm_name": self.swe_agent_model_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": self.swe_agent_output_id,
+                "output_number": self.output_id,
                 "path": self._output_fpath
             }
             json.dump(exp_meta_dict, f, indent=4) 
