@@ -196,7 +196,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
     def _write_metadata(self, repo_path: os.PathLike):
         """ Write out experiment_metadata.json adjacent to repo path.
         """
-        exp_meta_fpath = os.path.join(self._output_path, "experiment_metadata.json")
+        exp_meta_fpath = os.path.join(repo_path, "..", "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
 
         with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
@@ -206,7 +206,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": int(repo_path.split("/")[-2][7:]),
+                "output_number": int(str(repo_path).split("/")[-2][7:]),
                 "path": repo_path,
                 "inference_stats": self.get_stats()
             }
