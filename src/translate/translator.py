@@ -16,7 +16,7 @@ from repo import Repo
 class Translator(ABC):
 
     _input_repo: Repo
-    _output_fpaths: List[os.PathLike]
+    _output_paths: List[os.PathLike]
     _src_model: str
     _dst_model: str
     _dst_config: dict
@@ -36,7 +36,7 @@ class Translator(ABC):
             hide_progress: bool = False
     ):
         self._input_repo = input_repo
-        self._output_fpaths = output_repos
+        self._output_paths = output_repos
         self._src_model = src_model
         self._dst_model = dst_model
         self._dst_config = dst_config
