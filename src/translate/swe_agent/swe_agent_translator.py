@@ -42,7 +42,7 @@ class SWEAgentTranslator(Translator):
         self.swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
         self.output_id = output_id
         self.temp_repo_path = "/tmp/temp_sweagent_repo"
-        self.translation_task_path = os.path.join(self.input_repo.path, "translation_task.md")
+        self.translation_task_path = os.path.join(self._input_repo.path, "translation_task.md")
 
     @staticmethod
     def add_args(parser):
@@ -116,7 +116,7 @@ class SWEAgentTranslator(Translator):
             print("The temporary repository exists. Removing the repository...")
             shutil.rmtree(self.temp_repo_path)
         # Copies original repo to temp repo
-        shutil.copytree(self.input_repo.path, self.temp_repo_path, dirs_exist_ok=True)
+        shutil.copytree(self._input_repo.path, self.temp_repo_path, dirs_exist_ok=True)
 
         # Initial commits to the temp repo
         subprocess.run(["git", "init"], cwd=self.temp_repo_path, check=True)
