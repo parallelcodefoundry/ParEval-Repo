@@ -210,7 +210,7 @@ class DependencyAgent:
         prompt = prompt.format(num_lines=num_lines, source_file=source_file,
                                source_lines=source_lines,
                                source_files="\n".join(source_files))
-        deps, _ = self._generator.generate(prompt)
+        deps = self._generator.generate(prompt)[0].response
         if deps is None:
             return None
 

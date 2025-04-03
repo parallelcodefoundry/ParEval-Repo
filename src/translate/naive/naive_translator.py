@@ -193,10 +193,10 @@ class NaiveTranslator(Translator, GeneratorMixin):
                 f.write(response + "\n\n")
 
 
-    def _write_metadata(self, repo_fpath: os.PathLike):
+    def _write_metadata(self, repo_path: os.PathLike):
         """ Write out experiment_metadata.json adjacent to repo path.
         """
-        exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
+        exp_meta_fpath = os.path.join(self._output_path, "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
 
         with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
@@ -206,8 +206,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": int(repo_fpath.split("/")[-2][7:]),
-                "path": repo_fpath,
+                "output_number": int(repo_path.split("/")[-2][7:]),
+                "path": repo_path,
                 "inference_stats": self.get_stats()
             }
             json.dump(exp_meta_dict, f, indent=4)
@@ -219,13 +219,13 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """ Translate the entire repository.
         """
         all_files = self._input_repo.get_all_filenames(relpaths=True)
-        num_translations = len(self._output_fpaths)
-        repo_paths = [os.path.join(self._output_fpaths[i], f"output-{i}") \
+        num_translations = len(self._output_paths)
+        repo_paths = [os.path.join(self._output_paths[i], f"output-{i}") \
                        for i in range(num_translations)]
         max_cols = self._safe_get_columns()
 
         print(f"Beginning {num_translations} batched translation(s) " +
-              "starting from {repo_fpath} using {self._llm_name} with NaiveTranslator.")
+              f"starting from {repo_paths[0]} using {self._llm_name} with NaiveTranslator.")
         print(f"Files to translate: {all_files}")
 
         # loop over all files and translate
@@ -245,7 +245,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
                       f"{output_fpaths[0]}..{output_fpaths[-1]} for dry run.")
                 continue
 
-            responses = self.generate(prompt, temperature=0.2, top_p=0.95)
+            responses = self.generate(prompt, temperature=0.2, top_p=0.95,
+                                      n=num_translations)
             for i, response in enumerate(responses):
                 output_fpath, repo_path = output_fpaths[i], repo_paths[i]
                 raw_output, reasoning = response.response, response.reasoning
@@ -258,6 +259,6 @@ class NaiveTranslator(Translator, GeneratorMixin):
                     f.write(output)
                 print(f"Translated {fpath} to {output_fpath}")
 
-
-        # dump experiment metadata
-        self._write_metadata(repo_fpath)
+        # dump experiment metadata files
+        for repo_path in repo_paths:
+            self._write_metadata(repo_path)

@@ -38,12 +38,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _chunk_file_agent: ChunkFileAgent
     _context_agent: ContextAgent
     _system_prompt: str
-    _interactions_path: Optional[str]
+    _interactions_path: Optional[os.PathLike] = None
+    _output_fpath: os.PathLike
 
     def __init__(
             self,
             input_repo: Repo,
-            output_repo: os.PathLike,
+            output_repos: List[os.PathLike],
             src_model: str,
             dst_model: str,
             dst_config: dict,
@@ -53,7 +54,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             dry: bool = False,
             hide_progress: bool = False
     ):
-        super().__init__(input_repo, output_repo, src_model, dst_model,
+        super().__init__(input_repo, output_repos, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
 
         self._system_prompt = ac.SYSTEM_TEMPLATE.format(
@@ -62,7 +63,9 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
         GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt)
 
-        interactions_path = None
+        # use the first output repo since agent doesn't support multiple outputs
+        self._output_fpath = output_repos[0]
+
         if self._log_interactions:
             self._interactions_path = os.path.join(self._output_fpath, "interactions.txt")
 
@@ -70,13 +73,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             os.makedirs(os.path.dirname(self._interactions_path), exist_ok=True)
 
         self._dependency_agent = DependencyAgent(generator=self,
-                                                 interactions_path=interactions_path)
+                                                 interactions_path=self._interactions_path)
         lang = "c" if self._dst_config["filename_desc"] == "C" else "cpp"
         self._chunk_file_agent = ChunkFileAgent(generator=self,
-                                                interactions_path=interactions_path,
+                                                interactions_path=self._interactions_path,
                                                 language=lang)
         self._context_agent = ContextAgent(generator=self,
-                                           interactions_path=interactions_path,
+                                           interactions_path=self._interactions_path,
                                            output_fpath=self._output_fpath)
 
     @staticmethod
@@ -170,7 +173,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": int(repo_fpath.split("/")[-2][7:]),
+                "output_number": int(str(repo_fpath).split("/")[-2][7:]),
                 "path": repo_fpath,
                 "inference_stats": self.get_stats()
             }
@@ -290,7 +293,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 ex_build_desc=prompt_config_dst["ex_build_desc"],
                 dep_graph=DependencyAgent.graph_to_str(graph)))
 
-        response, reasoning = self.generate(prompt, temperature=0.2, top_p=0.95)
+        response_obj = self.generate(prompt, temperature=0.2, top_p=0.95)[0]
+        response, reasoning = response_obj.response, response_obj.reasoning
 
         if self._log_interactions:
             self._log_interaction(prompt, response, reasoning)
