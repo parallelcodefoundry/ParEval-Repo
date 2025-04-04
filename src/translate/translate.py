@@ -10,12 +10,15 @@
 from argparse import ArgumentParser
 import os
 import json
+import shutil
+import tarfile
 
 # local imports
 from repo import Repo
 from translator import Translator
 from naive.naive_translator import NaiveTranslator
 from restate.top_down_agent import TopDownAgentTranslator
+from swe_agent.swe_agent_translator import SWEAgentTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -23,7 +26,7 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive", "restate"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive", "restate", "swe-agent"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
@@ -39,14 +42,20 @@ def get_args():
     # subgroup for top-down agent
     agent_args = parser.add_argument_group("top-down agent")
     TopDownAgentTranslator.add_args(agent_args)
-    return parser.parse_args()
 
+    # subgroup for SWE-agent translation method
+    swe_agent_args = parser.add_argument_group("SWE-agent translation")
+    SWEAgentTranslator.add_args(swe_agent_args)
+
+    return parser.parse_args()
 
 def get_translator_cls(method: str):
     if method == "naive":
         return NaiveTranslator
     if method == "restate":
         return TopDownAgentTranslator
+    if method == "swe-agent":
+        return SWEAgentTranslator
     raise ValueError(f"Translation method {method} not recognized.")
 
 
@@ -88,9 +97,24 @@ def main():
         log_interactions=args.log_interactions,
         dry=args.dry,
         hide_progress=args.hide_progress,
+        output_id=args.output_id,
         **translator_args
     )
     translator.translate()
+
+    def create_tarball():
+        """ Create a tarball of the output directory. """
+        tarball_name = f"output-{args.output_id}.tar.gz"
+        tarball_path = os.path.join(args.output, tarball_name)
+
+        with tarfile.open(tarball_path, "w:gz") as tar:
+            arcname = os.path.basename(output_dir)
+            tar.add(output_dir, arcname=arcname)
+
+        # deletes output directory after creating tarball
+        shutil.rmtree(output_dir)
+
+    create_tarball()
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):

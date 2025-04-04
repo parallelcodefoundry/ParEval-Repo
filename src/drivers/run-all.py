@@ -11,6 +11,7 @@ import os
 import logging
 import shutil
 import tempfile
+import tarfile
 import sys
 from typing import Dict, List
 
@@ -66,6 +67,23 @@ def get_args() -> ArgumentParser:
                         default="INFO", type=str.upper, help="Logging level.")
     return parser.parse_args()
 
+def extract_tarballs(translations_root: str, remove_tarball: bool = False):
+    """
+    Find all tarballs in translations_root and extract them.
+    Optionally remove the tarball if remove_tarball is True.
+    """
+    # Note: Need to check if corresponding output-repo already exists (need to delete it before extracting the tarball again)
+    # Idea: Could have a list of extracted repos and after running the drivers, remove those directories
+    for root, _, files in os.walk(translations_root):
+        for filename in files:
+            if filename.endswith(".tar.gz"):
+                tarball_path = os.path.join(root, filename)
+                print(f"Found tarball: {tarball_path} and extracting it.")
+                with tarfile.open(tarball_path, "r:gz") as tar:
+                    tar.extractall(path=root)
+                if remove_tarball:
+                    os.remove(tarball_path)
+                    print(f"Removed {tarball_path} after extraction.")
 
 def parse_metadata(args: ArgumentParser, exp_meta: Dict[str, str],
                    metadata_found: Dict[str, List]) -> Dict[str, str]:
@@ -247,6 +265,9 @@ def main():
 
     # Startup from command line arguments
     scratch = startup_from_args(args)
+
+    # Extract tarballs
+    extract_tarballs(args.translations_root, remove_tar=False)
 
     # Load system config
     with open(args.system_config, "r", encoding="utf-8") as f:
