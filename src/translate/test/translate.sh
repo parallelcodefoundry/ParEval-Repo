@@ -1,7 +1,7 @@
 #!/bin/bash
 get_usage () {
     echo "Usage: translate.sh method llm_name llm_backend [application] [outputid] [finid]"
-    echo "method: the method to use (e.g., naive, restate)"
+    echo "method: the method to use (e.g., naive, cnaive, restate)"
     echo "llm_name: the name of the LLM to use (e.g., gpt-4o-mini, gemini-2.0-flash)"
     echo "llm_backend: the backend to use (e.g., openai, gemini)"
     echo "application: the name of the application to translate"
@@ -21,6 +21,10 @@ run_translate () {
     llm_backend=$3
     application=$4
     iter=$5
+    if [[ $method == "cnaive" ]]; then
+        method="naive"
+        extra_args="--enable-chunking"
+    fi
     python3 ../translate.py \
             --input ../../../targets/${application}/cuda \
             --config ../../../targets/${application}/openmp-offload \
@@ -33,6 +37,7 @@ run_translate () {
             --src-model cuda \
             --dst-model openmp-offload \
             --log-interactions \
+            ${extra_args} \
             -f
     if [ $? -ne 0 ]; then
         echo "Failed at iteration ${iter}"
