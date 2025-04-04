@@ -93,7 +93,8 @@ class GeneratorMixin:
             from openai import OpenAI
             self._vllm_client = OpenAI(
                 base_url="http://127.0.0.1:8000/v1",
-                api_key="token_abc123"
+                api_key="token_abc123",
+                timeout=1200
             )
             self._generator = self._generate_vllm
 
