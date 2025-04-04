@@ -14,6 +14,21 @@ Here is the code for each file in the codebase:
 Translate the {filename} file to the {dst_model} execution model. Output the translated file in one code block. Assume {exts} filenames whenever referring to other files as this will be a {filename_desc} code.
 """
 
+CHUNK_PROMPT_TEMPLATE: str = """Below is a codebase written in the {src_model} execution model. We are translating it to the {dst_model} execution model.
+Here is the file tree of the entire repository:
+
+{file_tree}
+
+Here is the code for each file in the codebase besides the one being translated:
+
+{all_files}
+
+Translate the below chunk of {filename} file to the {dst_model} execution model. Output the translated file in one code block. Assume {exts} filenames whenever referring to other files as this will be a {filename_desc} code:
+
+{chunk}
+"""
+
+
 MAIN_ADDENDUM: str = """This file includes the main function. Please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
 """
 
