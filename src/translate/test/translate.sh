@@ -40,6 +40,38 @@ run_translate () {
     fi
 }
 
+run_batch_translate () {
+    method=$1
+    llm_version=$2
+    base_llm_version=$(basename -- "$llm_version")
+    llm_name="${base_llm_version%.*}"
+    if [[ $llm_version == *"gemini"* ]]; then
+        llm_name=${llm_version}
+    fi
+    llm_backend=$3
+    application=$4
+    fiter=$5
+    liter=$6
+    python3 ../translate.py \
+            --input ../../../targets/${application}/cuda \
+            --config ../../../targets/${application}/openmp-offload \
+            --output ../../../../code-translation-results/outputs/${application}/${method}-${llm_name}-cuda-to-omp \
+            --output-id ${fiter} \
+            -n $((1 + $liter - $fiter)) \
+            --app-name ${application} \
+            --method ${method} \
+            --${method}-backend ${llm_backend} \
+            --${method}-llm-name ${llm_version} \
+            --src-model cuda \
+            --dst-model openmp-offload \
+            --log-interactions \
+            -f
+    if [ $? -ne 0 ]; then
+        echo "Failed at iteration ${iter}"
+        exit 1
+    fi
+}
+
 if [ "$#" -eq 3 ]; then
     method=$1
     llm_version=$2
@@ -75,9 +107,14 @@ elif [ "$#" -eq 6 ]; then
     fiter=$5
     liter=$6
     echo "Running ${fiter} thru ${liter} ${method} experiments for ${llm_version} (${llm_backend}) and ${application}"
-    for iter in $(seq ${fiter} ${liter}); do
-        run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
-    done
+    if [[ $llm_backend == "vllm" && $method == "naive" ]]; then
+        echo "Using n-wise batching"
+        run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter}
+    else
+        for iter in $(seq ${fiter} ${liter}); do
+            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
+        done
+    fi
 else
     get_usage
     exit 1
