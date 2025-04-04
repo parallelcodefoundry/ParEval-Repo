@@ -42,7 +42,7 @@ split --lines=1 --numeric-suffixes=1 --suffix-length=2 $PBS_NODEFILE local_hostf
 for iter in $(seq -f %02.0f 1 $NNODES); do
     echo "Launching translate instance on local_hostfile.$iter: ${Arglist[$iter]}"
     cd $SCRIPTDIR
-    mpiexec -n 1 --ppn 1 --hostfile $WORKDIR/local_hostfile.$iter bash translate_vllm_instance.sh ${Arglist[$iter]} $WORKDIR/out.$iter &
+    mpiexec -n 1 --ppn 1 --hostfile $WORKDIR/local_hostfile.$iter bash translate_vllm_instance.sh ${Arglist[$iter]} $WORKDIR/out.$iter polaris &
     sleep 1s
 done
 
