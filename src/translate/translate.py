@@ -72,7 +72,7 @@ def main():
                     raise FileExistsError(f"Output directory {d} already exists. " +
                                           "Provide --force-overwrite to overwrite.")
     else:
-        os.mkdir(args.output)
+        os.makedirs(args.output, exist_ok=True)
 
     # check that the dest model target json for prompt config exists
     if not os.path.exists(args.config):
