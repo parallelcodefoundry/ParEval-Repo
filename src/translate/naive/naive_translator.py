@@ -97,7 +97,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
         prompt_config_src = self._input_repo.get_meta_dict()
         prompt_config_dst = self._dst_config
 
-        exts_str = ", ".join(v for v in nc.type_to_ext[prompt_config_dst["filename_desc"].lower()].values())
+        exts_str = ", ".join(v for v in \
+                             nc.type_to_ext[prompt_config_dst["filename_desc"].lower()].values())
         if chunk:
             print(chunk)
             base_prompt = nc.CHUNK_PROMPT_TEMPLATE.format(
@@ -152,13 +153,14 @@ class NaiveTranslator(Translator, GeneratorMixin):
         return (base_prompt, trigger_rename)
 
 
-    def _postprocess(self, output: str) -> str:
+    def _postprocess(self, output: str) -> Union[str, None]:
         """ make sure there's only one codeblock and extract it
         """
         CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
         match = CODE_BLOCK_PATTERN.search(output)
         if match is None:
-            raise ValueError(f"No code block found in output:\n{output}")
+            print(f"No code block found in output:\n{output}")
+            return None
         return match.group(1)
 
 
@@ -262,6 +264,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
             self._update_interaction_log(prompt, raw_output, reasoning,
                                          fpath, repo_path)
             output = self._postprocess(raw_output)
+            if output is None:
+                print(f"Failed to translate {fpath} to {output_fpath}")
+                continue
 
             os.makedirs(os.path.dirname(output_fpath), exist_ok=True)
             open_mode = "w" if chunk_id == 0 else "a"
