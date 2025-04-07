@@ -10,4 +10,4 @@
 #SBATCH --constraint="scratch"
 
 cd /u/jhdavis/code-translation/src/translate/test
-bash translate_vllm_instance.sh naive qwq-32b-q8_0.gguf nanoXOR 1 50 runs/naive-qwq-microxor.out delta
+bash translate_vllm_instance.sh naive qwq-32b-q8_0.gguf nanoXOR 1 50 runs/naive-llama-nanoxor.out delta
