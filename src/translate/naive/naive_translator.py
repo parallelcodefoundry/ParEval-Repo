@@ -82,7 +82,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
 
     def _get_prompt(self, fname: os.PathLike, chunk: Optional[str] = None) \
-            -> Tuple[str, Union[str, None]]:
+            -> Tuple[str, Union[os.PathLike, None]]:
         """ Get and format the prompt for a specific file.
         """
         file_tree = self._input_repo.get_file_tree_str()
@@ -285,8 +285,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """
         all_files = self._input_repo.get_all_filenames(relpaths=True)
         num_translations = len(self._output_paths)
-        repo_paths = [os.path.join(self._output_paths[i], f"output-{i}") \
-                       for i in range(num_translations)]
+        repo_paths = [os.path.join(self._output_paths[i], "repo") \
+                      for i in range(num_translations)]
         max_cols = self._safe_get_columns()
 
         print(f"Beginning {num_translations} batched translation(s) " +

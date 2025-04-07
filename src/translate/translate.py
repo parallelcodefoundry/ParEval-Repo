@@ -67,10 +67,6 @@ def main():
     if not os.path.exists(args.input):
         raise FileNotFoundError(f"Input directory {args.input} not found.")
 
-    # Exit if trying to run top-down agent with more than one translation
-    if args.method == "restate" and args.num_translations > 1:
-        raise ValueError("Top-down agent only supports a single translation at a time.")
-
     # check if the output directories exist and are empty
     output_dirs = [os.path.join(args.output, "output-" + str(i)) \
                    for i in range(args.output_id, args.output_id + args.num_translations)]
