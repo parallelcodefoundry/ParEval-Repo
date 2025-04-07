@@ -27,6 +27,11 @@ MAKEFILE_ADDENDUM: str = """You are translating code taken from a Makefile. Plea
 ```
 {dep_graph}
 ```
+
+And here is the file tree of the entire repository:
+```
+{file_tree}
+```
 """
 
 # Dicts of file extension mappings

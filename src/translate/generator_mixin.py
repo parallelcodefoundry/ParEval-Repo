@@ -64,7 +64,8 @@ class GeneratorMixin:
         max_output_tokens: Optional[int] = None,
         max_requests: Optional[int] = None,
         system_prompt: Optional[str] = None,
-        disable_request_cache: Optional[bool] = False
+        disable_request_cache: Optional[bool] = False,
+        async_mode: bool = False,
     ):
         self._backend = backend
         self._llm_name = llm_name
@@ -75,6 +76,7 @@ class GeneratorMixin:
         self._max_requests = max_requests
         self._system_prompt = system_prompt
         self._disable_request_cache = disable_request_cache
+        self._async_mode = async_mode
 
         if self._backend not in ["openai", "gemini", "hf", "vllm", "local"]:
             raise ValueError(f"Invalid backend specified: '{self._backend}'")
@@ -90,7 +92,10 @@ class GeneratorMixin:
 
         elif self._backend == "vllm":
             # Using OpenAI server API
-            from openai import OpenAI
+            if self._async_mode:
+                from openai import AsyncOpenAI as OpenAI
+            else:
+                from openai import OpenAI
             self._vllm_client = OpenAI(
                 base_url="http://127.0.0.1:8000/v1",
                 api_key="token_abc123",
@@ -205,10 +210,11 @@ class GeneratorMixin:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
         is_reasoning = False
-        if system_prompt is not None and "QwQ" in self._llm_name:
-            # Merge system prompt into main prompt if using reasoning model
-            text = self._format_messages_list(system_prompt + "\n" + prompt)
-            # Also adjust temp and top_p
+        if "QwQ" in self._llm_name:
+            if system_prompt is not None and self._system_prompt != system_prompt:
+                # Merge system prompt into main prompt if using reasoning model
+                text = self._format_messages_list(system_prompt + "\n" + prompt)
+            # Adjust temp and top_p
             temperature = 0.6
             top_p = 0.95
             is_reasoning = True
@@ -231,6 +237,57 @@ class GeneratorMixin:
                                 completion.usage.completion_tokens // n,
                                 c.message.reasoning_content if is_reasoning else None
                                 ) for c in completion.choices]
+
+    async def _generate_vllm_async(
+            self,
+            prompts: List[str],
+            system_prompt: Optional[str] = None,
+            max_new_tokens: int = 2048,
+            temperature: Optional[float] = None,
+            top_p: Optional[float] = None,
+            **kwargs
+    ) -> List[GenericResponse]:
+        """ Generate text using the vLLM via the OpenAI server API in async mode.
+        """
+        if not self._vllm_client:
+            raise ValueError("vLLM (OpenAI) client not initialized.")
+
+        is_reasoning = False
+        if "QwQ" in self._llm_name:
+            # Adjust temp and top_p
+            temperature = 0.6
+            top_p = 0.95
+            is_reasoning = True
+
+        if system_prompt is not None and self._system_prompt != system_prompt:
+            prompts = [system_prompt + "\n" + p for p in prompts]
+
+        completion = await self._vllm_client.completions.create(
+            model=self._llm_name,
+            prompt=prompts,
+            temperature=temperature,
+            top_p=top_p,
+            **kwargs
+        )
+
+        if not (completion and completion.choices):
+            raise ValueError("No completions returned from vLLM.")
+        results = []
+        for c in completion.choices:
+            response, reasoning = c.text, None
+            if is_reasoning:
+                c_split = response.split("</think>")
+                if len(c_split) > 1:
+                    response, reasoning = c_split[0], c_split[1]
+                else:
+                    reasoning = response
+            results.append(GenericResponse(response,
+                                           completion.usage.prompt_tokens // len(prompts),
+                                           completion.usage.completion_tokens // len(prompts),
+                                           reasoning
+                                           ))
+
+        return results
 
 
     def _generate_gemini(
@@ -361,6 +418,42 @@ class GeneratorMixin:
                 self._recent_requests.pop(0)
 
 
+    def generate_async(
+            self,
+            prompts: List[str],
+            system_prompt: Optional[str] = None,
+            max_new_tokens: int = 2048,
+            temperature: Optional[float] = None,
+            top_p: Optional[float] = None,
+            **kwargs
+    ) -> List[GenericResponse]:
+        """ Generate text using the specified backend in async mode.
+        """
+        import asyncio
+        if not self._async_mode or len(prompts) < 2 or self._backend != "vllm":
+            return [self.generate(p,
+                                  system_prompt,
+                                  max_new_tokens,
+                                  temperature,
+                                  top_p,
+                                  **kwargs) for p in prompts]
+        batch = asyncio.run(self._generate_vllm_async(prompts,
+                                                      system_prompt,
+                                                      max_new_tokens,
+                                                      temperature,
+                                                      top_p,
+                                                      **kwargs))
+
+        # update token counts
+        in_tokens = int(sum(r.prompt_tokens for r in batch))
+        out_tokens = int(sum(r.completion_tokens for r in batch))
+        self._input_token_count += in_tokens
+        self._output_token_count += out_tokens
+        self._request_count += len(batch)
+
+        return batch
+
+
     def generate(
         self,
         prompt: str,
@@ -426,6 +519,6 @@ class GeneratorMixin:
         # update token counts
         self._input_token_count += in_tokens
         self._output_token_count += out_tokens
-        self._request_count += 1
+        self._request_count += n
 
         return responses
