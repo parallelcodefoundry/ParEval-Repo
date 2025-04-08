@@ -1,0 +1,140 @@
+naive-llama-llmc:
+  time: 2:00:00
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: llm.c
+  start_idx: 1
+  end_idx: 25
+naive-llama-xsbench:
+  time: 2:00:00
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: XSBench
+  start_idx: 1
+  end_idx: 25
+naive-llama-simplemoc:
+  time: 2:00:00
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: SimpleMOC-kernel
+  start_idx: 1
+  end_idx: 25
+naive-llama-microxor:
+  time: 2:00:00
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: microXOR
+  start_idx: 1
+  end_idx: 25
+naive-llama-nanoxor:
+  time: 2:00:00
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: nanoXOR
+  start_idx: 1
+  end_idx: 25
+naive-qwq-llmc:
+  time: 2:00:00
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: llm.c
+  start_idx: 1
+  end_idx: 25
+naive-qwq-xsbench:
+  time: 2:00:00
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: XSBench
+  start_idx: 1
+  end_idx: 25
+naive-qwq-simplemoc:
+  time: 2:00:00
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: SimpleMOC-kernel
+  start_idx: 1
+  end_idx: 25
+naive-qwq-microxor:
+  time: 2:00:00
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: microXOR
+  start_idx: 1
+  end_idx: 25
+naive-qwq-nanoxor:
+  time: 2:00:00
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: nanoXOR
+  start_idx: 1
+  end_idx: 25
+restate-llama-llmc:
+  time: 2:00:00
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: llm.c
+  start_idx: 1
+  end_idx: 25
+restate-llama-xsbench:
+  time: 2:00:00
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: XSBench
+  start_idx: 1
+  end_idx: 25
+restate-llama-simplemoc:
+  time: 2:00:00
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: SimpleMOC-kernel
+  start_idx: 1
+  end_idx: 25
+restate-llama-microxor:
+  time: 2:00:00
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: microXOR
+  start_idx: 1
+  end_idx: 25
+restate-llama-nanoxor:
+  time: 2:00:00
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: nanoXOR
+  start_idx: 1
+  end_idx: 25
+restate-qwq-llmc:
+  time: 2:00:00
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: llm.c
+  start_idx: 1
+  end_idx: 25
+restate-qwq-xsbench:
+  time: 2:00:00
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: XSBench
+  start_idx: 1
+  end_idx: 25
+restate-qwq-simplemoc:
+  time: 2:00:00
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: SimpleMOC-kernel
+  start_idx: 1
+  end_idx: 25
+restate-qwq-microxor:
+  time: 2:00:00
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: microXOR
+  start_idx: 1
+  end_idx: 25
+restate-qwq-nanoxor:
+  time: 2:00:00
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: nanoXOR
+  start_idx: 1
+  end_idx: 25
