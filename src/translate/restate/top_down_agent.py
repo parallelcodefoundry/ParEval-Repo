@@ -250,7 +250,9 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                                                    prev_chunks=prev_chunks)
                 chunk_translations = [self._postprocess(response) for response in responses]
                 if len(translations) > 0:
-                    translations = [t + "\n" + ct \
+                    translations = [t if t is not None else "" \
+                                    + "\n" \
+                                    + ct if ct is not None else "" \
                                     for t, ct in zip(translations, chunk_translations)]
                 else:
                     translations = chunk_translations
@@ -258,7 +260,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
         for i, translation in enumerate(translations):
             # write the translation to the output file
-            self._write_file(node.rel_path, translation, i)
+            if translation is not None:
+                self._write_file(node.rel_path, translation, i)
 
     def _get_translations(self, contexts: List[str], source_code: str, file: FileNode, \
                           graph: Optional[List[FileNode]] = None, \

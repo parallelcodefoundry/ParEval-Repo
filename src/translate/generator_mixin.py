@@ -210,7 +210,7 @@ class GeneratorMixin:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
         is_reasoning = False
-        if "QwQ" in self._llm_name:
+        if "QwQ" in self._llm_name or "qwq" in self._llm_name:
             if system_prompt is not None and self._system_prompt != system_prompt:
                 # Merge system prompt into main prompt if using reasoning model
                 text = self._format_messages_list(system_prompt + "\n" + prompt)
@@ -253,10 +253,11 @@ class GeneratorMixin:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
         is_reasoning = False
-        if "QwQ" in self._llm_name:
+        if "QwQ" or "qwq" in self._llm_name:
             # Adjust temp and top_p
             temperature = 0.6
             top_p = 0.95
+            max_new_tokens = 8192
             is_reasoning = True
 
         if system_prompt is not None and self._system_prompt != system_prompt:
@@ -267,6 +268,7 @@ class GeneratorMixin:
             prompt=prompts,
             temperature=temperature,
             top_p=top_p,
+            max_tokens=max_new_tokens,
             **kwargs
         )
 
@@ -275,6 +277,7 @@ class GeneratorMixin:
         results = []
         for c in completion.choices:
             response, reasoning = c.text, None
+            print(f"Raw response: {response}")
             if is_reasoning:
                 c_split = response.split("</think>")
                 if len(c_split) > 1:
