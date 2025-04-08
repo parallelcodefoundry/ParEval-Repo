@@ -1,5 +1,5 @@
 naive-llama-llmc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: llm.c
@@ -7,7 +7,7 @@ naive-llama-llmc-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-llama-xsbench-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: XSBench
@@ -15,7 +15,7 @@ naive-llama-xsbench-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-llama-simplemoc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: SimpleMOC-kernel
@@ -23,7 +23,7 @@ naive-llama-simplemoc-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-llama-microxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: microXOR
@@ -31,7 +31,7 @@ naive-llama-microxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-llama-nanoxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: nanoXOR
@@ -39,7 +39,7 @@ naive-llama-nanoxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-qwq-llmc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: llm.c
@@ -47,7 +47,7 @@ naive-qwq-llmc-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-qwq-xsbench-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: XSBench
@@ -55,7 +55,7 @@ naive-qwq-xsbench-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-qwq-simplemoc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: SimpleMOC-kernel
@@ -63,7 +63,7 @@ naive-qwq-simplemoc-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-qwq-microxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: microXOR
@@ -71,7 +71,7 @@ naive-qwq-microxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 naive-qwq-nanoxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: nanoXOR
@@ -79,7 +79,7 @@ naive-qwq-nanoxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-llama-llmc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: llm.c
@@ -87,7 +87,7 @@ restate-llama-llmc-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-llama-xsbench-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: XSBench
@@ -95,7 +95,7 @@ restate-llama-xsbench-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-llama-simplemoc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: SimpleMOC-kernel
@@ -103,7 +103,7 @@ restate-llama-simplemoc-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-llama-microxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: microXOR
@@ -111,7 +111,7 @@ restate-llama-microxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-llama-nanoxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: nanoXOR
@@ -119,7 +119,7 @@ restate-llama-nanoxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-qwq-llmc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: llm.c
@@ -127,7 +127,7 @@ restate-qwq-llmc-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-qwq-xsbench-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: XSBench
@@ -135,7 +135,7 @@ restate-qwq-xsbench-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-qwq-simplemoc-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: SimpleMOC-kernel
@@ -143,7 +143,7 @@ restate-qwq-simplemoc-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-qwq-microxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: microXOR
@@ -151,7 +151,7 @@ restate-qwq-microxor-omp:
   end_idx: 25
   dst_model: openmp-offload
 restate-qwq-nanoxor-omp:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: nanoXOR
@@ -160,7 +160,7 @@ restate-qwq-nanoxor-omp:
   dst_model: openmp-offload
 
 naive-llama-llmc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: llm.c
@@ -168,7 +168,7 @@ naive-llama-llmc-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-llama-xsbench-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: XSBench
@@ -176,7 +176,7 @@ naive-llama-xsbench-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-llama-simplemoc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: SimpleMOC-kernel
@@ -184,7 +184,7 @@ naive-llama-simplemoc-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-llama-microxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: microXOR
@@ -192,7 +192,7 @@ naive-llama-microxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-llama-nanoxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: nanoXOR
@@ -200,7 +200,7 @@ naive-llama-nanoxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-qwq-llmc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: llm.c
@@ -208,7 +208,7 @@ naive-qwq-llmc-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-qwq-xsbench-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: XSBench
@@ -216,7 +216,7 @@ naive-qwq-xsbench-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-qwq-simplemoc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: SimpleMOC-kernel
@@ -224,7 +224,7 @@ naive-qwq-simplemoc-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-qwq-microxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: microXOR
@@ -232,7 +232,7 @@ naive-qwq-microxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 naive-qwq-nanoxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: naive
   model: qwq-32b-q8_0.gguf
   app: nanoXOR
@@ -240,7 +240,7 @@ naive-qwq-nanoxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-llama-llmc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: llm.c
@@ -248,7 +248,7 @@ restate-llama-llmc-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-llama-xsbench-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: XSBench
@@ -256,7 +256,7 @@ restate-llama-xsbench-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-llama-simplemoc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: SimpleMOC-kernel
@@ -264,7 +264,7 @@ restate-llama-simplemoc-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-llama-microxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: microXOR
@@ -272,7 +272,7 @@ restate-llama-microxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-llama-nanoxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
   app: nanoXOR
@@ -280,7 +280,7 @@ restate-llama-nanoxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-qwq-llmc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: llm.c
@@ -288,7 +288,7 @@ restate-qwq-llmc-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-qwq-xsbench-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: XSBench
@@ -296,7 +296,7 @@ restate-qwq-xsbench-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-qwq-simplemoc-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: SimpleMOC-kernel
@@ -304,7 +304,7 @@ restate-qwq-simplemoc-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-qwq-microxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: microXOR
@@ -312,7 +312,7 @@ restate-qwq-microxor-kokkos:
   end_idx: 25
   dst_model: kokkos
 restate-qwq-nanoxor-kokkos:
-  time: 2:00:00
+  time: '2:00:00'
   method: restate
   model: qwq-32b-q8_0.gguf
   app: nanoXOR
