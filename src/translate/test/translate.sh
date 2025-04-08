@@ -112,7 +112,7 @@ elif [ "$#" -eq 6 ]; then
     fiter=$5
     liter=$6
     echo "Running ${fiter} thru ${liter} ${method} experiments for ${llm_version} (${llm_backend}) and ${application}"
-    if [[ $llm_backend == "vllm" && $method == "naive" ]]; then
+    if [[ $llm_backend == "vllm" ]]; then
         echo "Using n-wise batching"
         run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter}
     else

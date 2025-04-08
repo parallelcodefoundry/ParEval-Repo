@@ -22,7 +22,7 @@ class ContextAgent:
         """
         print("Extracting context for dependent files...")
         if not dependencies:
-            return ""
+            return ["" for _ in self._output_paths]
 
         # For each output path, read over dependent files already translated
         # and extract relevant code snippets.
