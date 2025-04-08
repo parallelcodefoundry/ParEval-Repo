@@ -150,12 +150,12 @@ class GeneratorMixin:
                     pickle.dump(self._recent_requests, f)
 
     def _format_messages_list(self, prompt: str,
-                              system_prompt: Optional[str] = None) \
+                              system_prompt: Union[str, None]) \
                               -> List[Dict[str, str]]:
         """ Format the prompt and system prompt into a list of messages for OpenAI.
         """
         messages = []
-        if system_prompt:
+        if system_prompt is not None:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
         return messages
@@ -163,7 +163,7 @@ class GeneratorMixin:
     def _generate_openai(
             self,
             prompt: str,
-            system_prompt: Optional[str] = None,
+            system_prompt: str,
             max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
@@ -197,7 +197,7 @@ class GeneratorMixin:
     def _generate_vllm(
             self,
             prompt: str,
-            system_prompt: Optional[str] = None,
+            system_prompt: str,
             max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
@@ -210,38 +210,39 @@ class GeneratorMixin:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
         is_reasoning = False
+        text = self._format_messages_list(prompt, system_prompt)
         if "QwQ" in self._llm_name or "qwq" in self._llm_name:
-            if system_prompt is not None and self._system_prompt != system_prompt:
+            if system_prompt is not None:
                 # Merge system prompt into main prompt if using reasoning model
-                text = self._format_messages_list(system_prompt + "\n" + prompt)
+                text = self._format_messages_list(system_prompt + "\n" + prompt, None)
             # Adjust temp and top_p
             temperature = 0.6
             top_p = 0.95
+            max_new_tokens = 8192
             is_reasoning = True
-        else:
-            text = self._format_messages_list(prompt, system_prompt)
 
         completion = self._vllm_client.chat.completions.create(
             model=self._llm_name,
             messages=text,
             temperature=temperature,
             top_p=top_p,
+            max_tokens=max_new_tokens,
             n=n,
             **kwargs
         )
 
         if not (completion and completion.choices):
             raise ValueError("No completions returned from vLLM.")
-        return [GenericResponse(c.message.content,
-                                completion.usage.prompt_tokens // n,
-                                completion.usage.completion_tokens // n,
+        return [GenericResponse(c.message.content if c.message.content else "",
+                                completion.usage.prompt_tokens // n if completion.usage else 0,
+                                completion.usage.completion_tokens // n if completion.usage else 0,
                                 c.message.reasoning_content if is_reasoning else None
                                 ) for c in completion.choices]
 
     async def _generate_vllm_async(
             self,
             prompts: List[str],
-            system_prompt: Optional[str] = None,
+            system_prompt: str,
             max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
@@ -260,7 +261,7 @@ class GeneratorMixin:
             max_new_tokens = 8192
             is_reasoning = True
 
-        if system_prompt is not None and self._system_prompt != system_prompt:
+        if system_prompt is not None:
             prompts = [system_prompt + "\n" + p for p in prompts]
 
         completion = await self._vllm_client.completions.create(
@@ -296,7 +297,7 @@ class GeneratorMixin:
     def _generate_gemini(
             self,
             prompt: str,
-            system_prompt: Optional[str] = None,
+            system_prompt: str,
             max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
@@ -332,7 +333,7 @@ class GeneratorMixin:
     def _generate_hf(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str,
         max_new_tokens: int = 2048,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
@@ -424,7 +425,7 @@ class GeneratorMixin:
     def generate_async(
             self,
             prompts: List[str],
-            system_prompt: Optional[str] = None,
+            system_prompt: str,
             max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
