@@ -25,21 +25,22 @@ def generate_job_script(job_name, job_config):
 #SBATCH --constraint="scratch"
 
 cd /u/jhdavis/code-translation/src/translate/test
-bash translate_vllm_instance.sh {job_config['method']} {job_config['model']} {job_config['app']} {job_config['start_idx']} {job_config['end_idx']} runs/{job_name}.out delta
+bash translate_vllm_instance.sh {job_config['method']} {job_config['model']} {job_config['app']} {job_config['start_idx']} {job_config['end_idx']} {job_config['dst_model']} runs/{job_name}.out delta
 """
 
     # Create the job script file
-    script_filename = f"{job_name}.slurm"
+    script_filename = f"gen_{job_name}.slurm"
     with open(script_filename, 'w') as script_file:
         script_file.write(script)
     print(f"Generated job script: {script_filename}")
     return script_filename
 
+
 def generate_batch_script(job_names):
     """Generate a batch script to enqueue all the jobs."""
     batch_script = "#!/bin/bash\n"
     for job_name in job_names:
-        batch_script += f"sbatch {job_name}.slurm\n"
+        batch_script += f"sbatch gen_{job_name}.slurm\n"
 
     # Create the batch script file
     batch_script_filename = "enqueue_jobs.sh"
@@ -47,6 +48,7 @@ def generate_batch_script(job_names):
         batch_file.write(batch_script)
     print(f"Generated batch script: {batch_script_filename}")
     return batch_script_filename
+
 
 if __name__ == "__main__":
     # Check if the input YAML file is provided
