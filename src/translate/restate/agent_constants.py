@@ -1,6 +1,6 @@
 SYSTEM_TEMPLATE: str = """You are a helpful coding assistant.
 You are helping a software developer translate a codebase from the {src_model} execution model to the {dst_model} execution model.
-Writing correct, fast code is important, so take some time to think before responding to any query."""
+Writing correct, fast code is important, so take some time to think before responding to any query, and ensure that the code you create is enclosed in triple backticks (```), as used in the query below."""
 
 PROMPT_TEMPLATE: str = """Your task is to translate the following {src_model} code from {filename} into {dst_model}:
 ```
