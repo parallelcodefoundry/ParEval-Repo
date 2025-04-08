@@ -1,0 +1,9 @@
+{
+    "gnu": "",
+    "llvm": "",
+    "cuda": "",
+    "kokkos": "",
+    "sm": "86",
+    "exec_check": "ncu",
+    "exec_check_fail_text": "==WARNING== No kernels were profiled."
+}
