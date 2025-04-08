@@ -1,6 +1,6 @@
 #!/bin/bash
 get_usage () {
-    echo "Usage: translate.sh method llm_name llm_backend [application] [outputid] [finid]"
+    echo "Usage: translate.sh method llm_name llm_backend [application] [outputid] [finid] [dstmodel]"
     echo "method: the method to use (e.g., naive, cnaive, restate)"
     echo "llm_name: the name of the LLM to use (e.g., gpt-4o-mini, gemini-2.0-flash)"
     echo "llm_backend: the backend to use (e.g., openai, gemini)"
@@ -8,6 +8,7 @@ get_usage () {
     echo "             (e.g., microXOR, XSBench, SimpleMOC-kernel, llm.c)"
     echo "outputid: the integer output ID to use for the translation, requires application"
     echo "finid: providing this makes the script run a translation for each in outputid..finid"
+    echo "dstmodel: the destination model to translate to (e.g., openmp-offload, kokkos, t-openmp-offload)"
 }
 
 run_translate () {
@@ -21,21 +22,31 @@ run_translate () {
     llm_backend=$3
     application=$4
     iter=$5
+    dstmodel=$6
     if [[ $method == "cnaive" ]]; then
         method="naive"
         extra_args="--enable-chunking"
     fi
+    srcmodel="cuda"
+    if [[ $dstmodel == *"t-openmp-offload"* ]]; then
+        srcmodel="openmp-threads"
+        dstmodel="openmp-offload"
+    fi
+    shortdst=$dstmodel
+    if [[ $dstmodel == *"openmp-offload"* ]]; then
+        shortdst="omp"
+    fi
     python3 ../translate.py \
-            --input ../../../targets/${application}/cuda \
-            --config ../../../targets/${application}/openmp-offload \
-            --output ../../../../code-translation-results/outputs/${application}/${method}-${llm_name}-cuda-to-omp \
+            --input ../../../targets/${application}/${srcmodel} \
+            --config ../../../targets/${application}/${dstmodel} \
+            --output ../../../../code-translation-results/outputs/${application}/${method}-${llm_name}-${srcmodel}-to-${shortdst} \
             --output-id ${iter} \
             --app-name ${application} \
             --method ${method} \
             --${method}-backend ${llm_backend} \
             --${method}-llm-name ${llm_version} \
-            --src-model cuda \
-            --dst-model openmp-offload \
+            --src-model ${srcmodel} \
+            --dst-model ${dstmodel} \
             --log-interactions \
             ${extra_args} \
             -f
@@ -57,18 +68,28 @@ run_batch_translate () {
     application=$4
     fiter=$5
     liter=$6
+    dstmodel=$7
+    srcmodel="cuda"
+    if [[ $dstmodel == *"t-openmp-offload"* ]]; then
+        srcmodel="openmp-threads"
+        dstmodel="openmp-offload"
+    fi
+    shortdst=$dstmodel
+    if [[ $dstmodel == *"openmp-offload"* ]]; then
+        shortdst="omp"
+    fi
     python3 ../translate.py \
-            --input ../../../targets/${application}/cuda \
-            --config ../../../targets/${application}/openmp-offload \
-            --output ../../../../code-translation-results/outputs/${application}/${method}-${llm_name}-cuda-to-omp \
+            --input ../../../targets/${application}/${srcmodel} \
+            --config ../../../targets/${application}/${dstmodel} \
+            --output ../../../../code-translation-results/outputs/${application}/${method}-${llm_name}-${srcmodel}-to-${shortdst} \
             --output-id ${fiter} \
             -n $((1 + $liter - $fiter)) \
             --app-name ${application} \
             --method ${method} \
             --${method}-backend ${llm_backend} \
             --${method}-llm-name ${llm_version} \
-            --src-model cuda \
-            --dst-model openmp-offload \
+            --src-model ${srcmodel} \
+            --dst-model ${dstmodel} \
             --log-interactions \
             -f
     if [ $? -ne 0 ]; then
@@ -84,7 +105,7 @@ if [ "$#" -eq 3 ]; then
     echo "Running all ${method} experiments for ${llm_version} (${llm_backend})"
     for application in "microXOR" "XSBench" "SimpleMOC-kernel" "llm.c"; do
         for iter in {1..5}; do
-            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
+            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} "openmp-offload"
         done
     done
 elif [ "$#" -eq 4 ]; then
@@ -94,7 +115,7 @@ elif [ "$#" -eq 4 ]; then
     application=$4
     echo "Running all ${method} experiments for ${llm_version} (${llm_backend}) and ${application}"
     for iter in {1..50}; do
-        run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
+        run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} "openmp-offload"
     done
 elif [ "$#" -eq 5 ]; then
     method=$1
@@ -103,7 +124,7 @@ elif [ "$#" -eq 5 ]; then
     application=$4
     iter=$5
     echo "Running one ${method} experiment for ${llm_version} (${llm_backend}) and ${application}, output ID ${iter}"
-    run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
+    run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} "openmp-offload"
 elif [ "$#" -eq 6 ]; then
     method=$1
     llm_version=$2
@@ -114,10 +135,27 @@ elif [ "$#" -eq 6 ]; then
     echo "Running ${fiter} thru ${liter} ${method} experiments for ${llm_version} (${llm_backend}) and ${application}"
     if [[ $llm_backend == "vllm" ]]; then
         echo "Using n-wise batching"
-        run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter}
+        run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter} "openmp-offload"
     else
         for iter in $(seq ${fiter} ${liter}); do
-            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter}
+            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} "openmp-offload"
+        done
+    fi
+elif [ "$#" -eq 7 ]; then
+    method=$1
+    llm_version=$2
+    llm_backend=$3
+    application=$4
+    fiter=$5
+    liter=$6
+    dstmodel=$7
+    echo "Running ${fiter} thru ${liter} ${method} experiments for ${llm_version} (${llm_backend}) and ${application} to ${dstmodel}"
+    if [[ $llm_backend == "vllm" ]]; then
+        echo "Using n-wise batching"
+        run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter} ${dstmodel}
+    else
+        for iter in $(seq ${fiter} ${liter}); do
+            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} ${dstmodel}
         done
     fi
 else
