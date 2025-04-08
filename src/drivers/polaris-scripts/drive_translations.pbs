@@ -17,22 +17,22 @@ mkdir $WORKDIR
 cd $WORKDIR
 
 # Array of driver instance args
-Arglist=('-m openmp-offload -a nanoxor -p naive -o $WORKDIR/polaris-omp-nanoxor-naive.json' \
-             '-m openmp-offload -a microxor -p naive -o $WORKDIR/polaris-omp-microxor-naive.json' \
-             '-m openmp-offload -a simplemoc-kernel -p naive -o $WORKDIR/polaris-omp-simplemoc-naive.json' \
-             '-m openmp-offload -a xsbench -p naive -o $WORKDIR/polaris-omp-xsbench-naive.json' \
-             '-m openmp-offload -a llm.c -p naive -o $WORKDIR/polaris-omp-llm.c-naive.json' \
-             '-m openmp-offload -a nanoxor -p restate -o $WORKDIR/polaris-omp-nanoxor-restate.json' \
-             '-m openmp-offload -a microxor -p restate -o $WORKDIR/polaris-omp-microxor-restate.json' \
-             '-m openmp-offload -a simplemoc-kernel -p restate -o $WORKDIR/polaris-omp-simplemoc-restate.json' \
-             '-m openmp-offload -a xsbench -p restate -o $WORKDIR/polaris-omp-xsbench-restate.json' \
-             '-m openmp-offload -a llm.c -p restate -o $WORKDIR/polaris-omp-llm.c-restate.json' \
+Arglist=("-m openmp-offload -a nanoxor -p naive -o $WORKDIR/polaris-omp-nanoxor-naive.json" \
+             "-m openmp-offload -a microxor -p naive -o $WORKDIR/polaris-omp-microxor-naive.json" \
+             "-m openmp-offload -a simplemoc-kernel -p naive -o $WORKDIR/polaris-omp-simplemoc-naive.json" \
+             "-m openmp-offload -a xsbench -p naive -o $WORKDIR/polaris-omp-xsbench-naive.json" \
+             "-m openmp-offload -a llm.c -p naive -o $WORKDIR/polaris-omp-llm.c-naive.json" \
+             "-m openmp-offload -a nanoxor -p restate -o $WORKDIR/polaris-omp-nanoxor-restate.json" \
+             "-m openmp-offload -a microxor -p restate -o $WORKDIR/polaris-omp-microxor-restate.json" \
+             "-m openmp-offload -a simplemoc-kernel -p restate -o $WORKDIR/polaris-omp-simplemoc-restate.json" \
+             "-m openmp-offload -a xsbench -p restate -o $WORKDIR/polaris-omp-xsbench-restate.json" \
+             "-m openmp-offload -a llm.c -p restate -o $WORKDIR/polaris-omp-llm.c-restate.json" \
         )
 
-CPUbinds=('--cpu-bind list:24:25:26:27:28:29:30:31' \
-              '--cpu-bind list:16:17:18:19:20:21:22:23' \
-              '--cpu-bind list:8:9:10:11:12:13:14:15' \
-              '--cpu-bind list:0:1:2:3:4:5:6:7'
+CPUbinds=("--cpu-bind list:24:25:26:27:28:29:30:31" \
+              "--cpu-bind list:16:17:18:19:20:21:22:23" \
+              "--cpu-bind list:8:9:10:11:12:13:14:15" \
+              "--cpu-bind list:0:1:2:3:4:5:6:7"
          )
 
 # Get number of nodes
