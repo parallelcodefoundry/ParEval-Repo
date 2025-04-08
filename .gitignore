@@ -12,3 +12,7 @@ tmp*
 .env
 
 .request_cache_*.pkl
+
+src/translate/test/delta-scripts/enqueue_jobs.sh
+src/translate/test/delta-scripts/naive*.slurm
+src/translate/test/delta-scripts/restate*.slurm
