@@ -430,13 +430,14 @@ class GeneratorMixin:
         """ Generate text using the specified backend in async mode.
         """
         import asyncio
+        print("Generating in async mode...")
         if not self._async_mode or len(prompts) < 2 or self._backend != "vllm":
             return [self.generate(p,
                                   system_prompt,
                                   max_new_tokens,
                                   temperature,
                                   top_p,
-                                  **kwargs) for p in prompts]
+                                  **kwargs)[0] for p in prompts]
         batch = asyncio.run(self._generate_vllm_async(prompts,
                                                       system_prompt,
                                                       max_new_tokens,

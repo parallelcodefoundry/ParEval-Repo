@@ -38,7 +38,6 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _chunk_file_agent: ChunkFileAgent
     _context_agent: ContextAgent
     _system_prompt: str
-    _repo_paths: List[os.PathLike]
     _interactions_paths: Optional[List[os.PathLike]] = None
 
     def __init__(
@@ -65,6 +64,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                                 async_mode=True)
 
         if self._log_interactions:
+            self._interactions_paths = []
             for output_repo in self._output_paths:
                 interactions_path = os.path.join(output_repo, "interactions.txt")
                 self._interactions_paths.append(interactions_path)
@@ -110,18 +110,18 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 raise error
         return max_cols
 
-    def _read_file(self, rel_path: str) -> str:
+    def _read_file(self, rel_path: os.PathLike) -> str:
         """ Read the contents of a file from the input repository.
         """
         input_file_path = os.path.join(self._input_repo.path, rel_path)
         with open(input_file_path, 'r', encoding="UTF-8") as f:
             return f.read()
 
-    def _update_output_file_extension(self, fname: str) -> str:
+    def _update_output_file_extension(self, fname: os.PathLike) -> os.PathLike:
         """ Return the filename with updated extension based on the destination model.
         """
         # Check if file has an extension
-        if "." in fname:
+        if "." in str(fname):
             name, current_ext = os.path.splitext(fname)
 
             # Check if the extension is in the dict
@@ -145,10 +145,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         return match.group(1)
 
 
-    def _write_file(self, rel_path: str, contents: str, idx: int = 0):
+    def _write_file(self, rel_path: os.PathLike, contents: str, idx: int = 0):
         """ Write the contents to a file in the output repository.
         """
-        output_file_path = os.path.join(self._output_paths[0], "repo",
+        output_file_path = os.path.join(self._output_paths[idx], "repo",
                                         self._update_output_file_extension(rel_path))
 
         # make parent dirs if necessary
@@ -232,21 +232,21 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         source_code = self._read_file(node.rel_path)
 
         # get the context from the parent nodes
-        context = self._context_agent.get_context(node.dependencies, node, self._dst_model)
+        contexts = self._context_agent.get_contexts(node.dependencies, node, self._dst_model)
 
         # translate the source code; if it's too long use the chunk file agent
         # to translate it in parts
         chunks = self._chunk_file_agent.chunk_file(source_code)
         if len(chunks) == 1:
             print("Requesting whole file translation...")
-            responses = self._get_translations(context, chunks[0], node, graph, tree)
+            responses = self._get_translations(contexts, chunks[0], node, graph, tree)
             translations = [self._postprocess(response) for response in responses]
         else:
             translations = []
             prev_chunks = []
             for chunk in chunks:
                 print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
-                responses = self._get_translations(context, chunk, node, graph, tree,
+                responses = self._get_translations(contexts, chunk, node, graph, tree,
                                                    prev_chunks=prev_chunks)
                 chunk_translations = [self._postprocess(response) for response in responses]
                 if len(translations) > 0:
@@ -260,7 +260,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             # write the translation to the output file
             self._write_file(node.rel_path, translation, i)
 
-    def _get_translations(self, context: str, source_code: str, file: FileNode, \
+    def _get_translations(self, contexts: List[str], source_code: str, file: FileNode, \
                           graph: Optional[List[FileNode]] = None, \
                           tree: Optional[str] = None, \
                           prev_chunks: List[Union[str, None]] = []) -> List[str]:
@@ -276,10 +276,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                                              filename=filename,
                                              dst_model=self._dst_model,
                                              source_code=source_code,
-                                             context=context,
+                                             context=c,
                                              exts=exts_str,
                                              filename_desc=filename_desc
-                                             ) for _ in self._output_paths]
+                                             ) for _, c in zip(self._output_paths, contexts)]
 
         if len(prev_chunks) > 0:
             prompts = [p + "\n" + \
