@@ -310,15 +310,22 @@ def update_results(results, results_row, output):
         else:
             raise ValueError(f"Key {key} not found in results.")
 
-    # Todo: change below to append to existing file rather than rewriting everything
-
     # Convert results dict to dataframe
     results_df = pd.DataFrame.from_dict(results)
 
-    # Write the results dataframe to the output filename
+    # Back up the existing output file if it exists before writing
+    if os.path.exists(output):
+        logging.debug(f"Backing up {output} to {output}.bak.")
+        shutil.copyfile(output, output + ".bak")
+
+    # Write the results to the output file
     logging.info(f"Writing results to {output}.")
     with open(output, "w", encoding="utf-8") as f:
         json.dump(json.loads(results_df.to_json(orient="index")), f, indent=4)
+
+    # Remove the backup file if the write was successful
+    if os.path.exists(output + ".bak"):
+        os.remove(output + ".bak")
 
 
 def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
@@ -336,6 +343,12 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
         logging.debug(f"Building code repository: {code_repo['path']}")
         results_row_build = build_repo(code_repo, system_config, args, tempdir,
                                        ground_truth_build=ground_truth_build)
+        if not ground_truth_build:
+            # Save the stdout and stderr of the build process with the original makefile
+            # for debugging since ground truth build will overwrite otherwise
+            results_row_build["gen_build_stdout_debug"] = results_row_build["build_stdout_debug"]
+            results_row_build["gen_build_stderr_debug"] = results_row_build["build_stderr_debug"]
+
         update_results(results, results_row_build, output)
         pbar()
 
