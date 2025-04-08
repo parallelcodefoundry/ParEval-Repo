@@ -76,9 +76,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         self._chunk_file_agent = ChunkFileAgent(generator=self,
                                                 interactions_paths=self._interactions_paths,
                                                 language=lang)
-        self._context_agent = ContextAgent(generator=self,
-                                           interactions_paths=self._interactions_paths,
-                                           output_paths=self._output_paths)
+        self._context_agent = ContextAgent(generator=self, output_paths=self._output_paths,
+                                           interactions_paths=self._interactions_paths)
 
     @staticmethod
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
@@ -264,7 +263,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def _get_translations(self, context: str, source_code: str, file: FileNode, \
                           graph: Optional[List[FileNode]] = None, \
                           tree: Optional[str] = None, \
-                          prev_chunks: Optional[List[str]] = []) -> List[str]:
+                          prev_chunks: List[Union[str, None]] = []) -> List[str]:
         """ Get the translation for a region of code using the provided context.
         """
         prompt_config_src = self._input_repo.get_meta_dict()
@@ -311,9 +310,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
 
         # generate the translations asynchronously so they can be batched
-        #response_handles = [, async=True) for p in prompts]
-        #response_objs = [self.get_response(handle) for handle in response_handles]
-        response_obs = self.generate(prompts, temperature=0.2, top_p=0.95)
+        response_obs = self.generate_async(prompts, temperature=0.2, top_p=0.95)
 
         responses = [r.response for r in response_obs]
         reasonings = [r.reasoning for r in response_obs]

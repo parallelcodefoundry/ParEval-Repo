@@ -17,11 +17,11 @@ class ChunkFileAgent:
     AVG_CHAR_PER_TOKEN = 3.5
 
     def __init__(self, generator: GeneratorMixin, max_tokens: int = 1024,
-                 interactions_path: Optional[os.PathLike] = None,
+                 interactions_paths: Optional[List[os.PathLike]] = None,
                  language: str = 'c'):
         self._generator = generator
         self._max_tokens = max_tokens
-        self._interactions_path = interactions_path
+        self._interactions_paths = interactions_paths
         self._language = Language(language)
         self._splitter = rcts.from_language(self._language,
                                             chunk_size=ceil(max_tokens * self.AVG_CHAR_PER_TOKEN),
