@@ -425,7 +425,7 @@ class GeneratorMixin:
     def generate_async(
             self,
             prompts: List[str],
-            system_prompt: str,
+            system_prompt: Optional[str] = None,
             max_new_tokens: int = 2048,
             temperature: Optional[float] = None,
             top_p: Optional[float] = None,
@@ -435,6 +435,11 @@ class GeneratorMixin:
         """
         import asyncio
         print("Generating in async mode...")
+
+        # set system prompt if not provided
+        if self._system_prompt is not None and system_prompt is None:
+            system_prompt = self._system_prompt
+
         if not self._async_mode or len(prompts) < 2 or self._backend != "vllm":
             return [self.generate(p,
                                   system_prompt,
