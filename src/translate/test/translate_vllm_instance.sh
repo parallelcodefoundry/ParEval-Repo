@@ -8,6 +8,7 @@ get_usage () {
     echo "             (e.g., microXOR, XSBench, SimpleMOC-kernel, llm.c)"
     echo "fisrtid: integer ID for the first iteration to execute"
     echo "lastid: integer ID for the last iteration to execute"
+    echo "dstmodel: the destination model to translate to"
     echo "outpath: file path to write all output for the run"
     echo "hostname: name of the system being used, determines configuration paths"
 }
@@ -18,6 +19,7 @@ run_vllm_translation () {
     APPLICATION=$3
     FITER=$4
     LITER=$5
+    DSTMODEL=$6
     llm_path=$LLM_NAME
 
     # If model is already downloaded, then copy to $LOCAL_MEM/
@@ -63,9 +65,9 @@ run_vllm_translation () {
     nvidia-smi
 
     # Do translation
-    echo "Running translation $METHOD $llm_path vllm $APPLICATION $FITER $LITER... "
+    echo "Running translation $METHOD $llm_path vllm $APPLICATION $FITER $LITER $DSTMODEL... "
     cd $SCRIPT_DIR
-    bash translate.sh $METHOD $llm_path vllm $APPLICATION $FITER $LITER
+    bash translate.sh $METHOD $llm_path vllm $APPLICATION $FITER $LITER $DSTMODEL
     echo "Done"
 }
 
@@ -73,8 +75,8 @@ stamp () {
     echo "[$$ | $(date '+%Y-%m-%d %H:%M:%S')]"
 }
 
-if [ "$#" -eq 7 ]; then
-    SYSTEM=$7
+if [ "$#" -eq 8 ]; then
+    SYSTEM=$8
     if [[ $SYSTEM == "delta" ]]; then
         LOCAL_MEM=/tmp
         VLLM_VENV=/u/jhdavis/vllm_venv/bin/activate
@@ -97,9 +99,9 @@ if [ "$#" -eq 7 ]; then
         module load llvm cudatoolkit-standalone
     fi
 
-    echo "$(stamp) Starting vLLM translation instance, writing to $6"
-    run_vllm_translation "$1" "$2" "$3" "$4" "$5" &> $6
-    echo "$(stamp) Finished vLLM translation instance, written to $6"
+    echo "$(stamp) Starting vLLM translation instance, writing to $7"
+    run_vllm_translation "$1" "$2" "$3" "$4" "$5" "$6" &> $7
+    echo "$(stamp) Finished vLLM translation instance, written to $7"
     exit
 else
     get_usage
