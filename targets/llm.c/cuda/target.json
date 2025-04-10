@@ -3,7 +3,7 @@
     "model": "cuda",
     "path": "targets/llm.c/cuda/repo",
     "dependencies": ["cuda", "llvm"],
-    "setup_commands": ["chmod u+x ./dev/download_starter_pack.sh", "./dev/download_starter_pack.sh"],
+    "setup_commands": ["cp $SCRATCH/llmc_inputs/*.bin ."],
     "build_commands_debug": "make test_gpt2fp32cu FORCE_NVCC_O=0",
     "build_commands_perf": "make test_gpt2fp32cu",
     "build_timeout": 30,
