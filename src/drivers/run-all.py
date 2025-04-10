@@ -392,6 +392,12 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
         # otherwise, build failed, but this is not the ground truth build and we
         # are going to try again
 
+        # rm all subdirs in tempdir manually before exiting `when` block,
+        # workaround for oserror race condition bug
+        for root, dirs, _ in os.walk(tempdir):
+            for d in dirs:
+                shutil.rmtree(os.path.join(root, d))
+
         pbar()
 
     return results_row_build
