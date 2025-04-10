@@ -1,0 +1,73 @@
+naive-llmc-omp:
+  time: '2:00:00'
+  method: naive
+  app: llm.c
+  dst_model: openmp-offload
+  skip_build_swap: yes
+
+naive-llmc-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: llm.c
+  dst_model: kokkos
+  skip_build_swap: yes
+naive-xsbench-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: XSBench
+  dst_model: kokkos
+naive-simplemoc-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: SimpleMOC-kernel
+  dst_model: kokkos
+  skip_build_swap: yes
+naive-microxor-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: microXOR
+  dst_model: kokkos
+  skip_build_swap: yes
+naive-nanoxor-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: nanoXOR
+  dst_model: kokkos
+  skip_build_swap: yes
+
+restate-llmc-omp:
+  time: '2:00:00'
+  method: restate
+  app: llm.c
+  dst_model: openmp-offload
+  skip_build_swap: yes
+
+restate-llmc-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: llm.c
+  dst_model: kokkos
+  skip_build_swap: yes
+restate-xsbench-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: XSBench
+  dst_model: kokkos
+restate-simplemoc-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: SimpleMOC-kernel
+  dst_model: kokkos
+  skip_build_swap: yes
+restate-microxor-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: microXOR
+  dst_model: kokkos
+  skip_build_swap: yes
+restate-nanoxor-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: nanoXOR
+  dst_model: kokkos
+  skip_build_swap: yes
