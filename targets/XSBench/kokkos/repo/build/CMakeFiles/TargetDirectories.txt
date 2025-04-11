@@ -1,7 +1,0 @@
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/XSBench.dir
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/edit_cache.dir
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/rebuild_cache.dir
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/list_install_components.dir
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/install.dir
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/install/local.dir
-/home/jhdavis/llms4hpc/code-translation/targets/XSBench/kokkos/repo/build/CMakeFiles/install/strip.dir
