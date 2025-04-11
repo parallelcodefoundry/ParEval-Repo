@@ -151,7 +151,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
 
     def _write_file(self, rel_path: os.PathLike, contents: str, idx: int = 0,
-                    trigger_rename: Optional[str] = None):
+                    trigger_rename: Optional[os.PathLike] = None):
         """ Write the contents to a file in the output repository.
         """
         output_file_path = os.path.join(self._output_paths[idx], "repo",
@@ -255,8 +255,9 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
             prev_chunks = []
             for chunk in chunks:
                 print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
-                responses, trigger_rename = self._get_translations(contexts, chunk, node, graph, tree,
-                                                   prev_chunks=prev_chunks)
+                responses, trigger_rename = self._get_translations(contexts, chunk, node,
+                                                                   graph, tree,
+                                                                   prev_chunks=prev_chunks)
                 chunk_translations = [self._postprocess(response) for response in responses]
                 if len(translations) > 0:
                     translations = [t if t is not None else "" \
