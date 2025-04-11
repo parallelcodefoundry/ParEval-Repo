@@ -23,7 +23,7 @@ Do not repeat the previous chunk in your output, but do use it as context for yo
 MAIN_ADDENDUM: str = """You are translating code from a file that includes the main function. As relevant, please ensure the command line interface after translation still works as expected, so that, for example, `{ex_run_cmd}` still works to run the code with {ex_run_desc}.
 """
 
-MAKEFILE_ADDENDUM: str = """You are translating code taken from a Makefile. Please output an equivalent Makefile snippet converted to compile this code as a {dst_model} code. Where relevant, assume {exts} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}. For reference, here are the file dependendencies of the full application:
+BUILD_ADDENDUM: str = """You are translating code taken from a {build_filename}. Please output an equivalent snippet of {new_build_filename} code converted to compile this code as a {dst_model} code. Where relevant, assume {exts} filenames as this will be a {filename_desc} code, and that the user will compile this code using, for example, `{ex_build_cmd}` to build the code for {ex_build_desc}. For reference, here are the file dependendencies of the full application:
 ```
 {dep_graph}
 ```
