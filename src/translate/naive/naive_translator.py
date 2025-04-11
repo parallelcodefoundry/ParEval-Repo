@@ -164,9 +164,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
         return match.group(1)
 
 
-    def _update_output_file_extension(self, fname: os.PathLike,
-                                      trigger_rename: Optional[os.PathLike] = None) \
-                                      -> os.PathLike:
+    def _update_file_ext(self, fname: os.PathLike,
+                         trigger_rename: Optional[os.PathLike] = None) -> os.PathLike:
         """ Return the filename with updated extension based on the destination model.
         """
 
@@ -246,9 +245,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """ Translate a single file.
         """
         prompt, trigger_rename = self._get_prompt(fpath, chunk=chunk)
-        updated_fname = self._update_output_file_extension(fpath,
-                                                           trigger_rename=trigger_rename)
-        output_fpaths = [os.path.join(rp, updated_fname) for rp in self._output_paths]
+        updated_fname = self._update_file_ext(fpath,
+                                              trigger_rename=trigger_rename)
+        output_fpaths = [os.path.join(rp, "repo", updated_fname) for rp in self._output_paths]
 
         if self._dry:
             print(prompt)

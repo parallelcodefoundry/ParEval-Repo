@@ -13,7 +13,7 @@
 import os
 import sys
 import json
-from typing import Dict, Literal, Optional, List, Union
+from typing import Dict, Literal, Optional, List, Union, Tuple
 import re
 
 # local imports
@@ -117,9 +117,14 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         with open(input_file_path, 'r', encoding="UTF-8") as f:
             return f.read()
 
-    def _update_output_file_extension(self, fname: os.PathLike) -> os.PathLike:
+    def _update_file_ext(self, fname: os.PathLike,
+                         trigger_rename: Optional[os.PathLike] = None) -> os.PathLike:
         """ Return the filename with updated extension based on the destination model.
         """
+
+        if trigger_rename:
+            fname = trigger_rename
+
         # Check if file has an extension
         if "." in str(fname):
             name, current_ext = os.path.splitext(fname)
@@ -145,11 +150,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         return match.group(1)
 
 
-    def _write_file(self, rel_path: os.PathLike, contents: str, idx: int = 0):
+    def _write_file(self, rel_path: os.PathLike, contents: str, idx: int = 0,
+                    trigger_rename: Optional[str] = None):
         """ Write the contents to a file in the output repository.
         """
         output_file_path = os.path.join(self._output_paths[idx], "repo",
-                                        self._update_output_file_extension(rel_path))
+                                        self._update_file_ext(rel_path,
+                                                              trigger_rename=trigger_rename))
 
         # make parent dirs if necessary
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
@@ -204,7 +211,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
 
         # Create target version of dep_graph by renaming filenames in copy of dep_graph
         target_dep_graph = DependencyAgent.make_target_graph(dep_graph,
-                                                             self._update_output_file_extension)
+                                                             self._update_file_ext)
 
         # walk down the graph and translate each file
         max_cols = self._safe_get_columns()
@@ -237,16 +244,18 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         # translate the source code; if it's too long use the chunk file agent
         # to translate it in parts
         chunks = self._chunk_file_agent.chunk_file(source_code)
+        trigger_rename = None
         if len(chunks) == 1:
             print("Requesting whole file translation...")
-            responses = self._get_translations(contexts, chunks[0], node, graph, tree)
+            responses, trigger_rename = self._get_translations(contexts, chunks[0],
+                                                               node, graph, tree)
             translations = [self._postprocess(response) for response in responses]
         else:
             translations = []
             prev_chunks = []
             for chunk in chunks:
                 print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
-                responses = self._get_translations(contexts, chunk, node, graph, tree,
+                responses, trigger_rename = self._get_translations(contexts, chunk, node, graph, tree,
                                                    prev_chunks=prev_chunks)
                 chunk_translations = [self._postprocess(response) for response in responses]
                 if len(translations) > 0:
@@ -261,12 +270,13 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         for i, translation in enumerate(translations):
             # write the translation to the output file
             if translation is not None:
-                self._write_file(node.rel_path, translation, i)
+                self._write_file(node.rel_path, translation, i, trigger_rename)
 
     def _get_translations(self, contexts: List[str], source_code: str, file: FileNode, \
                           graph: Optional[List[FileNode]] = None, \
                           tree: Optional[str] = None, \
-                          prev_chunks: List[Union[str, None]] = []) -> List[str]:
+                          prev_chunks: List[Union[str, None]] = []) \
+                          -> Tuple[List[str], Optional[str]]:
         """ Get the translation for a region of code using the provided context.
         """
         prompt_config_src = self._input_repo.get_meta_dict()
@@ -299,9 +309,23 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                            ex_run_desc=prompt_config_dst["ex_run_desc"]
                        ) for p in prompts]
 
-        if filename == prompt_config_src["build_filename"]:
+        trigger_rename = None
+        key_filename = prompt_config_src["build_filename"]
+        if prompt_config_dst["build_filename"] != prompt_config_src["build_filename"]:
+            trigger_rename = prompt_config_dst["build_filename"]
+
+            # If the repo being translated already has the build file that we want
+            # to use, but it's not the default build file, then we should trigger
+            # the build addendum for that extra build file rather than the default.
+            if ("extra_build_files" in prompt_config_src
+                and prompt_config_dst["build_filename"] in prompt_config_src["extra_build_files"]):
+                key_filename = prompt_config_dst["build_filename"]
+
+        if filename == key_filename:
             prompts = [p + "\n" + \
-                       ac.MAKEFILE_ADDENDUM.format(
+                       ac.BUILD_ADDENDUM.format(
+                           build_filename=key_filename,
+                           new_build_filename=prompt_config_dst["build_filename"],
                            dst_model=self._dst_model,
                            exts=exts_str,
                            filename_desc=filename_desc,
@@ -310,6 +334,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                            dep_graph=DependencyAgent.graph_to_str(graph),
                            file_tree=tree
                        ) for p in prompts]
+        else:
+            trigger_rename = None
 
 
         # generate the translations asynchronously so they can be batched
@@ -321,4 +347,4 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         if self._log_interactions:
             self._log_interaction(prompts, responses, reasonings)
 
-        return responses
+        return (responses, trigger_rename)
