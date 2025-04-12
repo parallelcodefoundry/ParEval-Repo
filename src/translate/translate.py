@@ -35,6 +35,7 @@ def get_args():
     parser.add_argument("--dry", "-d", action="store_true", help="Dry run the translation.")
     parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
     parser.add_argument("--hide-progress", action="store_true", help="Hide the progress bar.")
+    parser.add_argument("--tar-outputs", action="store_true", help="Create a tarball of the output directories.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
@@ -102,14 +103,13 @@ def main():
         log_interactions=args.log_interactions,
         dry=args.dry,
         hide_progress=args.hide_progress,
-        output_id=args.output_id,
         **translator_args
     )
     translator.translate()
 
     def create_tarball():
         """ Create a tarball of the output directory. """
-        tarball_name = f"output-{args.output_id}.tar.gz"
+        tarball_name = f"output-{output_dir.split('-')[-1]}.tar.gz"
         tarball_path = os.path.join(args.output, tarball_name)
 
         with tarfile.open(tarball_path, "w:gz") as tar:
@@ -119,7 +119,14 @@ def main():
         # deletes output directory after creating tarball
         shutil.rmtree(output_dir)
 
-    create_tarball()
+    # create tarballs for each output directory
+    if args.tar_outputs:
+        for i in range(args.output_id, args.output_id + args.num_translations):
+            output_dir = os.path.join(args.output, "output-" + str(i))
+            if os.path.exists(output_dir):
+                create_tarball()
+            else:
+                print(f"Output directory {output_dir} does not exist. Skipping tarball creation.")
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):

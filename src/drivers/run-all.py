@@ -30,6 +30,8 @@ def get_args() -> ArgumentParser:
     parser = ArgumentParser(description="Compile and run all the generated code repositories.")
     parser.add_argument("translations_root", type=str,
                         help="Root directory of the generated code repositories.")
+    parser.add_argument("--outputs-tarball", action="store_true",
+                        help="If provided, untar tarballs in the translations root directory.")
     parser.add_argument("-o", "--output", type=str, default="results.json",
                         help="Output JSON file containing the results.")
     parser.add_argument("--scratch-dir", type=str, default="scratch",
@@ -412,7 +414,9 @@ def main():
     scratch = startup_from_args(args)
 
     # Extract tarballs
-    extract_tarballs(args.translations_root, remove_tar=False)
+    if args.outputs_tarball:
+        logging.info("Extracting tarballs in translations root directory.")
+        extract_tarballs(args.translations_root, remove_tarball=False)
 
     # Load system config
     with open(args.system_config, "r", encoding="utf-8") as f:
