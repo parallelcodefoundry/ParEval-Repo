@@ -30,6 +30,14 @@ naive-llama-microxor-omp:
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
+naive-llama-microxorh-omp:
+  time: '2:00:00'
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: microXORh
+  start_idx: 1
+  end_idx: 25
+  dst_model: openmp-offload
 naive-llama-nanoxor-omp:
   time: '2:00:00'
   method: naive
@@ -38,6 +46,7 @@ naive-llama-nanoxor-omp:
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
+
 naive-qwq-llmc-omp:
   time: '2:00:00'
   method: naive
@@ -70,6 +79,14 @@ naive-qwq-microxor-omp:
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
+naive-qwq-microxorh-omp:
+  time: '2:00:00'
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: microXORh
+  start_idx: 1
+  end_idx: 25
+  dst_model: openmp-offload
 naive-qwq-nanoxor-omp:
   time: '2:00:00'
   method: naive
@@ -78,6 +95,7 @@ naive-qwq-nanoxor-omp:
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
+
 restate-llama-llmc-omp:
   time: '2:00:00'
   method: restate
@@ -110,6 +128,14 @@ restate-llama-microxor-omp:
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
+restate-llama-microxorh-omp:
+  time: '2:00:00'
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: microXORh
+  start_idx: 1
+  end_idx: 25
+  dst_model: openmp-offload
 restate-llama-nanoxor-omp:
   time: '2:00:00'
   method: restate
@@ -118,6 +144,7 @@ restate-llama-nanoxor-omp:
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
+
 restate-qwq-llmc-omp:
   time: '2:00:00'
   method: restate
@@ -147,6 +174,14 @@ restate-qwq-microxor-omp:
   method: restate
   model: qwq-32b-q8_0.gguf
   app: microXOR
+  start_idx: 1
+  end_idx: 25
+  dst_model: openmp-offload
+restate-qwq-microxorh-omp:
+  time: '2:00:00'
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: microXORh
   start_idx: 1
   end_idx: 25
   dst_model: openmp-offload
@@ -191,6 +226,14 @@ naive-llama-microxor-kokkos:
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
+naive-llama-microxorh-kokkos:
+  time: '2:00:00'
+  method: naive
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: microXORh
+  start_idx: 1
+  end_idx: 25
+  dst_model: kokkos
 naive-llama-nanoxor-kokkos:
   time: '2:00:00'
   method: naive
@@ -199,6 +242,7 @@ naive-llama-nanoxor-kokkos:
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
+
 naive-qwq-llmc-kokkos:
   time: '2:00:00'
   method: naive
@@ -231,6 +275,14 @@ naive-qwq-microxor-kokkos:
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
+naive-qwq-microxorh-kokkos:
+  time: '2:00:00'
+  method: naive
+  model: qwq-32b-q8_0.gguf
+  app: microXORh
+  start_idx: 1
+  end_idx: 25
+  dst_model: kokkos
 naive-qwq-nanoxor-kokkos:
   time: '2:00:00'
   method: naive
@@ -239,6 +291,7 @@ naive-qwq-nanoxor-kokkos:
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
+
 restate-llama-llmc-kokkos:
   time: '2:00:00'
   method: restate
@@ -271,6 +324,14 @@ restate-llama-microxor-kokkos:
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
+restate-llama-microxorh-kokkos:
+  time: '2:00:00'
+  method: restate
+  model: Llama-3.3-70B-Instruct-Q4_K_L.gguf
+  app: microXORh
+  start_idx: 1
+  end_idx: 25
+  dst_model: kokkos
 restate-llama-nanoxor-kokkos:
   time: '2:00:00'
   method: restate
@@ -279,6 +340,7 @@ restate-llama-nanoxor-kokkos:
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
+
 restate-qwq-llmc-kokkos:
   time: '2:00:00'
   method: restate
@@ -308,6 +370,14 @@ restate-qwq-microxor-kokkos:
   method: restate
   model: qwq-32b-q8_0.gguf
   app: microXOR
+  start_idx: 1
+  end_idx: 25
+  dst_model: kokkos
+restate-qwq-microxorh-kokkos:
+  time: '2:00:00'
+  method: restate
+  model: qwq-32b-q8_0.gguf
+  app: microXORh
   start_idx: 1
   end_idx: 25
   dst_model: kokkos
