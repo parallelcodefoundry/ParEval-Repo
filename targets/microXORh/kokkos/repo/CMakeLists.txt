@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(
-    microXOR_Kokkos
+    microXORh_Kokkos
     VERSION 1.0
     LANGUAGES CXX
 )
@@ -34,9 +34,9 @@ elseif (${KOKKOS_BACKEND} STREQUAL "HIP")
 endif ()
 
 
-set(SOURCE src/microXOR.cpp src/main.cpp)
+set(SOURCE src/main.cpp)
 
-add_executable(microXOR.exe ${SOURCE})
-target_link_libraries(microXOR.exe Kokkos::kokkos)
+add_executable(microXORh.exe ${SOURCE})
+target_link_libraries(microXORh.exe Kokkos::kokkos)
 
-install(TARGETS microXOR.exe DESTINATION bin)
+install(TARGETS microXORh.exe DESTINATION bin)

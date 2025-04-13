@@ -36,7 +36,7 @@ endif ()
 
 set(SOURCE nanoXOR.cpp)
 
-add_executable(nanoXOR ${SOURCE})
+add_executable(nanoXOR.exe ${SOURCE})
 target_link_libraries(nanoXOR.exe Kokkos::kokkos)
 
 install(TARGETS nanoXOR.exe DESTINATION bin)
