@@ -52,9 +52,9 @@ class SWEAgentTranslator(Translator):
 
     @staticmethod
     def add_args(parser):
-        parser.add_argument("--swe-agent-model-name", type=str, required=True,
+        parser.add_argument("--swe-agent-model-name", type=str,
                             help="Name of the agent model to use (e.g. 'gpt-4o').")
-        parser.add_argument("--swe-agent-per-instance-cost-limit", type=float, required=True,
+        parser.add_argument("--swe-agent-per-instance-cost-limit", type=float,
                             help="Per-instance cost limit for the agent model.")
 
 
