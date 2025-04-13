@@ -5,7 +5,7 @@
     "dependencies": ["llvm", "cuda"],
     "build_commands_debug": "make SM_VERSION=sm_80 DEBUG=yes CXX_COMPILER=clang++",
     "build_commands_perf": "make SM_VERSION=sm_80 CXX_COMPILER=clang++",
-    "build_timeout": 30,
+    "build_timeout": 120,
     "exe_file": "microXOR.exe",
     "debug_type": "match",
     "run_commands_debug": [

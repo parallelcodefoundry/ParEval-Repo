@@ -5,7 +5,7 @@
     "dependencies": ["cuda", "llvm"],
     "build_commands_debug": "make CUDA_ARCH=80 DEBUG=yes COMPILER=llvm -j8",
     "build_commands_perf": "make CUDA_ARCH=80 COMPILER=llvm -j8",
-    "build_timeout": 30,
+    "build_timeout": 120,
     "exe_file": "XSBench",
     "debug_type": "match",
     "run_commands_debug": [

@@ -398,7 +398,7 @@ def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
         # workaround for oserror race condition bug
         for root, dirs, _ in os.walk(tempdir):
             for d in dirs:
-                shutil.rmtree(os.path.join(root, d))
+                shutil.rmtree(os.path.join(root, d), ignore_errors=True)
 
         pbar()
 

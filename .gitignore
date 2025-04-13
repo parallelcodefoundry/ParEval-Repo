@@ -1,4 +1,5 @@
 *.o
+*.e
 *.exe
 a.out
 *.bin
@@ -13,5 +14,5 @@ tmp*
 
 .request_cache_*.pkl
 
-src/translate/test/delta-scripts/enqueue_jobs.sh
-src/translate/test/delta-scripts/gen_*.slurm
+enqueue_jobs.sh
+gen_*.slurm

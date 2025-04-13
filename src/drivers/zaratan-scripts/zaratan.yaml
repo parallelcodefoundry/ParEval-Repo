@@ -14,6 +14,7 @@ naive-simplemoc-omp:
   method: naive
   app: SimpleMOC-kernel
   dst_model: openmp-offload
+  skip_build_swap: yes
 naive-microxor-omp:
   time: '2:00:00'
   method: naive
@@ -22,6 +23,34 @@ naive-microxor-omp:
 naive-nanoxor-omp:
   time: '2:00:00'
   method: naive
+  app: nanoXOR
+  dst_model: openmp-offload
+
+restate-llmc-omp:
+  time: '2:00:00'
+  method: restate
+  app: llm.c
+  dst_model: openmp-offload
+  skip_build_swap: yes
+restate-xsbench-omp:
+  time: '2:00:00'
+  method: restate
+  app: XSBench
+  dst_model: openmp-offload
+restate-simplemoc-omp:
+  time: '2:00:00'
+  method: restate
+  app: SimpleMOC-kernel
+  dst_model: openmp-offload
+  skip_build_swap: yes
+restate-microxor-omp:
+  time: '2:00:00'
+  method: restate
+  app: microXOR
+  dst_model: openmp-offload
+restate-nanoxor-omp:
+  time: '2:00:00'
+  method: restate
   app: nanoXOR
   dst_model: openmp-offload
 
@@ -47,39 +76,11 @@ naive-microxor-kokkos:
   method: naive
   app: microXOR
   dst_model: kokkos
-  skip_build_swap: yes
 naive-nanoxor-kokkos:
   time: '2:00:00'
   method: naive
   app: nanoXOR
   dst_model: kokkos
-  skip_build_swap: yes
-
-restate-llmc-omp:
-  time: '2:00:00'
-  method: restate
-  app: llm.c
-  dst_model: openmp-offload
-restate-xsbench-omp:
-  time: '2:00:00'
-  method: restate
-  app: XSBench
-  dst_model: openmp-offload
-restate-simplemoc-omp:
-  time: '2:00:00'
-  method: restate
-  app: SimpleMOC-kernel
-  dst_model: openmp-offload
-restate-microxor-omp:
-  time: '2:00:00'
-  method: restate
-  app: microXOR
-  dst_model: openmp-offload
-restate-nanoxor-omp:
-  time: '2:00:00'
-  method: restate
-  app: nanoXOR
-  dst_model: openmp-offload
 
 restate-llmc-kokkos:
   time: '2:00:00'
@@ -103,10 +104,8 @@ restate-microxor-kokkos:
   method: restate
   app: microXOR
   dst_model: kokkos
-  skip_build_swap: yes
 restate-nanoxor-kokkos:
   time: '2:00:00'
   method: restate
   app: nanoXOR
   dst_model: kokkos
-  skip_build_swap: yes

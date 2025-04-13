@@ -6,7 +6,7 @@
     "setup_commands": ["cp $SCRATCH/llmc_inputs/*.bin ."],
     "build_commands_debug": "cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -GNinja -Bbuild . && cmake --build build/",
     "build_commands_perf": "cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -GNinja -Bbuild . && cmake --build build/",
-    "build_timeout": 30,
+    "build_timeout": 120,
     "exe_file": "build/test_gpt2fp32cu",
     "debug_type": "match",
     "run_commands_debug": [
