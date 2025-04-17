@@ -22,15 +22,16 @@ run_translate () {
     llm_backend=$3
     application=$4
     iter=$5
-    dstmodel=$6
+    dstmodel_arg=$6
     if [[ $method == "cnaive" ]]; then
         method="naive"
         extra_args="--enable-chunking"
     fi
-    srcmodel="cuda"
-    if [[ $dstmodel == *"t-openmp-offload"* ]]; then
+    if [[ $dstmodel_arg == *"t-openmp-offload"* ]]; then
         srcmodel="openmp-threads"
         dstmodel="openmp-offload"
+    else
+        srcmodel="cuda"
     fi
     shortdst=$dstmodel
     if [[ $dstmodel == *"openmp-offload"* ]]; then
@@ -68,11 +69,12 @@ run_batch_translate () {
     application=$4
     fiter=$5
     liter=$6
-    dstmodel=$7
-    srcmodel="cuda"
-    if [[ $dstmodel == *"t-openmp-offload"* ]]; then
+    dstmodel_arg=$7
+    if [[ $dstmodel_arg == *"t-openmp-offload"* ]]; then
         srcmodel="openmp-threads"
         dstmodel="openmp-offload"
+    else
+        srcmodel="cuda"
     fi
     shortdst=$dstmodel
     if [[ $dstmodel == *"openmp-offload"* ]]; then
@@ -148,14 +150,14 @@ elif [ "$#" -eq 7 ]; then
     application=$4
     fiter=$5
     liter=$6
-    dstmodel=$7
+    dstmodel_arg=$7
     echo "Running ${fiter} thru ${liter} ${method} experiments for ${llm_version} (${llm_backend}) and ${application} to ${dstmodel}"
     if [[ $llm_backend == "vllm" ]]; then
         echo "Using n-wise batching"
-        run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter} ${dstmodel}
+        run_batch_translate ${method} ${llm_version} ${llm_backend} ${application} ${fiter} ${liter} ${dstmodel_arg}
     else
         for iter in $(seq ${fiter} ${liter}); do
-            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} ${dstmodel}
+            run_translate ${method} ${llm_version} ${llm_backend} ${application} ${iter} ${dstmodel_arg}
         done
     fi
 else
