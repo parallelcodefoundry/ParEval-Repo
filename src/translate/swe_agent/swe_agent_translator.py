@@ -144,7 +144,7 @@ Ensure that the user can compile this code using, for example, `{data["ex_build_
             f"--agent.model.name={self._swe_agent_model_name}",
             f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}",
             f"--env.repo.path={self._temp_repo_path}",
-            f"--env.deployment.image=python",
+            "--env.deployment.image=python",
             f"--problem_statement.path={self._translation_task_path}",
         ]
 
@@ -152,7 +152,7 @@ Ensure that the user can compile this code using, for example, `{data["ex_build_
 
         try:
             # Runs the SWE-agent command
-            process = subprocess.run(command, text=True, cwd=self._temp_repo_path)
+            process = subprocess.run(command, text=True, cwd=self._temp_repo_path, check=True)
             # If SWE-agent does not encounter any issues, try to apply the patch
             # file via git apply
             if process.returncode == 0:
@@ -166,7 +166,7 @@ Ensure that the user can compile this code using, for example, `{data["ex_build_
 
                 # Finds the path of the patch file
                 def find_patch_file(trajectories_dir):
-                    for root, dirs, files in os.walk(trajectories_dir):
+                    for root, _, files in os.walk(trajectories_dir):
                         for file in files:
                             if file.endswith(".patch"):
                                 # Return the full path of the .patch file
@@ -182,31 +182,24 @@ Ensure that the user can compile this code using, for example, `{data["ex_build_
                 if old_patch_path is None:
                     print("Error: No patch file found in trajectories directory.")
                     return False
-                else:
-                    new_patch_path = os.path.join(self._temp_repo_path, "temp.patch")
-                    os.rename(old_patch_path, new_patch_path)
 
-                # Clears the unnecessary whitespace of the patch file
-                subprocess.run(["sed", "-i", "", "s/[ \t]*$//", new_patch_path],
-                               check=True, cwd=self._temp_repo_path)
-                print('Cleared up the whitespace of the patch file')
+                new_patch_path = os.path.join(self._temp_repo_path, "temp.patch")
+                os.rename(old_patch_path, new_patch_path)
 
                 # Apply the patch to the temp repo
                 try:
-                    subprocess.run(["git", "apply", "--directory=.", "--reject",
-                                    "--whitespace=fix", "--unsafe-paths", new_patch_path],
+                    subprocess.run(["patch", "-p1", "-i", new_patch_path],
                                    cwd=self._temp_repo_path, check=True)
                     print("Patch applied successfully.")
-
                 except subprocess.CalledProcessError as e:
+                    print(f"Error applying patch: {e}")
                     return False
 
                 return True
 
-            else:
-                print(f"Command failed with return code {process.returncode}.")
-                # print the subprocess return code
-                return False
+            print(f"Command failed with return code {process.returncode}.")
+            # print the subprocess return code
+            return False
 
         except Exception as e:
             print(f"An error occurred: {e}")
@@ -246,10 +239,10 @@ Ensure that the user can compile this code using, for example, `{data["ex_build_
 
         app_name = os.path.basename(self._input_repo.path)
 
-        with open(exp_meta_fpath, 'w') as f:
+        with open(exp_meta_fpath, 'w', encoding='utf-8') as f:
             exp_meta_dict = {
                 "app": app_name,
-                "prompt_strategy": ["SWE", "agent"],
+                "prompt_strategy": "SWE-agent",
                 "llm_name": self._swe_agent_model_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
