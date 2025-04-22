@@ -237,11 +237,9 @@ Ensure that the user can compile this code using, for example, `{data["ex_build_
         exp_meta_fpath = os.path.join(self._output_path, "..", "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
 
-        app_name = os.path.basename(self._input_repo.path)
-
         with open(exp_meta_fpath, 'w', encoding='utf-8') as f:
             exp_meta_dict = {
-                "app": app_name,
+                "app": self._dst_config["app"],
                 "prompt_strategy": "SWE-agent",
                 "llm_name": self._swe_agent_model_name,
                 "source_model": self._src_model,
