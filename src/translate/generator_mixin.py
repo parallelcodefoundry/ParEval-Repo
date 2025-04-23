@@ -254,7 +254,7 @@ class GeneratorMixin:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
         is_reasoning = False
-        if "QwQ" or "qwq" in self._llm_name:
+        if "QwQ" in self._llm_name or "qwq" in self._llm_name:
             # Adjust temp and top_p
             temperature = 0.6
             top_p = 0.95
