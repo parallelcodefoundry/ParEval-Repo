@@ -4,6 +4,6 @@
     "cuda": "module load cuda/gcc/11.3.0/zen2/12.3.0",
     "kokkos": "spack load kokkos",
     "sm": "80",
-    "exec_check": "ncu",
-    "exec_check_fail_text": "==WARNING== No kernels were profiled."
+    "exec_check": "~/llms4hpc/code-translation/src/drivers/exec-check.sh",
+    "exec_check_fail_text": "No GPU kernels launched!!"
 }
