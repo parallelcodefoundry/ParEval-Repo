@@ -6,7 +6,6 @@ import os
 import sys
 import re
 import json
-from abc import abstractmethod
 from typing import Dict, Tuple, Union, Literal, List, Optional
 
 # tpl imports
@@ -117,7 +116,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
                             default="openai", help="The backend to use for translation.")
         parser.add_argument("--naive-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
-        parser.add_argument("--enable-chunking", action="store_true",
+        parser.add_argument("--naive-enable-chunking", action="store_true",
                             help="Enable chunking for the naive translation method.")
 
 
@@ -128,7 +127,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
         return {
             "backend": args.naive_backend,
             "llm_name": args.naive_llm_name,
-            "enable_chunking": args.enable_chunking,
+            "enable_chunking": args.naive_enable_chunking,
         }
 
 

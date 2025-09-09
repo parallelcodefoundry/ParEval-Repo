@@ -129,10 +129,10 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
         """ Add arguments for the top-down agent translation method.
         """
-        parser.add_argument("--top_down_agentic-backend",
+        parser.add_argument("--top-down-agentic-backend",
                             choices=["openai", "gemini", "hf", "vllm", "local"],
                             default="openai", help="The backend to use for translation.")
-        parser.add_argument("--top_down_agentic-llm-name",
+        parser.add_argument("--top-down-agentic-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
 
 

@@ -9,6 +9,7 @@ import os
 from typing import Optional, List
 import json
 
+TASK_FILE = "translation_task.md"
 
 class Repo:
 
@@ -33,7 +34,7 @@ class Repo:
         if self._exp_meta['path'] != os.path.sep.join(implicit_path.split(os.path.sep)[-len(explicit_path_steps):]):
             raise ValueError("The provided path in the exp_meta file does not match the path of the exp_meta file.")
         return self(implicit_path, self._exp_meta)
-    
+
     @property
     def path(self) -> os.PathLike:
         return self._path
@@ -51,6 +52,8 @@ class Repo:
     def get_all_filenames(self, relpaths: bool = False) -> List[os.PathLike]:
         """ get all the files names in this._path as relative paths """
         all_files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(self._path) for f in filenames]
+        # Remove task description file used for SWE-agent
+        all_files = [f for f in all_files if TASK_FILE not in f]
         if relpaths:
             return [os.path.relpath(f, self._path) for f in all_files]
         return all_files
