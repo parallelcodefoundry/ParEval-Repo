@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-""" Translating repositories from one execution model to another using LLMs.
+""" Translates repositories from one execution model to another using LLMs.
     For example, this script can take a CUDA application as input and
     translate it to an OpenMP version of the same application.
 
-    author: Daniel Nichols
-    date: April 2024
+    author: Daniel Nichols, Joshua Davis
+    date: April 2024, September 2025
 """
 # std imports
 from argparse import ArgumentParser

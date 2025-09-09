@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-'''
-Run all generated code repositories
-author: Josh Davis
-date: October 2024
+''' Compiles and runs a set of translated code repositories to test translation correctness.
+
+    author: Joshua Davis
+    date: October 2024, September 2025
 '''
 # std imports
 from argparse import ArgumentParser
