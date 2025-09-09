@@ -1,121 +1,67 @@
 import logging
-from subprocess import CompletedProcess
+from typing import Dict, Any, List
 
-from util import run_bash, find_config, list_dep_cmds
-
-def check_output(repo_data, target_config, run_result, i):
-    ''' Check the run output against the expected output '''
-    if target_config["debug_type"] == "match":
-        if target_config["debug_outputs"][i] not in run_result.stdout:
-            logging.debug(f"Output mismatch for {repo_data['app']} with model {repo_data['dest_model']} test {i}.")
-            logging.debug(f"Expected output to contain: {target_config['debug_outputs'][i]}")
-            logging.debug(f"Actual output: {run_result.stdout}")
-            return 1
-    return 0
-
-def check_exec(repo_data, target_config, system_config, i, args, tempdir):
-    ''' Check that binary executes as expected for this input '''
-    if system_config["exec_check"] != "":
-        cmds = list_dep_cmds(system_config, target_config)
-        exc_cmd = [system_config["exec_check"] + " " + target_config["run_commands_perf"][0]]
-        exec_check_result = run_bash(cmds + exc_cmd, cwd=tempdir, timeout=target_config["run_timeout"], dry=args.dry)
-        fail_text = system_config["exec_check_fail_text"]
-        if fail_text == "":
-            logging.error(f"exec_check_fail_text not specified in {args.system_config}.")
-            raise ValueError(f"exec_check_fail_text not specified in {args.system_config}.")
-        if fail_text in exec_check_result.stdout or fail_text in exec_check_result.stderr:
-            logging.debug(f"Execution check failed for {repo_data['app']} with model {repo_data['dest_model']} test {i}.")
-            return 1
-    else:
-        logging.debug(f"No execution check specified in {args.system_config}.")
-    return 0
+from util import run_bash, find_config, list_dep_cmds, ResultBuilder, LoggingHelper, ValidationHelper, ResultsManager
 
 
-def prepare_result_dict(repo_data, run_results, run_exec_checks, run_stdouts, run_stderrs):
-    ''' Create a result dict from a bash run result.
-    '''
-    result = {}
-    result["path"] = repo_data['path']
-    result["run_results_debug"] = run_results
-    result["run_exec_checks_debug"] = run_exec_checks
-    result["run_stdouts_debug"] = run_stdouts
-    result["run_stderrs_debug"] = run_stderrs
-    return result
+def execute_single_run(repo_data: Dict[str, str], target_config: Dict[str, Any],
+                      system_config: Dict[str, Any], args: Any, tempdir: str,
+                      test_index: int, cmds: List[str]) -> tuple:
+    """Execute a single run command and return the results."""
+    run_cmd = [target_config["run_commands_debug"][test_index]]
+
+    # Run the repo
+    run_result = run_bash(cmds + run_cmd, cwd=tempdir,
+                          timeout=target_config["run_timeout"], dry=args.dry,
+                          name="run")
+
+    # Check the run output against the expected output
+    run_result.returncode = ValidationHelper.check_output(
+        repo_data, target_config, run_result, test_index)
+
+    # Validate binary executes as expected for this input
+    exec_check = ValidationHelper.check_exec(
+        repo_data, target_config, system_config, test_index, args, tempdir)
+
+    if args.log_run_output:
+        logging.info(f"Run output: {run_result.stdout}")
+
+    # Log the run result
+    LoggingHelper.log_run_result(repo_data, run_result, args, test_index)
+
+    return run_result, exec_check
 
 
-def make_skip_run_result(repo_data):
-    ''' Create a result dict for a skipped run.
-    '''
-    result = {}
-    result["path"] = repo_data['path']
-    result["run_results_debug"] = [1]
-    result["run_exec_checks_debug"] = [0]
-    result["run_stdouts_debug"] = [""]
-    result["run_stderrs_debug"] = ["skip due to build failure"]
-    return result
-
-
-def log_run_result(repo_data, run_result, args, i):
-    ''' Log the run result.
-    '''
-    if run_result.returncode != 0:
-        logging.debug(f"Run failed for {repo_data['app']} with model " +
-                      f"{repo_data['dest_model']} test {i}.")
-        if args.log_run_errors:
-            logging.info(f"Run error: {run_result.stderr}")
-    else:
-        logging.debug(f"Run succeeded for {repo_data['app']} with model " +
-                      f"{repo_data['dest_model']} test {i}.")
-
-
-def save_run_result(run_result, exec_check, run_results, run_exec_checks,
-                    run_stdouts, run_stderrs):
-    ''' Save the run result.
-    '''
-    run_results.append(run_result.returncode)
-    run_exec_checks.append(exec_check)
-    run_stdouts.append(run_result.stdout)
-    run_stderrs.append(run_result.stderr)
-
-
-def run_repo(repo_data, system_config, args, tempdir):
+def run_repo(repo_data: Dict[str, str], system_config: Dict[str, Any],
+             args: Any, tempdir: str) -> Dict[str, Any]:
+    """Run the repo with the given configuration."""
     # Find the target config for this repo per dest model and app name
     target_config = find_config(repo_data["app"], repo_data["dest_model"], args.target_path)
 
     # Get dep cmds from system, target config
     cmds = list_dep_cmds(system_config, target_config)
 
-    # Loop over the run cmds
+    # Initialize result lists
     run_results = []
     run_exec_checks = []
     run_stdouts = []
     run_stderrs = []
-    for i in range(0, len(target_config["run_commands_debug"])):
-        run_cmd = [target_config["run_commands_debug"][i]]
 
-        # Run the repo
-        run_result = run_bash(cmds + run_cmd, cwd=tempdir,
-                              timeout=target_config["run_timeout"], dry=args.dry,
-                              name="run")
-
-        # Check the run output against the expected output
-        run_result.returncode = check_output(repo_data, target_config, run_result, i)
-
-        # Validate binary executes as expected for this input
-        exec_check = check_exec(repo_data, target_config, system_config, i, args, tempdir)
-
-        if args.log_run_output:
-            logging.info(f"Run output: {run_result.stdout}")
-
-        # Log the run result
-        log_run_result(repo_data, run_result, args, i)
+    # Loop over the run cmds
+    for i in range(len(target_config["run_commands_debug"])):
+        run_result, exec_check = execute_single_run(
+            repo_data, target_config, system_config, args, tempdir, i, cmds)
 
         # Save the run result
-        save_run_result(run_result, exec_check, run_results, run_exec_checks,
-                        run_stdouts, run_stderrs)
+        ResultsManager.save_run_result(
+            run_result, exec_check, run_results, run_exec_checks,
+            run_stdouts, run_stderrs)
 
     # Create run result dict to return
-    result = prepare_result_dict(repo_data, run_results, run_exec_checks,
-                                 run_stdouts, run_stderrs)
+    return ResultBuilder.build_run_result(
+        repo_data, run_results, run_exec_checks, run_stdouts, run_stderrs)
 
-    return result
+
+def make_skip_run_result(repo_data: Dict[str, str]) -> Dict[str, Any]:
+    """Create a result dict for a skipped run."""
+    return ResultBuilder.build_skip_run_result(repo_data)
