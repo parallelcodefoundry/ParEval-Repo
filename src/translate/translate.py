@@ -107,7 +107,7 @@ def main():
     )
     translator.translate()
 
-    def create_tarball():
+    def create_tarball(output_dir):
         """ Create a tarball of the output directory. """
         tarball_name = f"output-{output_dir.split('-')[-1]}.tar.gz"
         tarball_path = os.path.join(args.output, tarball_name)
@@ -124,7 +124,7 @@ def main():
         for i in range(args.output_id, args.output_id + args.num_translations):
             output_dir = os.path.join(args.output, "output-" + str(i))
             if os.path.exists(output_dir):
-                create_tarball()
+                create_tarball(output_dir)
             else:
                 print(f"Output directory {output_dir} does not exist. Skipping tarball creation.")
 
