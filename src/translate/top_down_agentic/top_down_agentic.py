@@ -20,11 +20,11 @@ import re
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from translator import Translator
-from restate.dependency_agent import DependencyAgent, FileNode, FileType
-from restate.chunk_agent import ChunkFileAgent
-from restate.context_agent import ContextAgent
-from restate import agent_constants as ac
-from restate.utils import (
+from top_down_agentic.dependency_agent import DependencyAgent, FileNode, FileType
+from top_down_agentic.chunk_agent import ChunkFileAgent
+from top_down_agentic.context_agent import ContextAgent
+from top_down_agentic import agent_constants as ac
+from top_down_agentic.utils import (
     safe_get_terminal_columns,
     extract_code_block,
     ensure_directory_exists,
@@ -38,7 +38,7 @@ from repo import Repo
 from alive_progress import alive_it
 
 
-class TopDownAgentTranslator(Translator, GeneratorMixin):
+class TopDownAgenticTranslator(Translator, GeneratorMixin):
     """Translator for entire repositories using the top-down agent method."""
 
     def __init__(
@@ -129,10 +129,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
         """ Add arguments for the top-down agent translation method.
         """
-        parser.add_argument("--restate-backend",
+        parser.add_argument("--top_down_agentic-backend",
                             choices=["openai", "gemini", "hf", "vllm", "local"],
                             default="openai", help="The backend to use for translation.")
-        parser.add_argument("--restate-llm-name",
+        parser.add_argument("--top_down_agentic-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
 
 
@@ -141,8 +141,8 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """ Parse the arguments for the top-down agent translation method.
         """
         return {
-            "backend": args.restate_backend,
-            "llm_name": args.restate_llm_name
+            "backend": args.top_down_agentic_backend,
+            "llm_name": args.top_down_agentic_llm_name
         }
 
 
@@ -224,7 +224,7 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         try:
             exp_meta_dict = {
                 "app": self._input_repo.get_meta_dict()["app"],
-                "prompt_strategy": "restate",
+                "prompt_strategy": "top_down_agentic",
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,

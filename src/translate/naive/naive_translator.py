@@ -18,7 +18,7 @@ from translator import Translator
 from generator_mixin import GeneratorMixin, GenericResponse
 from repo import Repo
 from naive import naive_constants as nc
-from restate.chunk_agent import ChunkFileAgent
+from top_down_agentic.chunk_agent import ChunkFileAgent
 
 # Constants
 DEFAULT_TERMINAL_COLS = 80
