@@ -1,7 +1,7 @@
 [project]
 name = "pareval-repo"
 version = "0.1.0"
-description = "Add your description here"
+description = "Package for evaluating LLM repository-scale translation of parallel HPC codes"
 readme = "README.md"
 requires-python = ">=3.11.13"
 dependencies = [
