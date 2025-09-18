@@ -16,10 +16,27 @@ The layout of the repository is as follows:
 - `config/`: Configuration json files to inform drivers on how to load dependencies and run on
   various systems.
 
-## Installation
+## Setup
 
-To use ParEval-Repo we require Python 3.11.13 or greater along with several libraries listed in
-`requirements.txt`. You can install these using pip or the package manager of your choice:
+We offer two methods to setup ParEval-Repo: via `uv` and via `pip`. We suggest `uv`.
+
+### Option 1: `uv` setup
+
+ParEval-Repo depends on a few libraries for inference APIs and other common tools. The preferred
+method to install these is via [`uv`, a fast Python package
+manager](https://docs.astral.sh/uv/getting-started/installation/). After installing `uv`, you can
+install our exact Python version and dependencies used for development and activate the resulting
+environment by running following commands in the repository root:
+
+```
+uv sync
+. .venv/bin/activate
+```
+
+### Option 2: `pip` setup
+
+You can also install in the more traditional manner using `pip`. We require Python 3.11.13 or
+greater and all dependencies are listed in `requirements.txt`:
 
 ```
 pip install -r requirements.txt
