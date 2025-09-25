@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ Translating repositories from one execution model to another using LLMs.
-    For example, this script can take a CUDA application as input and 
+    For example, this script can take a CUDA application as input and
     translate it to an OpenMP version of the same application.
 
     author: Daniel Nichols
@@ -29,11 +29,13 @@ def get_args():
     parser.add_argument("--method", choices=["naive", "restate", "swe-agent"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
-    parser.add_argument("--output-id", type=int, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
+    parser.add_argument("--output-id", type=int, required=True, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
+    parser.add_argument("-n", "--num-translations", type=int, default=1, help="The number of translations to generate. Currently only supported for OpenAI and vLLM with naive, will write to directories numbered from output-id through output-id + num-translations - 1.")
     parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
     parser.add_argument("--dry", "-d", action="store_true", help="Dry run the translation.")
     parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
     parser.add_argument("--hide-progress", action="store_true", help="Hide the progress bar.")
+    parser.add_argument("--tar-outputs", action="store_true", help="Create a tarball of the output directories.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
@@ -66,13 +68,17 @@ def main():
     if not os.path.exists(args.input):
         raise FileNotFoundError(f"Input directory {args.input} not found.")
 
-    # check if the output directory exists and is empty
-    output_dir = os.path.join(args.output, "output-" + str(args.output_id))
+    # check if the output directories exist and are empty
+    output_dirs = [os.path.join(args.output, "output-" + str(i)) \
+                   for i in range(args.output_id, args.output_id + args.num_translations)]
     if os.path.exists(args.output):
-        if os.path.exists(output_dir) and not args.force_overwrite:
-            raise FileExistsError(f"Output directory {output_dir} already exists. Provide --force-overwrite to overwrite.")
+        if not args.force_overwrite:
+            for d in output_dirs:
+                if os.path.exists(d):
+                    raise FileExistsError(f"Output directory {d} already exists. " +
+                                          "Provide --force-overwrite to overwrite.")
     else:
-        os.mkdir(args.output)
+        os.makedirs(args.output, exist_ok=True)
 
     # check that the dest model target json for prompt config exists
     if not os.path.exists(args.config):
@@ -90,21 +96,20 @@ def main():
     translator_args = translator_cls.parse_args(args)
     translator = translator_cls(
         input_repo=input_repo,
-        output_repo=output_dir,
+        output_repos=output_dirs,
         src_model=args.src_model,
         dst_model=args.dst_model,
         dst_config=dst_config,
         log_interactions=args.log_interactions,
         dry=args.dry,
         hide_progress=args.hide_progress,
-        output_id=args.output_id,
         **translator_args
     )
     translator.translate()
 
-    def create_tarball():
+    def create_tarball(output_dir):
         """ Create a tarball of the output directory. """
-        tarball_name = f"output-{args.output_id}.tar.gz"
+        tarball_name = f"output-{output_dir.split('-')[-1]}.tar.gz"
         tarball_path = os.path.join(args.output, tarball_name)
 
         with tarfile.open(tarball_path, "w:gz") as tar:
@@ -114,7 +119,14 @@ def main():
         # deletes output directory after creating tarball
         shutil.rmtree(output_dir)
 
-    create_tarball()
+    # create tarballs for each output directory
+    if args.tar_outputs:
+        for i in range(args.output_id, args.output_id + args.num_translations):
+            output_dir = os.path.join(args.output, "output-" + str(i))
+            if os.path.exists(output_dir):
+                create_tarball(output_dir)
+            else:
+                print(f"Output directory {output_dir} does not exist. Skipping tarball creation.")
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):

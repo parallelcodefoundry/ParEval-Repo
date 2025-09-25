@@ -1,0 +1,49 @@
+#!/bin/bash
+#PBS -N translate_vllm
+#PBS -l select=2:system=polaris
+#PBS -l filesystems=home:eagle
+#PBS -l walltime=0:20:00
+#PBS -q debug
+#PBS -A DemocAI
+
+# Array of translate instance args
+Arglist=('_' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 1 2' \
+             'naive Qwen/QwQ-32B nanoXOR 1 2' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 13 25' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 26 38' \
+             'naive Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 39 50' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 1 12' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 13 25' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 26 38' \
+             'restate Llama-3.3-70B-Instruct-Q4_K_L.gguf nanoXOR 39 50' \
+             'naive Qwen/QwQ-32B nanoXOR 1 6' \
+             'naive Qwen/QwQ-32B nanoXOR 7 12' \
+             'naive Qwen/QwQ-32B nanoXOR 13 18' \
+             'naive Qwen/QwQ-32B nanoXOR 19 30' \
+             'restate Qwen/QwQ-32B nanoXOR 1 6' \
+             'restate Qwen/QwQ-32B nanoXOR 7 12' \
+             'restate Qwen/QwQ-32B nanoXOR 13 18' \
+             'restate Qwen/QwQ-32B nanoXOR 19 30' \
+        )
+
+# Setup working directory for the ensemble
+SCRIPTDIR=/home/jhdavis/llms4hpc/code-translation/src/translate/test
+WORKDIR=/home/jhdavis/llms4hpc/code-translation/src/translate/test/trns-ensemble-${PBS_JOBID%%.*}
+mkdir $WORKDIR
+cd $WORKDIR
+
+# Get number of nodes
+NNODES=`wc -l < $PBS_NODEFILE`
+
+# Create hostfiles
+split --lines=1 --numeric-suffixes=1 --suffix-length=2 $PBS_NODEFILE local_hostfile.
+
+for iter in $(seq -f %02.0f 1 $NNODES); do
+    echo "Launching translate instance on local_hostfile.$iter: ${Arglist[$iter]}"
+    cd $SCRIPTDIR
+    mpiexec -n 1 --ppn 1 --hostfile $WORKDIR/local_hostfile.$iter bash translate_vllm_instance.sh ${Arglist[$iter]} $WORKDIR/out.$iter polaris &
+    sleep 1s
+done
+
+wait

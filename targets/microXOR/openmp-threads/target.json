@@ -1,0 +1,35 @@
+{
+    "app": "microxor",
+    "model": "openmp-threads",
+    "path": "targets/microXOR/openmp-threads/repo",
+    "dependencies": ["llvm", "cuda"],
+    "build_commands_debug": "make DEBUG=yes CXX_COMPILER=clang++",
+    "build_commands_perf": "make CXX_COMPILER=clang++",
+    "build_timeout": 120,
+    "exe_file": "microXOR.exe",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "./microXOR.exe 4 1",
+        "./microXOR.exe 1024 2",
+        "./microXOR.exe 4096 8"
+    ],
+    "debug_outputs": [
+        "Validation passed.",
+        "Validation passed.",
+        "Validation passed."
+    ],
+    "run_commands_perf": [
+        "./microXOR.exe 4096 8"
+    ],
+    "perf_outputs": [
+        "Validation passed."
+    ],
+    "run_timeout": 120,
+    "ex_build_cmd": "make CXX_COMPILER=clang++",
+    "ex_build_desc": "a generic multicore x86 system compiled with clang++",
+    "build_filename": "Makefile",
+    "ex_run_cmd": "./microXOR.exe 1024 2",
+    "ex_run_desc": "a 1024 by 1024 input matrix with two OpenMP threads",
+    "main_filename": "microXOR.cpp",
+    "filename_desc": "C++"
+}

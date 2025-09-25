@@ -1,0 +1,35 @@
+{
+    "app": "nanoxor",
+    "model": "kokkos",
+    "path": "targets/nanoXOR/kokkos/repo",
+    "dependencies": ["gnu", "cuda", "kokkos"],
+    "build_commands_debug": "cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -GNinja -Bbuild . && cmake --build build/",
+    "build_commands_perf": "cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -GNinja -Bbuild . && cmake --build build/",
+    "build_timeout": 120,
+    "exe_file": "build/nanoXOR.exe",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "./build/nanoXOR.exe 4 2",
+        "./build/nanoXOR.exe 1024 32",
+        "./build/nanoXOR.exe 4096 16"
+    ],
+    "debug_outputs": [
+        "Validation passed.",
+        "Validation passed.",
+        "Validation passed."
+    ],
+    "run_commands_perf": [
+        "./build/nanoXOR.exe 4096 16"
+    ],
+    "perf_outputs": [
+        "Validation passed."
+    ],
+    "run_timeout": 120,
+    "ex_build_cmd": "cmake -DKOKKOS_BACKEND=CUDA -DCMAKE_CXX_COMPILER=g++ -Bbuild . && cmake --build build/",
+    "ex_build_desc": "the Kokkos CUDA backend, targeting a system with an NVIDIA GPU, compiled with g++ as the host compiler, with Kokkos installed and available in the environment through $PATH and $LD_LIBRARY_PATH",
+    "build_filename": "CMakeLists.txt",
+    "ex_run_cmd": "./build/nanoXOR.exe 1024 32",
+    "ex_run_desc": "a 1024 by 1024 input matrix and a kernel with 32 times 32 threads per block",
+    "main_filename": "nanoXOR.cpp",
+    "filename_desc": "C++"
+}

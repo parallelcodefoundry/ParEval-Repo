@@ -13,7 +13,7 @@
 import os
 import sys
 import json
-from typing import Dict, Literal, Optional, List
+from typing import Dict, Literal, Optional, List, Union, Tuple
 import re
 
 # local imports
@@ -38,53 +38,53 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
     _chunk_file_agent: ChunkFileAgent
     _context_agent: ContextAgent
     _system_prompt: str
-    _interactions_path: Optional[str]
+    _interactions_paths: Optional[List[os.PathLike]] = None
 
     def __init__(
             self,
             input_repo: Repo,
-            output_repo: os.PathLike,
+            output_repos: List[os.PathLike],
             src_model: str,
             dst_model: str,
             dst_config: dict,
             llm_name: str,
-            backend: Literal["openai", "gemini", "hf", "local"] = "openai",
+            backend: Literal["openai", "gemini", "hf", "vllm", "local"] = "openai",
             log_interactions: bool = False,
             dry: bool = False,
             hide_progress: bool = False
     ):
-        super().__init__(input_repo, output_repo, src_model, dst_model,
+        super().__init__(input_repo, output_repos, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
 
         self._system_prompt = ac.SYSTEM_TEMPLATE.format(
             src_model=self._src_model,
             dst_model=self._dst_model)
 
-        GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt)
+        GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt,
+                                async_mode=True)
 
-        interactions_path = None
         if self._log_interactions:
-            self._interactions_path = os.path.join(self._output_fpath, "interactions.txt")
-
-            # create directories if necessary
-            os.makedirs(os.path.dirname(self._interactions_path), exist_ok=True)
+            self._interactions_paths = []
+            for output_repo in self._output_paths:
+                interactions_path = os.path.join(output_repo, "interactions.txt")
+                self._interactions_paths.append(interactions_path)
+                os.makedirs(os.path.dirname(interactions_path), exist_ok=True)
 
         self._dependency_agent = DependencyAgent(generator=self,
-                                                 interactions_path=interactions_path)
+                                                 interactions_paths=self._interactions_paths)
         lang = "c" if self._dst_config["filename_desc"] == "C" else "cpp"
         self._chunk_file_agent = ChunkFileAgent(generator=self,
-                                                interactions_path=interactions_path,
+                                                interactions_paths=self._interactions_paths,
                                                 language=lang)
-        self._context_agent = ContextAgent(generator=self,
-                                           interactions_path=interactions_path,
-                                           output_fpath=self._output_fpath)
+        self._context_agent = ContextAgent(generator=self, output_paths=self._output_paths,
+                                           interactions_paths=self._interactions_paths)
 
     @staticmethod
     def add_args(parser: 'ArgumentParser'): # type: ignore # noqa: F821
         """ Add arguments for the top-down agent translation method.
         """
         parser.add_argument("--restate-backend",
-                            choices=["openai", "gemini", "hf", "local"],
+                            choices=["openai", "gemini", "hf", "vllm", "local"],
                             default="openai", help="The backend to use for translation.")
         parser.add_argument("--restate-llm-name",
                             type=str, help="The name of the LLM to use for translation.")
@@ -110,18 +110,23 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 raise error
         return max_cols
 
-    def _read_file(self, rel_path: str) -> str:
+    def _read_file(self, rel_path: os.PathLike) -> str:
         """ Read the contents of a file from the input repository.
         """
         input_file_path = os.path.join(self._input_repo.path, rel_path)
         with open(input_file_path, 'r', encoding="UTF-8") as f:
             return f.read()
 
-    def _update_output_file_extension(self, fname: str) -> str:
+    def _update_file_ext(self, fname: os.PathLike,
+                         trigger_rename: Optional[os.PathLike] = None) -> os.PathLike:
         """ Return the filename with updated extension based on the destination model.
         """
+
+        if trigger_rename:
+            fname = trigger_rename
+
         # Check if file has an extension
-        if "." in fname:
+        if "." in str(fname):
             name, current_ext = os.path.splitext(fname)
 
             # Check if the extension is in the dict
@@ -134,21 +139,24 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         return fname
 
 
-    def _postprocess(self, output: str) -> str:
+    def _postprocess(self, output: str) -> Union[str, None]:
         """ make sure there's only one codeblock and extract it
         """
         CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
         match = CODE_BLOCK_PATTERN.search(output)
         if match is None:
-            raise ValueError(f"No code block found in output:\n{output}")
+            print(f"No code block found in output:\n{output}")
+            return None
         return match.group(1)
 
 
-    def _write_file(self, rel_path: str, contents: str):
+    def _write_file(self, rel_path: os.PathLike, contents: str, idx: int = 0,
+                    trigger_rename: Optional[os.PathLike] = None):
         """ Write the contents to a file in the output repository.
         """
-        output_file_path = os.path.join(self._output_fpath, "repo",
-                                        self._update_output_file_extension(rel_path))
+        output_file_path = os.path.join(self._output_paths[idx], "repo",
+                                        self._update_file_ext(rel_path,
+                                                              trigger_rename=trigger_rename))
 
         # make parent dirs if necessary
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
@@ -158,10 +166,10 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         print(f"Wrote file {output_file_path}")
 
 
-    def _write_metadata(self, repo_fpath: os.PathLike):
+    def _write_metadata(self, repo_path: os.PathLike):
         """ Write out experiment_metadata.json adjacent to repo path.
         """
-        exp_meta_fpath = os.path.join(self._output_fpath, "experiment_metadata.json")
+        exp_meta_fpath = os.path.join(repo_path, "..", "experiment_metadata.json")
         os.makedirs(os.path.dirname(exp_meta_fpath), exist_ok=True)
         with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
             exp_meta_dict = {
@@ -170,19 +178,27 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                 "llm_name": self._llm_name,
                 "source_model": self._src_model,
                 "dest_model": self._dst_model,
-                "output_number": int(repo_fpath.split("/")[-2][7:]),
-                "path": repo_fpath,
+                "output_number": int(str(repo_path).split("/")[-2][7:]),
+                "path": repo_path,
                 "inference_stats": self.get_stats()
             }
             json.dump(exp_meta_dict, f, indent=4)
         print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
 
 
-    def _log_interaction(self, response: str):
-        """ Log the raw LLM output to a text file.
+    def _log_interaction(self, prompts: List[str], responses: List[str],
+                         reasonings: List[Union[str, None]]):
+        """ Log the prompt and raw LLM output to a text file.
         """
-        with open(self._interactions_path, 'a', encoding="UTF-8") as f:
-            f.write(response + "\n")
+        for i, output_path in enumerate(self._interactions_paths):
+            with open(output_path, 'a', encoding="UTF-8") as f:
+                f.write("PROMPT:\n")
+                f.write(prompts[i] + "\n")
+                if reasonings[i] is not None:
+                    f.write("REASONING:\n")
+                    f.write(reasonings[i] + "\n")
+                f.write("RESPONSE:\n")
+                f.write(responses[i] + "\n\n")
 
 
     # override
@@ -191,10 +207,11 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         """
         print(f"Constructing dependency graph on {self._input_repo.path}...")
         dep_graph = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
+        file_tree = self._input_repo.get_file_tree_str()
 
         # Create target version of dep_graph by renaming filenames in copy of dep_graph
         target_dep_graph = DependencyAgent.make_target_graph(dep_graph,
-                                                             self._update_output_file_extension)
+                                                             self._update_file_ext)
 
         # walk down the graph and translate each file
         max_cols = self._safe_get_columns()
@@ -203,15 +220,17 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
                              max_cols=max_cols,
                              disable=self._hide_progress):
             if node.filetype == FileType.BUILD:
-                self._translate_node(node, graph=target_dep_graph)
+                self._translate_node(node, graph=target_dep_graph, tree=file_tree)
             else:
                 self._translate_node(node)
 
         # dump experiment metadata
-        self._write_metadata(os.path.join(self._output_fpath, "repo"))
+        for output_repo in self._output_paths:
+            self._write_metadata(os.path.join(output_repo, "repo"))
 
 
-    def _translate_node(self, node: FileNode, graph: Optional[List[FileNode]] = None):
+    def _translate_node(self, node: FileNode, graph: Optional[List[FileNode]] = None,
+                        tree: Optional[str] = None):
         """ Translate a single file node using context from its dependencies.
         """
         print(f"Translating file {node.rel_path}...")
@@ -220,36 +239,45 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         source_code = self._read_file(node.rel_path)
 
         # get the context from the parent nodes
-        context = self._context_agent.get_context(node.dependencies, node, self._dst_model)
+        contexts = self._context_agent.get_contexts(node.dependencies, node, self._dst_model)
 
         # translate the source code; if it's too long use the chunk file agent
         # to translate it in parts
         chunks = self._chunk_file_agent.chunk_file(source_code)
+        trigger_rename = None
         if len(chunks) == 1:
             print("Requesting whole file translation...")
-            response = self._get_translation(context, chunks[0], node, graph)
-            if self._log_interactions:
-                self._log_interaction(response)
-            translation = self._postprocess(response)
+            responses, trigger_rename = self._get_translations(contexts, chunks[0],
+                                                               node, graph, tree)
+            translations = [self._postprocess(response) for response in responses]
         else:
-            translation = ""
-            prev_chunk = ""
+            translations = []
+            prev_chunks = []
             for chunk in chunks:
                 print(f"Requesting chunk translation... [{chunks.index(chunk) + 1}/{len(chunks)}]")
-                response = self._get_translation(context, chunk, node, graph, prev_chunk=prev_chunk)
-                if self._log_interactions:
-                    self._log_interaction(response)
-                chunk_translation = self._postprocess(response)
-                translation += chunk_translation + "\n"
-                prev_chunk = chunk_translation
+                responses, trigger_rename = self._get_translations(contexts, chunk, node,
+                                                                   graph, tree,
+                                                                   prev_chunks=prev_chunks)
+                chunk_translations = [self._postprocess(response) for response in responses]
+                if len(translations) > 0:
+                    translations = [t if t is not None else "" \
+                                    + "\n" \
+                                    + ct if ct is not None else "" \
+                                    for t, ct in zip(translations, chunk_translations)]
+                else:
+                    translations = chunk_translations
+                prev_chunks = chunk_translations
 
-        # write the translation to the output repo
-        self._write_file(node.rel_path, translation)
+        for i, translation in enumerate(translations):
+            # write the translation to the output file
+            if translation is not None:
+                self._write_file(node.rel_path, translation, i, trigger_rename)
 
-
-    def _get_translation(self, context: str, source_code: str, file: FileNode, \
-                         graph: Optional[List[FileNode]] = None, \
-                         prev_chunk: Optional[str] = "") -> str:
+    def _get_translations(self, contexts: List[str], source_code: str, file: FileNode, \
+                          graph: Optional[List[FileNode]] = None, \
+                          tree: Optional[str] = None, \
+                          prev_chunks: List[Union[str, None]] = []) \
+                          -> Tuple[List[str], Optional[str]]:
         """ Get the translation for a region of code using the provided context.
         """
         prompt_config_src = self._input_repo.get_meta_dict()
@@ -258,34 +286,66 @@ class TopDownAgentTranslator(Translator, GeneratorMixin):
         filename_desc = prompt_config_dst["filename_desc"]
         exts_str = ", ".join(v for v in ac.type_to_ext[filename_desc.lower()].values())
 
-        prompt = ac.PROMPT_TEMPLATE.format(
-            src_model=self._src_model,
-            filename=filename,
-            dst_model=self._dst_model,
-            source_code=source_code,
-            context=context,
-            exts=exts_str,
-            filename_desc=filename_desc
-        )
+        prompts = [ac.PROMPT_TEMPLATE.format(src_model=self._src_model,
+                                             filename=filename,
+                                             dst_model=self._dst_model,
+                                             source_code=source_code,
+                                             context=c,
+                                             exts=exts_str,
+                                             filename_desc=filename_desc
+                                             ) for _, c in zip(self._output_paths, contexts)]
 
-        if prev_chunk != "":
-            prompt += ("\n" + ac.CHUNK_ADDENDUM.format(
-                prev_chunk=prev_chunk,
-                src_model=self._src_model,
-                dst_model=self._dst_model))
+        if len(prev_chunks) > 0:
+            prompts = [p + "\n" + \
+                       ac.CHUNK_ADDENDUM.format(
+                           prev_chunk=prev_chunk,
+                           src_model=self._src_model,
+                           dst_model=self._dst_model
+                       ) for p, prev_chunk in zip(prompts, prev_chunks)]
 
         if filename == prompt_config_src["main_filename"]:
-            prompt += ("\n" + ac.MAIN_ADDENDUM.format(
-                ex_run_cmd=prompt_config_dst["ex_run_cmd"],
-                ex_run_desc=prompt_config_dst["ex_run_desc"]))
+            prompts = [p + "\n" + \
+                       ac.MAIN_ADDENDUM.format(
+                           ex_run_cmd=prompt_config_dst["ex_run_cmd"],
+                           ex_run_desc=prompt_config_dst["ex_run_desc"]
+                       ) for p in prompts]
 
-        if filename == prompt_config_src["build_filename"]:
-            prompt += ("\n" + ac.MAKEFILE_ADDENDUM.format(
-                dst_model=self._dst_model,
-                exts=exts_str,
-                filename_desc=filename_desc,
-                ex_build_cmd=prompt_config_dst["ex_build_cmd"],
-                ex_build_desc=prompt_config_dst["ex_build_desc"],
-                dep_graph=DependencyAgent.graph_to_str(graph)))
+        trigger_rename = None
+        key_filename = prompt_config_src["build_filename"]
+        if prompt_config_dst["build_filename"] != prompt_config_src["build_filename"]:
+            trigger_rename = prompt_config_dst["build_filename"]
 
-        return self.generate(prompt)
+            # If the repo being translated already has the build file that we want
+            # to use, but it's not the default build file, then we should trigger
+            # the build addendum for that extra build file rather than the default.
+            if ("extra_build_files" in prompt_config_src
+                and prompt_config_dst["build_filename"] in prompt_config_src["extra_build_files"]):
+                key_filename = prompt_config_dst["build_filename"]
+
+        if filename == key_filename:
+            prompts = [p + "\n" + \
+                       ac.BUILD_ADDENDUM.format(
+                           build_filename=key_filename,
+                           new_build_filename=prompt_config_dst["build_filename"],
+                           dst_model=self._dst_model,
+                           exts=exts_str,
+                           filename_desc=filename_desc,
+                           ex_build_cmd=prompt_config_dst["ex_build_cmd"],
+                           ex_build_desc=prompt_config_dst["ex_build_desc"],
+                           dep_graph=DependencyAgent.graph_to_str(graph),
+                           file_tree=tree
+                       ) for p in prompts]
+        else:
+            trigger_rename = None
+
+
+        # generate the translations asynchronously so they can be batched
+        response_obs = self.generate_async(prompts, temperature=0.2, top_p=0.95)
+
+        responses = [r.response for r in response_obs]
+        reasonings = [r.reasoning for r in response_obs]
+
+        if self._log_interactions:
+            self._log_interaction(prompts, responses, reasonings)
+
+        return (responses, trigger_rename)

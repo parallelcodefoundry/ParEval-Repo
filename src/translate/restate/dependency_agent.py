@@ -14,7 +14,7 @@ from glob import glob
 import logging
 import os
 import subprocess
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 from enum import Enum
 from graphlib import TopologicalSorter, CycleError
 
@@ -35,12 +35,12 @@ class FileNode:
     """ A node in a file dependency graph.
     """
 
-    rel_path: str
+    rel_path: os.PathLike
     dependencies: List['FileNode'] = [] # Files this file depends on
     dependents: List['FileNode'] = []   # Files that depend on this file
     filetype: FileType = FileType.OTHER
 
-    def __init__(self, rel_path: str = "", filetype: FileType = None):
+    def __init__(self, rel_path: os.PathLike = "", filetype: FileType = None):
         self.rel_path = rel_path
         if filetype:
             self.filetype = filetype
@@ -56,10 +56,11 @@ class FileNode:
         if ext in [".h", ".H", ".hh", ".hpp", ".cuh"]:
             return FileType.HEADER
         if ext in [".make"] \
-           or any(name in self.rel_path for name in ["Makefile", "CMakeLists.txt"]):
+           or any(name in str(self.rel_path) for name in ["Makefile", "CMakeLists.txt"]):
+            # Todo: above asssumes build files are in the root directory
             return FileType.BUILD
         if ext in [".txt", ".md"] \
-           or any(name in self.rel_path for name in ["README", "LICENSE", "INSTALL"]):
+           or any(name in str(self.rel_path) for name in ["README", "LICENSE", "INSTALL"]):
             return FileType.METADATA
         return FileType.OTHER
 
@@ -80,11 +81,12 @@ class DependencyAgent:
     """
 
     _generator: GeneratorMixin
-    _interactions_path: Optional[os.PathLike]
+    _interactions_paths: Optional[List[os.PathLike]]
 
-    def __init__(self, generator: GeneratorMixin, interactions_path: os.PathLike = None):
+    def __init__(self, generator: GeneratorMixin,
+                 interactions_paths: Optional[List[os.PathLike]] = None):
         self._generator = generator
-        self._interactions_path = interactions_path
+        self._interactions_paths = interactions_paths
 
     def _get_files_by_suffixes(self, repo_path: os.PathLike,
                                suffixes: List[str]) -> List[str]:
@@ -210,18 +212,20 @@ class DependencyAgent:
         prompt = prompt.format(num_lines=num_lines, source_file=source_file,
                                source_lines=source_lines,
                                source_files="\n".join(source_files))
-        deps = self._generator.generate(prompt)
+        deps = self._generator.generate(prompt)[0].response
         if deps is None:
             return None
 
         deps = deps.strip().split("\n")
         deps = list(map(str.strip, deps))
         print(f"Dependencies of {source_file}: {deps}")
-        if self._interactions_path:
-            with open(self._interactions_path, "a", encoding="UTF-8") as f:
-                f.write(f"Getting dependencies of {source_file}.\n")
-                f.write(f"Prompt:\n{prompt}\n")
-                f.write(f"Dependencies:\n{deps}")
+        if self._interactions_paths:
+            for path in self._interactions_paths:
+                interactions_path = path
+                with open(interactions_path, "a", encoding="UTF-8") as f:
+                    f.write(f"Getting dependencies of {source_file}.\n")
+                    f.write(f"Prompt:\n{prompt}\n")
+                    f.write(f"Dependencies:\n{deps}")
         return deps
 
 
@@ -298,7 +302,7 @@ class DependencyAgent:
 
     @staticmethod
     def make_target_graph(old_graph: List[FileNode],
-                          path_update_fn: callable) -> List[FileNode]:
+                          path_update_fn: Callable) -> List[FileNode]:
         """ Make a new graph from the old graph using the path update function.
         """
         new_graph = []

@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -N run_drivers
+#PBS -l select=1:system=polaris
+#PBS -l filesystems=home:eagle
+#PBS -l walltime=0:05:00
+#PBS -q debug
+#PBS -A DemocAI
+
+cd /home/jhdavis/llms4hpc/code-translation/src/drivers
+module use /soft/modulefiles
+module load cray-python llvm cudatoolkit-standalone
+mkdir /tmp/trns/
+python3 run-all.py -o polaris-test.json -s -y --scratch-dir $SCRATCH/trns/ --save-temps $SCRATCH/trns/saves/ -m openmp-offload -a microxor -p naive -t ../../targets/ --system-config ../../config/polaris-config.json --log DEBUG ../../../code-translation-results/outputs/
+
+# Exit when finished
+exit

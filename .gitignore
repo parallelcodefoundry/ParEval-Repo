@@ -1,7 +1,9 @@
 *.o
-microXOR.exe
+*.e
+*.exe
 a.out
 *.bin
+*.out
 
 .ipynb_checkpoints
 __pycache__
@@ -11,3 +13,6 @@ tmp*
 .env
 
 .request_cache_*.pkl
+
+enqueue_jobs.sh
+gen_*.slurm

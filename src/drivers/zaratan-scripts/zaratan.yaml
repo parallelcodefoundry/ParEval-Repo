@@ -1,0 +1,147 @@
+naive-llmc-omp:
+  time: '2:00:00'
+  method: naive
+  app: llm.c
+  dst_model: openmp-offload
+  skip_build_swap: yes
+naive-xsbench-omp:
+  time: '2:00:00'
+  method: naive
+  app: XSBench
+  dst_model: openmp-offload
+naive-simplemoc-omp:
+  time: '2:00:00'
+  method: naive
+  app: SimpleMOC-kernel
+  dst_model: openmp-offload
+  skip_build_swap: yes
+naive-microxor-omp:
+  time: '2:00:00'
+  method: naive
+  app: microXOR
+  dst_model: openmp-offload
+naive-microxorh-omp:
+  time: '2:00:00'
+  method: naive
+  app: microXORh
+  dst_model: openmp-offload
+naive-nanoxor-omp:
+  time: '2:00:00'
+  method: naive
+  app: nanoXOR
+  dst_model: openmp-offload
+
+restate-llmc-omp:
+  time: '2:00:00'
+  method: restate
+  app: llm.c
+  dst_model: openmp-offload
+  skip_build_swap: yes
+restate-xsbench-omp:
+  time: '2:00:00'
+  method: restate
+  app: XSBench
+  dst_model: openmp-offload
+restate-simplemoc-omp:
+  time: '2:00:00'
+  method: restate
+  app: SimpleMOC-kernel
+  dst_model: openmp-offload
+  skip_build_swap: yes
+restate-microxor-omp:
+  time: '2:00:00'
+  method: restate
+  app: microXOR
+  dst_model: openmp-offload
+restate-microxorh-omp:
+  time: '2:00:00'
+  method: restate
+  app: microXORh
+  dst_model: openmp-offload
+restate-nanoxor-omp:
+  time: '2:00:00'
+  method: restate
+  app: nanoXOR
+  dst_model: openmp-offload
+
+naive-llmc-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: llm.c
+  dst_model: kokkos
+  skip_build_swap: yes
+naive-xsbench-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: XSBench
+  dst_model: kokkos
+naive-simplemoc-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: SimpleMOC-kernel
+  dst_model: kokkos
+  skip_build_swap: yes
+naive-microxor-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: microXOR
+  dst_model: kokkos
+naive-microxorh-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: microXORh
+  dst_model: kokkos
+naive-nanoxor-kokkos:
+  time: '2:00:00'
+  method: naive
+  app: nanoXOR
+  dst_model: kokkos
+
+restate-llmc-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: llm.c
+  dst_model: kokkos
+  skip_build_swap: yes
+restate-xsbench-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: XSBench
+  dst_model: kokkos
+restate-simplemoc-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: SimpleMOC-kernel
+  dst_model: kokkos
+  skip_build_swap: yes
+restate-microxor-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: microXOR
+  dst_model: kokkos
+restate-microxorh-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: microXORh
+  dst_model: kokkos
+restate-nanoxor-kokkos:
+  time: '2:00:00'
+  method: restate
+  app: nanoXOR
+  dst_model: kokkos
+
+sweagent-nanoxor-kokkos:
+  time: '4:00:00'
+  method: SWE-agent
+  app: nanoXOR
+  dst_model: kokkos
+sweagent-microxorh-kokkos:
+  time: '4:00:00'
+  method: SWE-agent
+  app: microXORh
+  dst_model: kokkos
+sweagent-microxor-kokkos:
+  time: '4:00:00'
+  method: SWE-agent
+  app: microXOR
+  dst_model: kokkos

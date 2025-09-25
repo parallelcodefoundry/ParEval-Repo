@@ -1,10 +1,9 @@
 # stl imports
-from typing import List, Union
+from typing import List, Union, Optional
 import os
 from math import ceil
 
 # tpl imports
-import clang.cindex
 from langchain_text_splitters import Language
 from langchain_text_splitters import RecursiveCharacterTextSplitter as rcts
 
@@ -18,10 +17,11 @@ class ChunkFileAgent:
     AVG_CHAR_PER_TOKEN = 3.5
 
     def __init__(self, generator: GeneratorMixin, max_tokens: int = 1024,
-                 interactions_path: os.PathLike = None, language: str = 'c'):
+                 interactions_paths: Optional[List[os.PathLike]] = None,
+                 language: str = 'c'):
         self._generator = generator
         self._max_tokens = max_tokens
-        self._interactions_path = interactions_path
+        self._interactions_paths = interactions_paths
         self._language = Language(language)
         self._splitter = rcts.from_language(self._language,
                                             chunk_size=ceil(max_tokens * self.AVG_CHAR_PER_TOKEN),

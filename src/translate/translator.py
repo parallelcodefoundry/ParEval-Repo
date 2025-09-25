@@ -7,6 +7,7 @@
 # std imports
 from abc import ABC, abstractmethod
 import os
+from typing import List
 
 # local imports
 from repo import Repo
@@ -15,7 +16,7 @@ from repo import Repo
 class Translator(ABC):
 
     _input_repo: Repo
-    _output_fpath: os.PathLike
+    _output_paths: List[os.PathLike]
     _src_model: str
     _dst_model: str
     _dst_config: dict
@@ -26,7 +27,7 @@ class Translator(ABC):
     def __init__(
             self,
             input_repo: Repo,
-            output_repo: os.PathLike,
+            output_repos: List[os.PathLike],
             src_model: str,
             dst_model: str,
             dst_config: dict,
@@ -35,7 +36,7 @@ class Translator(ABC):
             hide_progress: bool = False
     ):
         self._input_repo = input_repo
-        self._output_fpath = output_repo
+        self._output_paths = output_repos
         self._src_model = src_model
         self._dst_model = dst_model
         self._dst_config = dst_config

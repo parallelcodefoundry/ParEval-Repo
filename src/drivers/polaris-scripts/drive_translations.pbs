@@ -1,0 +1,58 @@
+#!/bin/bash
+#PBS -N drive_trns_ensemble
+#PBS -l select=3:system=polaris
+#PBS -l filesystems=home:eagle
+#PBS -l walltime=1:00:00
+#PBS -q debug-scaling
+#PBS -A DemocAI
+
+# Prereqs
+module use /soft/modulefiles
+module load cray-python/3.11.5
+
+# Setup working directory for the ensemble
+SCRIPTDIR=/home/jhdavis/llms4hpc/code-translation/src/drivers
+WORKDIR=/home/jhdavis/llms4hpc/code-translation/src/drivers/polaris-scripts/driver-ensemble-${PBS_JOBID%%.*}
+mkdir $WORKDIR
+cd $WORKDIR
+
+# Array of driver instance args
+Arglist=("-m openmp-offload -a nanoxor -p naive -o $WORKDIR/polaris-omp-nanoxor-naive.json" \
+             "-m openmp-offload -a microxor -p naive -o $WORKDIR/polaris-omp-microxor-naive.json" \
+             "-m openmp-offload -a simplemoc-kernel -p naive -o $WORKDIR/polaris-omp-simplemoc-naive.json" \
+             "-m openmp-offload -a xsbench -p naive -o $WORKDIR/polaris-omp-xsbench-naive.json" \
+             "-m openmp-offload -a llm.c -p naive -o $WORKDIR/polaris-omp-llm.c-naive.json" \
+             "-m openmp-offload -a nanoxor -p restate -o $WORKDIR/polaris-omp-nanoxor-restate.json" \
+             "-m openmp-offload -a microxor -p restate -o $WORKDIR/polaris-omp-microxor-restate.json" \
+             "-m openmp-offload -a simplemoc-kernel -p restate -o $WORKDIR/polaris-omp-simplemoc-restate.json" \
+             "-m openmp-offload -a xsbench -p restate -o $WORKDIR/polaris-omp-xsbench-restate.json" \
+             "-m openmp-offload -a llm.c -p restate -o $WORKDIR/polaris-omp-llm.c-restate.json" \
+        )
+
+CPUbinds=("--cpu-bind list:24:25:26:27:28:29:30:31" \
+              "--cpu-bind list:16:17:18:19:20:21:22:23" \
+              "--cpu-bind list:8:9:10:11:12:13:14:15" \
+              "--cpu-bind list:0:1:2:3:4:5:6:7"
+         )
+
+# Get number of nodes
+NNODES=`wc -l < $PBS_NODEFILE`
+NGPUS_PER_NODE=4
+
+# Create hostfiles
+split --lines=1 --numeric-suffixes --suffix-length=2 $PBS_NODEFILE local_hostfile.
+
+for nodeid in $(seq -f %02.0f 0 $((NNODES-1))); do
+    for gpuid in $(seq 0 $((NGPUS_PER_NODE-1))); do
+        ind=$((nodeid*NGPUS_PER_NODE+gpuid))
+        if [[ "$ind" -lt "${#Arglist[@]}" ]]; then
+            echo "Launching driver instance $ind on local_hostfile.$nodeid: ${Arglist[$ind]} with GPU $gpuid"
+            cd $SCRIPTDIR
+            export CUDA_VISIBLE_DEVICES=$gpuid
+            mpiexec -n 1 --ppn 1 --hostfile $WORKDIR/local_hostfile.$nodeid ${CPUbinds[$gpuid]} ./run-all.py -y --scratch-dir $SCRATCH/trns -t ../../targets/ --log DEBUG --system-config ../../config/polaris-config.json ${Arglist[$ind]} /home/jhdavis/llms4hpc/code-translation-results/outputs &> $WORKDIR/driver_$ind.out &
+            sleep 1s
+        fi
+    done
+done
+
+wait
