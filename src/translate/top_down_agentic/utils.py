@@ -1,4 +1,4 @@
-"""Common utilities for the restate translation agents.
+"""Common utilities for the top_down_agentic translation agents.
 
 This module contains shared utilities, constants, and helper functions
 used across the different agent classes to reduce code duplication.

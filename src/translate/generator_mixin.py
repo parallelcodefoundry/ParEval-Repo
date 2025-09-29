@@ -578,9 +578,9 @@ class GeneratorMixin:
 
     def _check_limits(self) -> None:
         """Check if generator limits have been reached."""
-        if (self._max_input_tokens is not None and self._input_token_count > self._max_input_tokens or
-            self._max_output_tokens is not None and self._output_token_count > self._max_output_tokens or
-            self._max_requests is not None and self._request_count > self._max_requests):
+        if ((self._max_input_tokens is not None and self._input_token_count > self._max_input_tokens) or
+            (self._max_output_tokens is not None and self._output_token_count > self._max_output_tokens) or
+            (self._max_requests is not None and self._request_count > self._max_requests)):
             raise RuntimeError("Generator limits reached.")
 
 

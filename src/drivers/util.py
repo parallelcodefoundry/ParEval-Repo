@@ -127,6 +127,8 @@ class DataManager:
         """Set keys other than those in merge_dct to None at idx in dct."""
         for k in dct.keys():
             if k not in merge_dct:
+                if len(dct[k]) <= idx:
+                    raise ValueError(f"Key {k} in dct has length {len(dct[k])} but trying to write at index {idx}.")
                 dct[k][idx] = None
 
     @staticmethod
