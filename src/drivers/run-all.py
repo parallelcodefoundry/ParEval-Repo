@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-'''
-Run all generated code repositories
-author: Josh Davis
-date: October 2024
+''' Compiles and runs a set of translated code repositories to test translation correctness.
+
+    author: Joshua Davis
+    date: October 2024, September 2025
 '''
 # std imports
 from argparse import ArgumentParser
@@ -13,7 +13,7 @@ import shutil
 import tempfile
 import tarfile
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 # tpl imports
 from alive_progress import alive_bar
@@ -23,6 +23,7 @@ import pandas as pd
 from util import await_input, setup_tempdir, dict_merge, empty_results_dict, empty_other_keys_at_idx
 from build import build_repo
 from run import run_repo, make_skip_run_result
+from util import FileSystemHelper
 
 def get_args() -> ArgumentParser:
     ''' Get command line arguments.
@@ -74,6 +75,7 @@ def get_args() -> ArgumentParser:
                         default="INFO", type=str.upper, help="Logging level.")
     return parser.parse_args()
 
+
 def extract_tarballs(translations_root: str, remove_tarball: bool = False):
     """
     Find all tarballs in translations_root and extract them.
@@ -92,45 +94,86 @@ def extract_tarballs(translations_root: str, remove_tarball: bool = False):
                     os.remove(tarball_path)
                     print(f"Removed {tarball_path} after extraction.")
 
-def parse_metadata(args: ArgumentParser, exp_meta: Dict[str, str],
-                   metadata_found: Dict[str, List]) -> Dict[str, str]:
-    ''' Parse the metadata from the experiment_metadata.json file.
-    '''
-    app = exp_meta["app"]
+
+def check_app_filter(app: str, args: ArgumentParser) -> bool:
+    """Check if app passes the filter criteria."""
     if args.apps and app.lower() not in [s.lower() for s in args.apps]:
         logging.debug(f"Skipping {app} because it is not in {args.apps}.")
-        return None
-    if app not in metadata_found["apps_found"]:
-        metadata_found["apps_found"].append(app)
+        return False
+    return True
 
+
+def check_model_filter(dest_model: str, args: ArgumentParser) -> bool:
+    """Check if dest_model passes the filter criteria."""
+    if args.models and dest_model.lower() not in [s.lower() for s in args.models]:
+        logging.debug(f"Skipping {dest_model} because it is not in {args.models}.")
+        return False
+    return True
+
+
+def check_prompt_strategy_filter(prompt_strategy: str, args: ArgumentParser) -> bool:
+    """Check if prompt_strategy passes the filter criteria."""
+    if args.prompt_strategies and prompt_strategy.lower() not in \
+       [s.lower() for s in args.prompt_strategies]:
+        logging.debug(f"Skipping {prompt_strategy} because it is not in {args.prompt_strategies}.")
+        return False
+    return True
+
+
+def normalize_dest_model(exp_meta: Dict[str, str]) -> str:
+    """Normalize dest_model field (omp -> openmp-offload)."""
     dest_model = exp_meta["dest_model"]
     if dest_model == "omp":
         dest_model = "openmp-offload"
         exp_meta["dest_model"] = "openmp-offload"
-    if args.models and dest_model.lower() not in [s.lower() for s in args.models]:
-        logging.debug(f"Skipping {dest_model} because it is not in {args.models}.")
-        return None
-    if dest_model not in metadata_found["dest_models_found"]:
-        metadata_found["dest_models_found"].append(dest_model)
+    return dest_model
 
+
+def normalize_prompt_strategy(exp_meta: Dict[str, str]) -> str:
+    """Normalize prompt_strategy field (convert list to string)."""
     prompt_strategy = exp_meta["prompt_strategy"]
     if isinstance(prompt_strategy, list):
         prompt_strategy = "-".join(prompt_strategy)
-    if args.prompt_strategies and prompt_strategy.lower() not in \
-       [s.lower() for s in args.prompt_strategies]:
-        logging.debug(f"Skipping {prompt_strategy} because it is not in {args.prompt_strategies}.")
-        return None
+    return prompt_strategy
+
+
+def update_metadata_found(exp_meta: Dict[str, str], metadata_found: Dict[str, List]) -> None:
+    """Update the metadata_found tracking dictionary."""
+    app = exp_meta["app"]
+    dest_model = exp_meta["dest_model"]
+    prompt_strategy = exp_meta["prompt_strategy"]
+    llm_name = exp_meta["llm_name"]
+    source_model = exp_meta["source_model"]
+
+    if app not in metadata_found["apps_found"]:
+        metadata_found["apps_found"].append(app)
+    if dest_model not in metadata_found["dest_models_found"]:
+        metadata_found["dest_models_found"].append(dest_model)
     if prompt_strategy not in metadata_found["prompt_strategies_found"]:
         metadata_found["prompt_strategies_found"].append(prompt_strategy)
-
-    llm_name = exp_meta["llm_name"]
     if llm_name not in metadata_found["llms_found"]:
         metadata_found["llms_found"].append(llm_name)
-
-    source_model = exp_meta["source_model"]
     if source_model not in metadata_found["source_models_found"]:
         metadata_found["source_models_found"].append(source_model)
 
+
+def parse_metadata(args: ArgumentParser, exp_meta: Dict[str, str],
+                   metadata_found: Dict[str, List]) -> Optional[Dict[str, str]]:
+    """Parse the metadata from the experiment_metadata.json file."""
+    app = exp_meta["app"]
+    if not check_app_filter(app, args):
+        return None
+
+    dest_model = normalize_dest_model(exp_meta)
+    if not check_model_filter(dest_model, args):
+        return None
+
+    prompt_strategy = normalize_prompt_strategy(exp_meta)
+    if not check_prompt_strategy_filter(prompt_strategy, args):
+        return None
+
+    # Update tracking
+    update_metadata_found(exp_meta, metadata_found)
     return exp_meta
 
 
@@ -148,87 +191,91 @@ def log_metadata_found(metadata_found: Dict[str, List],
     logging.debug("\n" + json.dumps(code_repos, indent=4))
 
 
-def gather_code_repos(args: ArgumentParser, results: Dict[str, List], skip_repeats: bool) \
-    -> List[Dict[str, str]]:
-    ''' Gather all the generated code repositories. Root directory format is:
-        translations_root/app/case-name/output-number/, including
-        experiment_metadata.json and repo/ under each output-number directory.
-        repo/ contains the generated code. Want to create list of dictionaries
-        of the form:
-        {
-            "app": app,
-            "prompt_strategy": prompt_strategy,
-            "llm_name": llm_name,
-            "source_model": source_model,
-            "dest_model": dest_model,
-            "output_number": output_number,
-            "path": path
-        }
-        where all entries are read in from the experiment_metadata.json file.
-        If skip_repeats is set, skip code repositories that have already been run.
-    '''
-    code_repos = []
-
-    # For logging what we find
-    metadata_found = {
-        "apps_found" : [],
-        "dest_models_found" : [],
-        "source_models_found" : [],
-        "llms_found" : [],
-        "prompt_strategies_found" : [],
+def initialize_metadata_tracking() -> Dict[str, List]:
+    """Initialize the metadata tracking dictionary."""
+    return {
+        "apps_found": [],
+        "dest_models_found": [],
+        "source_models_found": [],
+        "llms_found": [],
+        "prompt_strategies_found": [],
     }
 
+
+def process_experiment_metadata_file(exp_meta_path: str, dirpath: str,
+                                   args: ArgumentParser, metadata_found: Dict[str, List],
+                                   results: Dict[str, List], skip_repeats: bool) -> Optional[Dict[str, str]]:
+    """Process a single experiment_metadata.json file."""
+    repo_path = os.path.join(dirpath, "repo")
+
+    if not os.path.isfile(exp_meta_path):
+        logging.info(f"Could not find experiment_metadata.json under {dirpath}, skipping.")
+        return None
+
+    if not os.path.isdir(repo_path):
+        logging.error(f"Could not find repo under {dirpath}.")
+        raise FileNotFoundError(f"Could not find repo under {dirpath}.")
+
+    with open(exp_meta_path, "r", encoding="utf-8") as f:
+        exp_meta = json.load(f)
+
+    # Clean up the path in the experiment metadata
+    exp_meta["path"] = repo_path
+
+    # Parse the metadata
+    exp_meta = parse_metadata(args, exp_meta, metadata_found)
+
+    # Go to next iter if parse_metadata decided to skip due to filters
+    if exp_meta is None:
+        return None
+
+    # Check if there is an entry in the results dict matching the current repo path
+    output_path = exp_meta["path"]
+    if output_path in results["path"] and skip_repeats:
+        idx = results["path"].index(output_path)
+        # Only skip if result found has complete data
+        if results["run_stdouts_debug"][idx] is not None:
+            logging.debug(f"Skipping duplicate code repository: {output_path}")
+            return "skip"
+        # Need to set non-metadata keys' values to None if found incomplete data
+        empty_other_keys_at_idx(results, exp_meta, idx)
+    else:
+        # Only need to add metadata to the results if not present
+        dict_merge(results, exp_meta)
+
+    logging.debug(f"Found code repository: {output_path}")
+    return exp_meta
+
+
+def gather_code_repos(args: ArgumentParser, results: Dict[str, List], skip_repeats: bool) \
+    -> List[Dict[str, str]]:
+    """Gather all the generated code repositories.
+
+    Root directory format is: translations_root/app/case-name/output-number/,
+    including experiment_metadata.json and repo/ under each output-number directory.
+    repo/ contains the generated code. Creates list of dictionaries with metadata
+    from experiment_metadata.json file.
+
+    If skip_repeats is set, skip code repositories that have already been run.
+    """
+    code_repos = []
+    metadata_found = initialize_metadata_tracking()
     num_skipped = 0
 
     for dirpath, _, filenames in os.walk(args.translations_root):
         for filename in filenames:
             if filename == "experiment_metadata.json":
                 exp_meta_path = os.path.join(dirpath, "experiment_metadata.json")
-                repo_path = os.path.join(dirpath, "repo")
-                if not os.path.isfile(exp_meta_path):
-                    logging.info("Could not find experiment_metadata.json "
-                                 + f"under {dirpath}, skipping.")
-                    continue
-                if not os.path.isdir(repo_path):
-                    logging.error(f"Could not find repo under {dirpath}.")
-                    raise FileNotFoundError(f"Could not find repo under {dirpath}.")
+                result = process_experiment_metadata_file(
+                    exp_meta_path, dirpath, args, metadata_found, results, skip_repeats)
 
-                with open(exp_meta_path, "r", encoding="utf-8") as f:
-                    exp_meta = json.load(f)
-
-                    # Clean up the path in the experiment metadata
-                    exp_meta["path"] = repo_path
-
-                    # Parse the metadata
-                    exp_meta = parse_metadata(args, exp_meta, metadata_found)
-
-                    # Go to next iter if parse_metadata decided to skip due to filters
-                    if exp_meta is None:
-                        continue
-
-                    # Check if there is an entry in the results dict matching
-                    # the current repo path
-                    output_path = exp_meta["path"]
-                    if output_path in results["path"] and skip_repeats:
-                        idx = results["path"].index(output_path)
-                        # Only skip if result found has complete data
-                        if results["run_stdouts_debug"][idx] is not None:
-                            num_skipped += 1
-                            logging.debug(f"Skipping duplicate code repository: {output_path}")
-                            continue
-                        # Need to set non-metadata keys' values to None if found incomplete data
-                        empty_other_keys_at_idx(results, exp_meta, idx)
-                    else:
-                        # Only need to add metadata to the results if not present
-                        dict_merge(results, exp_meta)
-
-                    # Always add the metadata to the code_repos list if not skipped
-                    code_repos.append(exp_meta)
-                    logging.debug(f"Found code repository: {output_path}")
+                if result == "skip":
+                    num_skipped += 1
+                elif result is not None:
+                    code_repos.append(result)
 
     if num_skipped > 0:
-        logging.info(f"Skipped {num_skipped} code repositories that have " +
-                     "already been run.")
+        logging.info(f"Skipped {num_skipped} code repositories that have already been run.")
 
     # Log the metadata found
     log_metadata_found(metadata_found, code_repos)
@@ -249,48 +296,23 @@ def safe_get_cols() -> int:
     return max_cols
 
 
-def startup_from_args(args: ArgumentParser) -> os.PathLike:
-    ''' Startup from command line arguments.
-    '''
-    # Set up logging
-    numeric_level = getattr(logging, args.log, None)
+def setup_logging(log_level: str) -> None:
+    """Set up logging configuration."""
+    numeric_level = getattr(logging, log_level, None)
     if not isinstance(numeric_level, int):
-        raise ValueError(f"Invalid log level: {args.log}")
+        raise ValueError(f"Invalid log level: {log_level}")
     logging.basicConfig(format="%(asctime)s [%(levelname)s] -- %(message)s",
                         level=numeric_level)
 
+
+def validate_directories(translations_root: str, scratch_dir: str) -> str:
+    """Validate and create necessary directories."""
     # Make sure the translations root directory exists
-    if not os.path.exists(args.translations_root):
-        raise FileNotFoundError("Translations root directory " +
-                                f"{args.translations_root} does not exist.")
-
-    # Warn user if using dry
-    if args.dry:
-        logging.warning("Running in dry mode. No code will be compiled or run!")
-
-    # Confirm user knows the script runs LLM code
-    logging.warning("This script will compile and run code generated by an LLM. " +
-                    "It is recommended that you run this script in a sandboxed environment.")
-    if not args.yes_to_all:
-        response = await_input("Continue knowing that this script runs LLM-generated code? [y/n]: ",
-                               lambda r: r.lower() in ["y", "n", "yes", "no"])
-        if response.lower() not in ["y", "yes"]:
-            logging.warning("Exiting.")
-            sys.exit(0)
-
-    # Check that force overwrite or skip repeats is set if output file already exists,
-    # and overwrite if force overwrite is set
-    if os.path.exists(args.output):
-        if not (args.force_overwrite or args.skip_repeats):
-            raise FileExistsError(f"Output file {args.output} already exists. " +
-                                  "Use --force-overwrite to overwrite or " +
-                                  "--skip-repeats to skip existing runs and append.")
-        if args.force_overwrite and not args.skip_repeats:
-            logging.warning(f"Output file {args.output} already exists. Overwriting.")
-            os.remove(args.output)
+    if not os.path.exists(translations_root):
+        raise FileNotFoundError(f"Translations root directory {translations_root} does not exist.")
 
     # Check that the scratch directory exists
-    scratch = os.path.abspath(args.scratch_dir)
+    scratch = os.path.abspath(scratch_dir)
     if not os.path.exists(scratch):
         logging.info(f"Creating scratch directory: {scratch}")
         os.makedirs(scratch)
@@ -298,15 +320,58 @@ def startup_from_args(args: ArgumentParser) -> os.PathLike:
     return scratch
 
 
+def handle_dry_run_warning(dry: bool) -> None:
+    """Handle dry run warning."""
+    if dry:
+        logging.warning("Running in dry mode. No code will be compiled or run!")
+
+
+def confirm_llm_code_execution(yes_to_all: bool) -> None:
+    """Confirm user knows the script runs LLM code."""
+    logging.warning("This script will compile and run code generated by an LLM. " +
+                    "It is recommended that you run this script in a sandboxed environment.")
+    if not yes_to_all:
+        response = await_input("Continue knowing that this script runs LLM-generated code? [y/n]: ",
+                               lambda r: r.lower() in ["y", "n", "yes", "no"])
+        if response.lower() not in ["y", "yes"]:
+            logging.warning("Exiting.")
+            sys.exit(0)
+
+
+def handle_output_file_conflicts(output_file: str, force_overwrite: bool, skip_repeats: bool) -> None:
+    """Handle conflicts with existing output files."""
+    if os.path.exists(output_file):
+        if not (force_overwrite or skip_repeats):
+            raise FileExistsError(f"Output file {output_file} already exists. " +
+                                  "Use --force-overwrite to overwrite or " +
+                                  "--skip-repeats to skip existing runs and append.")
+        if force_overwrite and not skip_repeats:
+            logging.warning(f"Output file {output_file} already exists. Overwriting.")
+            os.remove(output_file)
+
+
+def startup_from_args(args: ArgumentParser) -> os.PathLike:
+    """Startup from command line arguments."""
+    # Set up logging
+    setup_logging(args.log)
+
+    # Validate directories
+    scratch = validate_directories(args.translations_root, args.scratch_dir)
+
+    # Handle warnings and confirmations
+    handle_dry_run_warning(args.dry)
+    confirm_llm_code_execution(args.yes_to_all)
+
+    # Handle output file conflicts
+    handle_output_file_conflicts(args.output, args.force_overwrite, args.skip_repeats)
+
+    return scratch
+
+
 def save_temps(tempdir: os.PathLike, args: ArgumentParser,
                results_row: Dict[str, str]):
-    ''' Save temporary files to the provided directory.
-    '''
-    tempdir_name = os.path.basename(tempdir)
-    tempdir_path = os.path.join(args.save_temps, tempdir_name)
-    logging.info(f"Saving temporary directory to {tempdir_path}.")
-    shutil.copytree(tempdir, tempdir_path)
-    results_row["tempdir_path"] = str(tempdir_path)
+    """Save temporary files to the provided directory."""
+    FileSystemHelper.save_temps(tempdir, args.save_temps, results_row)
 
 
 def update_results(results, results_row, output):
@@ -348,98 +413,109 @@ def update_results(results, results_row, output):
         os.remove(output + ".bak")
 
 
+def handle_build_success(code_repo: Dict[str, str], system_config: Dict[str, str],
+                        args: ArgumentParser, tempdir: str, ground_truth_build: bool,
+                        results: Dict[str, List], output: os.PathLike, pbar: alive_bar) -> None:
+    """Handle successful build by running the code repository."""
+    logging.debug(f"Running code repository: {code_repo['path']}")
+    results_row_run = run_repo(code_repo, system_config, args, tempdir)
+    results_row_run["ground_truth_build"] = ground_truth_build
+
+    # Copy temporary directory to save_temps if provided
+    if args.save_temps:
+        save_temps(tempdir, args, results_row_run)
+
+    update_results(results, results_row_run, output)
+
+
+def handle_build_failure(code_repo: Dict[str, str], ground_truth_build: bool,
+                        args: ArgumentParser, results: Dict[str, List],
+                        output: os.PathLike) -> None:
+    """Handle build failure by creating skip result."""
+    logging.debug(f"Skipping run for {code_repo['path']} due to build failure.")
+    results_row_run = make_skip_run_result(code_repo)
+    results_row_run["ground_truth_build"] = ground_truth_build
+    update_results(results, results_row_run, output)
+
+
+def process_build_results(results_row_build: Dict[str, str], ground_truth_build: bool) -> None:
+    """Process build results and save debug information."""
+    if not ground_truth_build:
+        # Save the stdout and stderr of the build process with the original makefile
+        # for debugging since ground truth build will overwrite otherwise
+        results_row_build["gen_build_stdout_debug"] = results_row_build["build_stdout_debug"]
+        results_row_build["gen_build_stderr_debug"] = results_row_build["build_stderr_debug"]
+
+
 def process_repo(code_repo: Dict[str, str], results: Dict[str, List],
                  system_config: Dict[str, str], args: ArgumentParser,
                  scratch: os.PathLike, pbar: alive_bar,
                  output: os.PathLike,
                  ground_truth_build: Optional[bool] = False) -> Dict[str, str]:
-    ''' Build and run the code repository.
-    '''
+    """Build and run the code repository."""
     results_row_build = {}
+
     with tempfile.TemporaryDirectory(dir=scratch) as tempdir:
         logging.debug(f"Temporary directory created: {tempdir}")
         setup_tempdir(tempdir, code_repo)
 
+        # Build the repository
         logging.debug(f"Building code repository: {code_repo['path']}")
         results_row_build = build_repo(code_repo, system_config, args, tempdir,
                                        ground_truth_build=ground_truth_build)
-        if not ground_truth_build:
-            # Save the stdout and stderr of the build process with the original makefile
-            # for debugging since ground truth build will overwrite otherwise
-            results_row_build["gen_build_stdout_debug"] = results_row_build["build_stdout_debug"]
-            results_row_build["gen_build_stderr_debug"] = results_row_build["build_stderr_debug"]
 
+        # Process build results
+        process_build_results(results_row_build, ground_truth_build)
         update_results(results, results_row_build, output)
         pbar()
 
+        # Handle build success or failure
         if results_row_build["build_result_debug"] == 0:
-            logging.debug(f"Running code repository: {code_repo['path']}")
-            results_row_run = run_repo(code_repo, system_config, args, tempdir)
-            results_row_run["ground_truth_build"] = ground_truth_build
-
-            # Copy temporary directory to save_temps if provided
-            if args.save_temps:
-                save_temps(tempdir, args, results_row_run)
-
-            update_results(results, results_row_run, output)
-
+            handle_build_success(code_repo, system_config, args, tempdir,
+                               ground_truth_build, results, output, pbar)
         elif ground_truth_build or args.skip_build_swap:
-            # build failed and this is the ground truth build or we're skipping
-            # ground truth
-            logging.debug(f"Skipping run for {code_repo['path']} due to build failure.")
-            results_row_run = make_skip_run_result(code_repo)
-            results_row_run["ground_truth_build"] = ground_truth_build
-            update_results(results, results_row_run, output)
+            handle_build_failure(code_repo, ground_truth_build, args, results, output)
 
-        # otherwise, build failed, but this is not the ground truth build and we
-        # are going to try again
-
-        # rm all subdirs in tempdir manually before exiting `when` block,
-        # workaround for oserror race condition bug
-        for root, dirs, _ in os.walk(tempdir):
-            for d in dirs:
-                shutil.rmtree(os.path.join(root, d), ignore_errors=True)
-
+        # Clean up temporary directory
+        FileSystemHelper.cleanup_tempdir(tempdir)
         pbar()
 
     return results_row_build
 
 
-def main():
-    ''' Main function.
-    '''
-    args = get_args()
-
-    # Startup from command line arguments
-    scratch = startup_from_args(args)
-
-    # Extract tarballs
-    if args.outputs_tarball:
-        logging.info("Extracting tarballs in translations root directory.")
-        extract_tarballs(args.translations_root, remove_tarball=False)
-
-    # Load system config
-    with open(args.system_config, "r", encoding="utf-8") as f:
+def load_system_config(system_config_path: str) -> Dict[str, Any]:
+    """Load system configuration from file."""
+    with open(system_config_path, "r", encoding="utf-8") as f:
         system_config = json.load(f)
     logging.debug(f"Loaded system config: {system_config}")
+    return system_config
 
-    # Construct inital results dict from disk if skip repeats is set, otherwise
-    # create dict of empty lists to store results with columns for each field
+
+def load_existing_results(output_file: str) -> Dict[str, List]:
+    """Load existing results from file if skip_repeats is enabled."""
+    with open(output_file, "r", encoding="utf-8") as f:
+        results = json.loads(pd.read_json(f, orient="index").to_json(orient="columns"))
+        # convert back to dict of lists
+        results = {k: list(v.values()) for k, v in results.items()}
+    logging.info(f"Loaded {len(results['path'])} results from {output_file}.")
+    return results
+
+
+def initialize_results(args: ArgumentParser) -> Dict[str, List]:
+    """Initialize results dictionary from disk or create empty one."""
     if args.skip_repeats and os.path.exists(args.output):
-        with open(args.output, "r", encoding="utf-8") as f:
-            results = json.loads(pd.read_json(f, orient="index").to_json(orient="columns"))
-            # convert back to dict of lists
-            results = {k: list(v.values()) for k, v in results.items()}
-        logging.info(f"Loaded {len(results['path'])} results from {args.output}.")
+        return load_existing_results(args.output)
     else:
-        results = empty_results_dict()
+        return empty_results_dict()
 
-    # Gather all the code repositories
-    code_repos = gather_code_repos(args, results, args.skip_repeats)
 
-    # Build and run each code repository
+def process_code_repositories(code_repos: List[Dict[str, str]], results: Dict[str, List],
+                            system_config: Dict[str, Any], args: ArgumentParser,
+                            scratch: os.PathLike) -> None:
+    """Process all code repositories with progress bar."""
     max_cols = safe_get_cols()
     items = len(code_repos) * (2 if args.skip_build_swap else 4)
+
     with alive_bar(items,
                    title="Building and running code repositories",
                    max_cols=max_cols, disable=args.hide_progress) as pbar:
@@ -455,6 +531,31 @@ def main():
                 else:
                     pbar()
                     pbar()
+
+
+def main():
+    """Main function."""
+    args = get_args()
+
+    # Startup from command line arguments
+    scratch = startup_from_args(args)
+
+    # Extract tarballs if requested
+    if args.outputs_tarball:
+        logging.info("Extracting tarballs in translations root directory.")
+        extract_tarballs(args.translations_root, remove_tarball=False)
+
+    # Load system config
+    system_config = load_system_config(args.system_config)
+
+    # Initialize results
+    results = initialize_results(args)
+
+    # Gather all the code repositories
+    code_repos = gather_code_repos(args, results, args.skip_repeats)
+
+    # Process all code repositories
+    process_code_repositories(code_repos, results, system_config, args, scratch)
 
 if __name__ == "__main__":
     main()

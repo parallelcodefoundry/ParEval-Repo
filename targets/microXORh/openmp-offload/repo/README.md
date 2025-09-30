@@ -24,4 +24,4 @@ microXORh requires two command-line arguments, one for matrix size and one for b
 ./microXORh.exe 1024 32
 ```
 
-You should see `Validation passed.` if the operation completed sucessfully. The output of the kernel is tested against the output of the same problem run on the CPU.
+You should see `Validation passed.` if the operation completed successfully. The output of the kernel is tested against the output of the same problem run on the CPU.
