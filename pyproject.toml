@@ -1,0 +1,14 @@
+[project]
+name = "pareval-repo"
+version = "0.1.0"
+description = "Package for evaluating LLM repository-scale translation of parallel HPC codes"
+readme = "README.md"
+requires-python = ">=3.11.13"
+dependencies = [
+    "alive-progress>=3.3.0",
+    "google-generativeai>=0.8.5",
+    "huggingface-hub>=0.35.0",
+    "langchain-text-splitters>=0.3.11",
+    "openai>=1.107.3",
+    "pandas>=2.3.2",
+]
