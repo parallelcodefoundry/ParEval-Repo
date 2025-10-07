@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import json
+import time
 from typing import List, Optional, Dict, Any
 
 # local imports
@@ -20,6 +21,7 @@ class SWEAgentTranslator(Translator):
     TRAJECTORIES_DIR = "trajectories"
     PATCH_FILENAME = "temp.patch"
     EXPERIMENT_METADATA_FILENAME = "experiment_metadata.json"
+    SERVE_CHECK_COOLDOWN = 10
 
     # File extensions to remove from output
     REMOVE_EXTENSIONS = (".cu", ".cuh")
@@ -103,11 +105,36 @@ class SWEAgentTranslator(Translator):
             # Local runs typically disable cost tracking
             if self._swe_agent_per_instance_cost_limit is None:
                 self._swe_agent_per_instance_cost_limit = 0.0
+            self._launch_ollama_server()
 
     @staticmethod
     def _is_ollama_model(name: str) -> bool:
         name = (name or "").lower()
         return name.startswith("ollama/") or name.startswith("ollama_chat/")
+
+
+    def _launch_ollama_server(self) -> None:
+        """Launch an Ollama server in the background."""
+        # Check that ollama is installed
+        if not shutil.which("ollama"):
+            raise ValueError("Ollama is not in the path. Please install Ollama and add it to the path.")
+        # Early exit if ollama is already running
+        if subprocess.run(["ollama", "list"], capture_output=True, text=True).returncode == 0:
+            return
+        ollama_command = ["ollama", "serve", self._swe_agent_model_name]
+        subprocess.Popen(ollama_command)
+        # Check that the server is running
+        checking = True
+        while checking:
+            status = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+            if status.returncode == 0:
+                checking = False
+            else:
+                print(f"Ollama server not ready, checking again after {self.SERVE_CHECK_COOLDOWN} seconds...")
+                time.sleep(self.SERVE_CHECK_COOLDOWN)
+        print(f"Ollama server ready.")
+        return
+
 
     @staticmethod
     def add_args(parser: Any) -> None:
