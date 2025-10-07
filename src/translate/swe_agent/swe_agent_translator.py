@@ -121,7 +121,7 @@ class SWEAgentTranslator(Translator):
         # Early exit if ollama is already running
         if subprocess.run(["ollama", "list"], capture_output=True, text=True).returncode == 0:
             return
-        ollama_command = ["ollama", "serve", self._swe_agent_model_name]
+        ollama_command = ["ollama", "serve"]
         subprocess.Popen(ollama_command)
         # Check that the server is running
         checking = True
