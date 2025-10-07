@@ -32,6 +32,13 @@ class SWEAgentTranslator(Translator):
     # Instance variables
     _swe_agent_model_name: str
     _swe_agent_per_instance_cost_limit: float
+    _swe_agent_total_cost_limit: float
+    _swe_agent_per_instance_call_limit: Optional[int]
+    _swe_agent_api_base: Optional[str]
+    _swe_agent_config: Optional[str]
+    _swe_agent_parser: Optional[str]
+    _swe_agent_max_input_token: Optional[int]
+
     _temp_repo_path: str
     _translation_task_path: str
     _output_path: str
@@ -47,7 +54,13 @@ class SWEAgentTranslator(Translator):
         dry: bool = False,
         hide_progress: bool = False,
         swe_agent_model_name: Optional[str] = None,
-        swe_agent_per_instance_cost_limit: float = 0.06
+        swe_agent_per_instance_cost_limit: float = 0.06,
+        swe_agent_total_cost_limit: float = 0.0,
+        swe_agent_per_instance_call_limit: Optional[int] = None,
+        swe_agent_api_base: Optional[str] = None,
+        swe_agent_config: Optional[str] = None,
+        swe_agent_parser: Optional[str] = None,
+        swe_agent_max_input_token: Optional[int] = None,
     ) -> None:
         super().__init__(
             input_repo,
@@ -60,32 +73,76 @@ class SWEAgentTranslator(Translator):
             hide_progress=hide_progress
         )
 
-        self._swe_agent_model_name = swe_agent_model_name
+        self._swe_agent_model_name = swe_agent_model_name or ""
         self._swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
+        self._swe_agent_total_cost_limit = swe_agent_total_cost_limit
+        self._swe_agent_per_instance_call_limit = swe_agent_per_instance_call_limit
+        self._swe_agent_api_base = swe_agent_api_base
+        self._swe_agent_config = swe_agent_config
+        self._swe_agent_parser = swe_agent_parser
+        self._swe_agent_max_input_token = swe_agent_max_input_token
+
         self._temp_repo_path = self.TEMP_REPO_PATH
         self._translation_task_path = os.path.join(
             self._input_repo.path, self.TRANSLATION_TASK_FILENAME
         )
         self._output_path = os.path.join(self._output_paths[0], "repo")
 
+        if self._is_ollama_model(self._swe_agent_model_name):
+            if not self._swe_agent_api_base:
+                self._swe_agent_api_base = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+            if self._swe_agent_parser is None:
+                self._swe_agent_parser = "thought_action"
+            if self._swe_agent_total_cost_limit is None:
+                self._swe_agent_total_cost_limit = 0.0
+            if self._swe_agent_per_instance_call_limit is None:
+                self._swe_agent_per_instance_call_limit = 100
+            if self._swe_agent_max_input_token is None:
+                # quiets 'No max input tokens found' warnings for most local models
+                self._swe_agent_max_input_token = 4096
+            # Local runs typically disable cost tracking
+            if self._swe_agent_per_instance_cost_limit is None:
+                self._swe_agent_per_instance_cost_limit = 0.0
+
+    @staticmethod
+    def _is_ollama_model(name: str) -> bool:
+        name = (name or "").lower()
+        return name.startswith("ollama/") or name.startswith("ollama_chat/")
 
     @staticmethod
     def add_args(parser: Any) -> None:
         """Add command line arguments for SWE-agent configuration."""
         parser.add_argument("--swe-agent-model-name", type=str,
-                            help="Name of the agent model to use (e.g. 'gpt-4o').")
+                            help="Name of the agent model to use (e.g. 'gpt-4o', 'ollama/llama3.2:latest').")
         parser.add_argument("--swe-agent-per-instance-cost-limit", type=float,
-                            help="Per-instance cost limit for the agent model.")
-
+                            help="Per-instance cost limit for the agent model; set to 0 for local models.")
+        # New: local-model friendly options
+        parser.add_argument("--swe-agent-total-cost-limit", type=float, default=0.0,
+                            help="Total cost limit; set to 0 for local models.")
+        parser.add_argument("--swe-agent-per-instance-call-limit", type=int,
+                            help="Max LLM calls per instance (e.g., 100).")
+        parser.add_argument("--swe-agent-api-base", type=str,
+                            help="Override model base URL (e.g., 'http://127.0.0.1:11434' for Ollama).")
+        parser.add_argument("--swe-agent-config", type=str,
+                            help="Path to a SWE-agent YAML config (overrides defaults).")
+        parser.add_argument("--swe-agent-parser", type=str, choices=["thought_action", "function_call"],
+                            help="Parsing strategy. Use 'thought_action' for local/Ollama models.")
+        parser.add_argument("--swe-agent-max-input-token", type=int,
+                            help="Override max input tokens to avoid local-model warnings.")
 
     @staticmethod
     def parse_args(args: Any) -> Dict[str, Any]:
         """Parse command line arguments for SWE-agent configuration."""
         return {
             "swe_agent_model_name": args.swe_agent_model_name,
-            "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit
+            "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit,
+            "swe_agent_total_cost_limit": args.swe_agent_total_cost_limit,
+            "swe_agent_per_instance_call_limit": args.swe_agent_per_instance_call_limit,
+            "swe_agent_api_base": args.swe_agent_api_base,
+            "swe_agent_config": args.swe_agent_config,
+            "swe_agent_parser": args.swe_agent_parser,
+            "swe_agent_max_input_token": args.swe_agent_max_input_token,
         }
-
 
     def translate(self) -> None:
         """Execute the complete translation process using SWE-agent.
@@ -158,6 +215,7 @@ class SWEAgentTranslator(Translator):
         self._prepare_temp_directory()
         self._copy_source_to_temp()
         self._initialize_git_repo()
+        self._ensure_repro_scripts()
 
     def _prepare_temp_directory(self) -> None:
         """Remove existing temp directory if it exists."""
@@ -175,6 +233,23 @@ class SWEAgentTranslator(Translator):
         subprocess.run(self.GIT_ADD_ALL, cwd=self._temp_repo_path, check=True)
         subprocess.run(self.GIT_COMMIT_INITIAL, cwd=self._temp_repo_path, check=True)
 
+    def _ensure_repro_scripts(self) -> None:
+        """Create a minimal reproduce script at plausible paths to avoid tool-call loops."""
+        # Root-level repro script
+        root_repro = os.path.join(self._temp_repo_path, "reproduce_error.py")
+        if not os.path.exists(root_repro):
+            with open(root_repro, "w", encoding="utf-8") as f:
+                f.write('print("No repro needed yet.")\n')
+
+        # Also create under the declared relative path (if present) since some prompts try that path
+        rel_path = self._dst_config.get("path")
+        if isinstance(rel_path, str) and rel_path.strip():
+            nested_dir = os.path.join(self._temp_repo_path, rel_path)
+            os.makedirs(nested_dir, exist_ok=True)
+            nested_repro = os.path.join(nested_dir, "reproduce_error.py")
+            if not os.path.exists(nested_repro):
+                with open(nested_repro, "w", encoding="utf-8") as f:
+                    f.write('print("No repro needed yet.")\n')
 
     def run_swe_agent(self) -> bool:
         """Run the SWE-agent command and apply the resulting patch."""
@@ -197,14 +272,29 @@ class SWEAgentTranslator(Translator):
 
     def _build_swe_agent_command(self) -> List[str]:
         """Build the SWE-agent command with all required parameters."""
-        return [
+        cmd = [
             "sweagent", "run",
             f"--agent.model.name={self._swe_agent_model_name}",
             f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}",
+            f"--agent.model.total_cost_limit={self._swe_agent_total_cost_limit}",
             f"--env.repo.path={self._temp_repo_path}",
             "--env.deployment.image=python",
             f"--problem_statement.path={self._translation_task_path}",
         ]
+
+        # Optional / local-model-friendly overrides
+        if self._swe_agent_api_base:
+            cmd.append(f"--agent.model.api_base={self._swe_agent_api_base}")
+        if self._swe_agent_parser:
+            cmd.append(f"--agent.tools.parse_function.type={self._swe_agent_parser}")
+        if self._swe_agent_max_input_token:
+            cmd.append(f"--agent.model.max_input_tokens={self._swe_agent_max_input_token}")
+        if self._swe_agent_per_instance_call_limit is not None:
+            cmd.append(f"--agent.model.per_instance_call_limit={self._swe_agent_per_instance_call_limit}")
+        if self._swe_agent_config:
+            cmd.extend(["--config", self._swe_agent_config])
+
+        return cmd
 
     def _apply_swe_agent_patch(self) -> bool:
         """Find and apply the patch file generated by SWE-agent."""
