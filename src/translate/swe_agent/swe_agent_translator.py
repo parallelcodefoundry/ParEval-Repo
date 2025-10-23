@@ -69,7 +69,7 @@ class SWEAgentTranslator(Translator):
             hide_progress=hide_progress
         )
 
-        self._swe_agent_model_name = swe_agent_model_name or ""
+        self._swe_agent_model_name = swe_agent_model_name
         self._swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
         self._swe_agent_config = swe_agent_config
         self._swe_agent_parser = swe_agent_parser
