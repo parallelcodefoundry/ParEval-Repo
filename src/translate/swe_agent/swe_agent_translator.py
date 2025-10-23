@@ -305,7 +305,7 @@ class SWEAgentTranslator(Translator):
             f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}",
             f"--agent.model.total_cost_limit={self._swe_agent_total_cost_limit}",
             f"--env.repo.path={self._temp_repo_path}",
-            "--env.deployment.image=python",
+            "--config", os.path.expanduser("~/SWE-agent/config/podman.yaml"),
             f"--problem_statement.path={self._translation_task_path}",
         ]
 
