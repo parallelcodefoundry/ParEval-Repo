@@ -34,9 +34,6 @@ class SWEAgentTranslator(Translator):
     # Instance variables
     _swe_agent_model_name: str
     _swe_agent_per_instance_cost_limit: float
-    _swe_agent_total_cost_limit: float
-    _swe_agent_per_instance_call_limit: Optional[int]
-    _swe_agent_api_base: Optional[str]
     _swe_agent_config: Optional[str]
     _swe_agent_parser: Optional[str]
     _swe_agent_max_input_token: Optional[int]
@@ -57,9 +54,6 @@ class SWEAgentTranslator(Translator):
         hide_progress: bool = False,
         swe_agent_model_name: Optional[str] = None,
         swe_agent_per_instance_cost_limit: float = 0.06,
-        swe_agent_total_cost_limit: float = 0.0,
-        swe_agent_per_instance_call_limit: Optional[int] = None,
-        swe_agent_api_base: Optional[str] = None,
         swe_agent_config: Optional[str] = None,
         swe_agent_parser: Optional[str] = None,
         swe_agent_max_input_token: Optional[int] = None,
@@ -77,9 +71,6 @@ class SWEAgentTranslator(Translator):
 
         self._swe_agent_model_name = swe_agent_model_name or ""
         self._swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
-        self._swe_agent_total_cost_limit = swe_agent_total_cost_limit
-        self._swe_agent_per_instance_call_limit = swe_agent_per_instance_call_limit
-        self._swe_agent_api_base = swe_agent_api_base
         self._swe_agent_config = swe_agent_config
         self._swe_agent_parser = swe_agent_parser
         self._swe_agent_max_input_token = swe_agent_max_input_token
@@ -91,26 +82,16 @@ class SWEAgentTranslator(Translator):
         self._output_path = os.path.join(self._output_paths[0], "repo")
 
         if self._is_ollama_model(self._swe_agent_model_name):
-            if not self._swe_agent_api_base:
-                self._swe_agent_api_base = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
             if self._swe_agent_parser is None:
                 self._swe_agent_parser = "thought_action"
-            if self._swe_agent_total_cost_limit is None:
-                self._swe_agent_total_cost_limit = 0.0
-            if self._swe_agent_per_instance_call_limit is None:
-                self._swe_agent_per_instance_call_limit = 100
             if self._swe_agent_max_input_token is None:
-                # quiets 'No max input tokens found' warnings for most local models
                 self._swe_agent_max_input_token = 4096
-            # Local runs typically disable cost tracking
-            if self._swe_agent_per_instance_cost_limit is None:
-                self._swe_agent_per_instance_cost_limit = 0.0
             self._launch_ollama_server()
 
     @staticmethod
     def _is_ollama_model(name: str) -> bool:
         name = (name or "").lower()
-        return name.startswith("ollama/") or name.startswith("ollama_chat/")
+        return name.startswith("ollama/")
 
 
     def _launch_ollama_server(self) -> None:
@@ -143,15 +124,6 @@ class SWEAgentTranslator(Translator):
                             help="Name of the agent model to use (e.g. 'gpt-4o', 'ollama/llama3.2:latest').")
         parser.add_argument("--swe-agent-per-instance-cost-limit", type=float,
                             help="Per-instance cost limit for the agent model; set to 0 for local models.")
-        # New: local-model friendly options
-        parser.add_argument("--swe-agent-total-cost-limit", type=float, default=0.0,
-                            help="Total cost limit; set to 0 for local models.")
-        parser.add_argument("--swe-agent-per-instance-call-limit", type=int,
-                            help="Max LLM calls per instance (e.g., 100).")
-        parser.add_argument("--swe-agent-api-base", type=str,
-                            help="Override model base URL (e.g., 'http://127.0.0.1:11434' for Ollama).")
-        parser.add_argument("--swe-agent-config", type=str,
-                            help="Path to a SWE-agent YAML config (overrides defaults).")
         parser.add_argument("--swe-agent-parser", type=str, choices=["thought_action", "function_call"],
                             help="Parsing strategy. Use 'thought_action' for local/Ollama models.")
         parser.add_argument("--swe-agent-max-input-token", type=int,
@@ -163,9 +135,6 @@ class SWEAgentTranslator(Translator):
         return {
             "swe_agent_model_name": args.swe_agent_model_name,
             "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit,
-            "swe_agent_total_cost_limit": args.swe_agent_total_cost_limit,
-            "swe_agent_per_instance_call_limit": args.swe_agent_per_instance_call_limit,
-            "swe_agent_api_base": args.swe_agent_api_base,
             "swe_agent_config": args.swe_agent_config,
             "swe_agent_parser": args.swe_agent_parser,
             "swe_agent_max_input_token": args.swe_agent_max_input_token,
@@ -303,21 +272,14 @@ class SWEAgentTranslator(Translator):
             "sweagent", "run",
             f"--agent.model.name={self._swe_agent_model_name}",
             f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}",
-            f"--agent.model.total_cost_limit={self._swe_agent_total_cost_limit}",
             f"--env.repo.path={self._temp_repo_path}",
-            "--config", os.path.expanduser("~/SWE-agent/config/podman.yaml"),
             f"--problem_statement.path={self._translation_task_path}",
         ]
 
-        # Optional / local-model-friendly overrides
-        if self._swe_agent_api_base:
-            cmd.append(f"--agent.model.api_base={self._swe_agent_api_base}")
         if self._swe_agent_parser:
             cmd.append(f"--agent.tools.parse_function.type={self._swe_agent_parser}")
         if self._swe_agent_max_input_token:
             cmd.append(f"--agent.model.max_input_tokens={self._swe_agent_max_input_token}")
-        if self._swe_agent_per_instance_call_limit is not None:
-            cmd.append(f"--agent.model.per_instance_call_limit={self._swe_agent_per_instance_call_limit}")
         if self._swe_agent_config:
             cmd.extend(["--config", self._swe_agent_config])
 
