@@ -217,7 +217,6 @@ class SWEAgentTranslator(Translator):
         self._prepare_temp_directory()
         self._copy_source_to_temp()
         self._initialize_git_repo()
-        self._ensure_repro_scripts()
 
     def _prepare_temp_directory(self) -> None:
         """Remove existing temp directory if it exists."""
@@ -234,24 +233,6 @@ class SWEAgentTranslator(Translator):
         subprocess.run(self.GIT_INIT, cwd=self._temp_repo_path, check=True)
         subprocess.run(self.GIT_ADD_ALL, cwd=self._temp_repo_path, check=True)
         subprocess.run(self.GIT_COMMIT_INITIAL, cwd=self._temp_repo_path, check=True)
-
-    def _ensure_repro_scripts(self) -> None:
-        """Create a minimal reproduce script at plausible paths to avoid tool-call loops."""
-        # Root-level repro script
-        root_repro = os.path.join(self._temp_repo_path, "reproduce_error.py")
-        if not os.path.exists(root_repro):
-            with open(root_repro, "w", encoding="utf-8") as f:
-                f.write('print("No repro needed yet.")\n')
-
-        # Also create under the declared relative path (if present) since some prompts try that path
-        rel_path = self._dst_config.get("path")
-        if isinstance(rel_path, str) and rel_path.strip():
-            nested_dir = os.path.join(self._temp_repo_path, rel_path)
-            os.makedirs(nested_dir, exist_ok=True)
-            nested_repro = os.path.join(nested_dir, "reproduce_error.py")
-            if not os.path.exists(nested_repro):
-                with open(nested_repro, "w", encoding="utf-8") as f:
-                    f.write('print("No repro needed yet.")\n')
 
     def run_swe_agent(self) -> bool:
         """Run the SWE-agent command and apply the resulting patch."""
