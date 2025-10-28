@@ -107,8 +107,7 @@ class SWEAgentTranslator(Translator):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,       
         stdin=subprocess.DEVNULL,   
-        start_new_session=True,
-        env=env)
+        start_new_session=True)
         # Check that the server is running
         checking = True
         while checking:
