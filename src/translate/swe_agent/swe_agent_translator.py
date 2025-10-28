@@ -103,7 +103,11 @@ class SWEAgentTranslator(Translator):
         if subprocess.run(["ollama", "list"], capture_output=True, text=True).returncode == 0:
             return
         ollama_command = ["ollama", "serve"]
-        subprocess.Popen(ollama_command)
+        subprocess.Popen(ollama_command, stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,       
+        stdin=subprocess.DEVNULL,   
+        start_new_session=True,
+        env=env)
         # Check that the server is running
         checking = True
         while checking:
