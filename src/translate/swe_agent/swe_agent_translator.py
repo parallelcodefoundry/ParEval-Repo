@@ -130,7 +130,7 @@ class SWEAgentTranslator(Translator):
                             help="Per-instance cost limit for the agent model; set to 0 for local models.")
         parser.add_argument("--swe-agent-config", type=str,
                             help="Custom config file provided to SWE-Agent. Default config file is used if none is provided.")
-        parser.add_argument("--swe-agent-parser", type=str, choices=["thought_action", "function_call"],
+        parser.add_argument("--swe-agent-parser", type=str, choices=["thought_action", "function_calling"],
                             help="Parsing strategy. Use 'thought_action' for local/Ollama models.")
         parser.add_argument("--swe-agent-max-input-token", type=int,
                             help="Override max input tokens to avoid local-model warnings.")
