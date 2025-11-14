@@ -6,7 +6,8 @@ import shutil
 import subprocess
 import json
 import time
-from typing import List, Optional, Dict, Any
+import atexit
+from typing import List, Optional, Dict, Any, Union
 
 # local imports
 from translator import Translator
@@ -34,7 +35,7 @@ class SWEAgentTranslator(Translator):
     # Instance variables
     _swe_agent_model_name: str
     _swe_agent_per_instance_cost_limit: float
-    _swe_agent_config: Optional[str]
+    _swe_agent_config: Optional[List[str]]
     _swe_agent_parser: Optional[str]
     _swe_agent_max_input_token: Optional[int]
 
@@ -54,7 +55,7 @@ class SWEAgentTranslator(Translator):
         hide_progress: bool = False,
         swe_agent_model_name: Optional[str] = None,
         swe_agent_per_instance_cost_limit: float = 0.06,
-        swe_agent_config: Optional[str] = None,
+        swe_agent_config: Optional[Union[str, List[str]]] = None,
         swe_agent_parser: Optional[str] = None,
         swe_agent_max_input_token: Optional[int] = None,
     ) -> None:
@@ -71,9 +72,14 @@ class SWEAgentTranslator(Translator):
 
         self._swe_agent_model_name = swe_agent_model_name
         self._swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
-        self._swe_agent_config = swe_agent_config
         self._swe_agent_parser = swe_agent_parser
         self._swe_agent_max_input_token = swe_agent_max_input_token
+
+        # Handle a single-config file or multi-config files
+        if isinstance(swe_agent_config, str):
+            self._swe_agent_config = [swe_agent_config]
+        else:
+            self._swe_agent_config = swe_agent_config
 
         self._temp_repo_path = self.TEMP_REPO_PATH
         self._translation_task_path = os.path.join(
@@ -87,6 +93,8 @@ class SWEAgentTranslator(Translator):
             if self._swe_agent_max_input_token is None:
                 self._swe_agent_max_input_token = 4096
             self._launch_ollama_server()
+        else:
+            self._launch_vllm_server()
 
     @staticmethod
     def _is_ollama_model(name: str) -> bool:
@@ -128,8 +136,8 @@ class SWEAgentTranslator(Translator):
                             help="Name of the agent model to use (e.g. 'gpt-4o', 'ollama/llama3.2:latest').")
         parser.add_argument("--swe-agent-per-instance-cost-limit", type=float,
                             help="Per-instance cost limit for the agent model; set to 0 for local models.")
-        parser.add_argument("--swe-agent-config", type=str,
-                            help="Custom config file provided to SWE-Agent. Default config file is used if none is provided.")
+        parser.add_argument("--swe-agent-config", action="append",
+                            help="May be specified multiple times; default config file is used if none is provided.")
         parser.add_argument("--swe-agent-parser", type=str, choices=["thought_action", "function_calling"],
                             help="Parsing strategy. Use 'thought_action' for local/Ollama models.")
         parser.add_argument("--swe-agent-max-input-token", type=int,
@@ -268,7 +276,8 @@ class SWEAgentTranslator(Translator):
         if self._swe_agent_max_input_token:
             cmd.append(f"--agent.model.max_input_tokens={self._swe_agent_max_input_token}")
         if self._swe_agent_config:
-            cmd.extend(["--config", self._swe_agent_config])
+            for cfg in self._swe_agent_config:
+                cmd.extend(["--config", cfg])
 
         return cmd
 
@@ -393,3 +402,41 @@ class SWEAgentTranslator(Translator):
         except OSError as e:
             print(f"Error cleaning up temporary repository: {e}")
             # Don't raise here as this is cleanup code
+
+    def _launch_vllm_server(self, environment_path: str, yaml_config: Optional[str] = None):
+        """Launch a vLLM server in the background using the Python environment directory
+           provided.
+        """
+        # Early exit if vLLM server is already running
+        if subprocess.run(["curl", "http://127.0.0.1:8000/health"], capture_output=True,
+                          text=True, check=False).returncode == 0:
+            return None
+        py_executable = os.path.join(environment_path, "bin", "python")
+        vllm_command = [py_executable, "-m", "vllm.entrypoints.openai.api_server",
+                        "--model", self._model,
+                        "--host", "127.0.0.1",
+                        "--port", "8000"]
+        vllm_api_key = os.getenv("VLLM_API_KEY")
+        if vllm_api_key is not None:
+            vllm_command.extend(["--api-key", vllm_api_key])
+        if self._is_reasoning_model(self._model):
+            vllm_command.extend(["--enable-reasoning", "--reasoning-parser", "deepseek_r1"])
+        if yaml_config:
+            vllm_command.extend(["--config", yaml_config])
+        print("Full vLLM subprocess command: %s", ' '.join(vllm_command))
+        vllm_server = subprocess.Popen(vllm_command)
+        # Ping the server until it is ready at the health endpoint
+        checking, num_attempts = True, 0
+        while checking and num_attempts < self._MAX_SERVE_CHECK_ATTEMPTS:
+            status = subprocess.run(["curl", "http://127.0.0.1:8000/health"], capture_output=True,
+                                    text=True, check=False)
+            if status.returncode == 0:
+                checking = False
+            else:
+                print("VLLM server not ready, checking again after %d seconds...",
+                             self._SERVE_CHECK_COOLDOWN)
+                time.sleep(self._SERVE_CHECK_COOLDOWN)
+                num_attempts += 1
+        atexit.register(vllm_server.terminate)
+        print("VLLM server ready.")
+        return vllm_server
