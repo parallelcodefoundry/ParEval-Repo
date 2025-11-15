@@ -429,7 +429,7 @@ class SWEAgentTranslator(Translator):
             return None
         py_executable = os.path.join(environment_path, "bin", "python")
         vllm_command = [py_executable, "-m", "vllm.entrypoints.openai.api_server",
-                        "--model", (self._swe_agent_model_name or "").split("/")[-1],
+                        "--model", self._swe_agent_model_name,
                         "--host", "127.0.0.1",
                         "--port", "8000"]
         vllm_api_key = os.getenv("VLLM_API_KEY")
