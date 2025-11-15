@@ -23,6 +23,7 @@ class SWEAgentTranslator(Translator):
     PATCH_FILENAME = "temp.patch"
     EXPERIMENT_METADATA_FILENAME = "experiment_metadata.json"
     SERVE_CHECK_COOLDOWN = 10
+    _MAX_SERVE_CHECK_ATTEMPTS = 100
 
     # File extensions to remove from output
     REMOVE_EXTENSIONS = (".cu", ".cuh")
@@ -58,6 +59,8 @@ class SWEAgentTranslator(Translator):
         swe_agent_config: Optional[Union[str, List[str]]] = None,
         swe_agent_parser: Optional[str] = None,
         swe_agent_max_input_token: Optional[int] = None,
+        vllm_environment: Optional[str] = None,
+        vllm_yaml_config: Optional[str] = None,
     ) -> None:
         super().__init__(
             input_repo,
@@ -87,14 +90,21 @@ class SWEAgentTranslator(Translator):
         )
         self._output_path = os.path.join(self._output_paths[0], "repo")
 
+        self._vllm_environment = vllm_environment
+        self._vllm_yaml_config = vllm_yaml_config
+
         if self._is_ollama_model(self._swe_agent_model_name):
             if self._swe_agent_parser is None:
                 self._swe_agent_parser = "thought_action"
             if self._swe_agent_max_input_token is None:
                 self._swe_agent_max_input_token = 4096
             self._launch_ollama_server()
+
         else:
-            self._launch_vllm_server()
+            if self._vllm_environment:
+                self._launch_vllm_server(self._vllm_environment, self._vllm_yaml_config)
+            else:
+                print("Warning: vLLM environment not provided; assuming external vLLM server is running.")
 
     @staticmethod
     def _is_ollama_model(name: str) -> bool:
@@ -142,6 +152,10 @@ class SWEAgentTranslator(Translator):
                             help="Parsing strategy. Use 'thought_action' for local/Ollama models.")
         parser.add_argument("--swe-agent-max-input-token", type=int,
                             help="Override max input tokens to avoid local-model warnings.")
+        parser.add_argument("--vllm-environment", type=str,
+                    help="Path to the Python environment that has vLLM installed (e.g. ~/pssg-venv).")
+        parser.add_argument("--vllm-yaml-config", type=str,
+                    help="Path to vLLM YAML config file to pass via --config.")
 
     @staticmethod
     def parse_args(args: Any) -> Dict[str, Any]:
@@ -152,6 +166,8 @@ class SWEAgentTranslator(Translator):
             "swe_agent_config": args.swe_agent_config,
             "swe_agent_parser": args.swe_agent_parser,
             "swe_agent_max_input_token": args.swe_agent_max_input_token,
+            "vllm_environment": args.vllm_environment,
+            "vllm_yaml_config": args.vllm_yaml_config,
         }
 
     def translate(self) -> None:
@@ -413,14 +429,12 @@ class SWEAgentTranslator(Translator):
             return None
         py_executable = os.path.join(environment_path, "bin", "python")
         vllm_command = [py_executable, "-m", "vllm.entrypoints.openai.api_server",
-                        "--model", self._model,
+                        "--model", (self._swe_agent_model_name or "").split("/")[-1],
                         "--host", "127.0.0.1",
                         "--port", "8000"]
         vllm_api_key = os.getenv("VLLM_API_KEY")
         if vllm_api_key is not None:
             vllm_command.extend(["--api-key", vllm_api_key])
-        if self._is_reasoning_model(self._model):
-            vllm_command.extend(["--enable-reasoning", "--reasoning-parser", "deepseek_r1"])
         if yaml_config:
             vllm_command.extend(["--config", yaml_config])
         print("Full vLLM subprocess command: %s", ' '.join(vllm_command))
