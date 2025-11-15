@@ -437,7 +437,7 @@ class SWEAgentTranslator(Translator):
             vllm_command.extend(["--api-key", vllm_api_key])
         if yaml_config:
             vllm_command.extend(["--config", yaml_config])
-        print("Full vLLM subprocess command: %s", ' '.join(vllm_command))
+        print("Full vLLM subprocess command:", " ".join(vllm_command))
         vllm_server = subprocess.Popen(vllm_command)
         # Ping the server until it is ready at the health endpoint
         checking, num_attempts = True, 0
@@ -447,9 +447,8 @@ class SWEAgentTranslator(Translator):
             if status.returncode == 0:
                 checking = False
             else:
-                print("VLLM server not ready, checking again after %d seconds...",
-                             self._SERVE_CHECK_COOLDOWN)
-                time.sleep(self._SERVE_CHECK_COOLDOWN)
+                print(f"VLLM server not ready, checking again after {self.SERVE_CHECK_COOLDOWN} seconds...")
+                time.sleep(self.SERVE_CHECK_COOLDOWN)
                 num_attempts += 1
         atexit.register(vllm_server.terminate)
         print("VLLM server ready.")
