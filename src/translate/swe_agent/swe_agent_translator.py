@@ -428,10 +428,18 @@ class SWEAgentTranslator(Translator):
                           text=True, check=False).returncode == 0:
             return None
         py_executable = os.path.join(environment_path, "bin", "python")
-        vllm_command = [py_executable, "-m", "vllm.entrypoints.openai.api_server",
-                        "--model", self._swe_agent_model_name,
-                        "--host", "127.0.0.1",
-                        "--port", "8000"]
+        served_model_name = self._swe_agent_model_name
+        if "/" in served_model_name:
+            served_model_name = served_model_name.split("/", 1)[1]
+        vllm_command = [
+            py_executable, "-m", "vllm.entrypoints.openai.api_server",
+            "--model", self._swe_agent_model_name,
+            "--tool-call-parser", "openai",
+            "--enable-auto-tool-choice",
+            "--reasoning-parser", "openai_gptoss",
+            "--host", "127.0.0.1",
+            "--port", "8000",
+        ]
         vllm_api_key = os.getenv("VLLM_API_KEY")
         if vllm_api_key is not None:
             vllm_command.extend(["--api-key", vllm_api_key])
