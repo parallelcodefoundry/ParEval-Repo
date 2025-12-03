@@ -281,12 +281,14 @@ class SWEAgentTranslator(Translator):
         """Build the SWE-agent command with all required parameters."""
         cmd = [
             "sweagent", "run",
-            f"--agent.model.name={self._swe_agent_model_name}",
-            f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}",
             f"--env.repo.path={self._temp_repo_path}",
             f"--problem_statement.path={self._translation_task_path}",
         ]
 
+        if self._swe_agent_model_name:
+            cmd.append(f"--agent.model.name={self._swe_agent_model_name}")
+        if self._swe_agent_per_instance_cost_limit:
+            cmd.append(f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}")
         if self._swe_agent_parser:
             cmd.append(f"--agent.tools.parse_function.type={self._swe_agent_parser}")
         if self._swe_agent_max_input_token:
@@ -428,12 +430,8 @@ class SWEAgentTranslator(Translator):
                           text=True, check=False).returncode == 0:
             return None
         py_executable = os.path.join(environment_path, "bin", "python")
-        served_model_name = self._swe_agent_model_name
-        if "/" in served_model_name:
-            served_model_name = served_model_name.split("/", 1)[1]
         vllm_command = [
             py_executable, "-m", "vllm.entrypoints.openai.api_server",
-            "--model", self._swe_agent_model_name,
             "--tool-call-parser", "openai",
             "--enable-auto-tool-choice",
             "--reasoning-parser", "openai_gptoss",
@@ -441,6 +439,8 @@ class SWEAgentTranslator(Translator):
             "--port", "8000",
         ]
         vllm_api_key = os.getenv("VLLM_API_KEY")
+        if self._swe_agent_model_name is not None:
+            vllm_command.extend(["--model", self._swe_agent_model_name])
         if vllm_api_key is not None:
             vllm_command.extend(["--api-key", vllm_api_key])
         if yaml_config:
