@@ -401,10 +401,13 @@ class SWEAgentTranslator(Translator):
         print("Fixing Makefile tabs...")
         i = 0
         while i < len(lines) - 1:
-            curr = lines[i]
+            curr = lines[i].lstrip()
             nxt = lines[i + 1]
 
-            if ":" in curr:
+            is_rule = ":" in curr
+            is_conditional = curr.startswith("ifneq") or curr.startswith("else")
+
+            if is_rule or is_conditional:
                 if nxt.strip() and not nxt.startswith("\t") and not nxt.lstrip().startswith("#"):
                     lines[i + 1] = "\t" + nxt
             i += 1
