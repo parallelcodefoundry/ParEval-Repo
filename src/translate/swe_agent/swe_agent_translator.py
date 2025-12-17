@@ -7,6 +7,7 @@ import subprocess
 import json
 import time
 import atexit
+from pathlib import Path
 from typing import List, Optional, Dict, Any, Union
 
 # local imports
@@ -192,6 +193,7 @@ class SWEAgentTranslator(Translator):
         self.initialize_temp_repo()
 
         if self.run_swe_agent():
+            self._fix_makefile_tabs_and_duplicates()
             print("Saving translated output...")
             self.save_output(self._output_path)
             self.remove_unnecessary_output_files()
@@ -378,6 +380,36 @@ class SWEAgentTranslator(Translator):
                     file_path = os.path.join(root, file)
                     os.remove(file_path)
 
+    def _fix_makefile_tabs_and_duplicates(self) -> None:
+        makefile = Path(self._temp_repo_path) / "Makefile"
+        if not makefile.exists():
+            return
+
+        lines = makefile.read_text(encoding="utf-8", errors="replace").splitlines(True)
+
+        # 1) Remove exact duplicate lines (preserve order)
+        print("Removing duplicate lines in the Makefile...")
+        seen = set()
+        duplicates = []
+        for line in lines:
+            if line not in seen:
+                seen.add(line)
+                duplicates.append(line)
+        lines = duplicates
+
+        # 2) Enforce Makefile tab rules
+        print("Fixing Makefile tabs...")
+        i = 0
+        while i < len(lines) - 1:
+            curr = lines[i]
+            nxt = lines[i + 1]
+
+            if ":" in curr:
+                if nxt.strip() and not nxt.startswith("\t") and not nxt.lstrip().startswith("#"):
+                    lines[i + 1] = "\t" + nxt
+            i += 1
+
+        makefile.write_text("".join(lines), encoding="utf-8")
 
     def write_experiment_metadata(self) -> None:
         """Write experiment metadata to a JSON file in the output directory."""
