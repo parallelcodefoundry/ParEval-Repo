@@ -405,8 +405,14 @@ class SWEAgentTranslator(Translator):
             nxt = lines[i + 1]
 
             is_rule = ":" in curr
-            is_conditional = curr.startswith("ifneq") or curr.startswith("else")
-
+            is_conditional = curr.startswith((
+                "ifeq",
+                "ifneq",
+                "ifdef",
+                "ifndef",
+                "else"
+            ))
+            
             if is_rule or is_conditional:
                 if nxt.strip() and not nxt.startswith("\t") and not nxt.lstrip().startswith("#"):
                     lines[i + 1] = "\t" + nxt
