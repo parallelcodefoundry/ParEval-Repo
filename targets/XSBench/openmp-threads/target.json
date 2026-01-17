@@ -1,0 +1,34 @@
+{
+    "app": "xsbench",
+    "model": "openmp-threads",
+    "path": "targets/XSBench/openmp-threads/repo",
+    "dependencies": ["gnu"],
+    "build_commands_debug": "make DEBUG=yes COMPILER=llvm -j8",
+    "build_commands_perf": "make COMPILER=llvm -j8",
+    "build_timeout": 120,
+    "exe_file": "XSBench",
+    "debug_type": "match",
+    "run_commands_debug": [
+        "./XSBench -m event -s small -t 8",
+        "./XSBench -m event -s large -t 8"
+    ],
+    "debug_outputs": [
+        "(Valid)",
+        "(Valid)"
+    ],
+    "run_commands_perf": [
+        "./XSBench -m event -s large -t 8"
+    ],
+    "perf_outputs": [
+        "(Valid)"
+    ],
+    "run_timeout": 120,
+    "ex_build_cmd": "make",
+    "ex_build_desc": "a generic multicore x86 system using the gcc compiler",
+    "build_filename": "Makefile",
+    "extra_build_files": ["CMakeLists.txt"],
+    "ex_run_cmd": "./XSBench -m event -s large -t 8",
+    "ex_run_desc": "an event-based simulation with the large input size using 8 OpenMP threads",
+    "main_filename": "Main.c",
+    "filename_desc": "C"
+}

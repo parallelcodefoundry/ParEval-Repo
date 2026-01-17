@@ -3,9 +3,9 @@
     "model": "openmp-offload",
     "path": "targets/microXOR/openmp-offload/repo",
     "dependencies": ["llvm", "cuda"],
-    "build_commands_debug": "make SM_VERSION=80 DEBUG=yes CXX_COMPILER=clang++",
-    "build_commands_perf": "make SM_VERSION=80 CXX_COMPILER=clang++",
-    "build_timeout": 30,
+    "build_commands_debug": "make SM_VERSION=sm_80 DEBUG=yes CXX_COMPILER=clang++",
+    "build_commands_perf": "make SM_VERSION=sm_80 CXX_COMPILER=clang++",
+    "build_timeout": 120,
     "exe_file": "microXOR.exe",
     "debug_type": "match",
     "run_commands_debug": [
@@ -24,8 +24,8 @@
     "perf_outputs": [
         "Validation passed."
     ],
-    "run_timeout": 120,
-    "ex_build_cmd": "make SM_VERSION=80 CXX_COMPILER=clang++",
+    "run_timeout": 60,
+    "ex_build_cmd": "make SM_VERSION=sm_80 CXX_COMPILER=clang++",
     "ex_build_desc": "a system with an NVIDIA GPU with compute capability 80 compiled with clang++",
     "build_filename": "Makefile",
     "ex_run_cmd": "./microXOR.exe 1024 32",
