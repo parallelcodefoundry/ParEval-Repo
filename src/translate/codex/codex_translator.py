@@ -218,13 +218,10 @@ class CodexTranslator(Translator):
 
     def _build_codex_command(self, prompt: str) -> List[str]:
         """Build the Codex CLI command with all required parameters."""
-        cmd = [
-            "codex", "exec", prompt,
-            "--sandbox", "workspace-write",
-            "--ask-for-approval", "never",
-        ]
+        cmd = ["codex", "exec", "--sandbox", "workspace-write"]
         if self._codex_model_name:
             cmd.extend(["--model", self._codex_model_name])
+        cmd.append(prompt)
         return cmd
 
     def _build_codex_env(self) -> dict:
