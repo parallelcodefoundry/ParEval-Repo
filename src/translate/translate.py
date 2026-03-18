@@ -19,6 +19,7 @@ from naive.naive_translator import NaiveTranslator
 from top_down_agentic.top_down_agentic import TopDownAgenticTranslator
 from swe_agent.swe_agent_translator import SWEAgentTranslator
 from codex.codex_translator import CodexTranslator
+from opencode.opencode_translator import OpenCodeTranslator
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -26,7 +27,7 @@ def get_args():
     parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
     parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive", "top-down-agentic", "swe-agent", "codex"], required=True, help="The translation method to use.")
+    parser.add_argument("--method", choices=["naive", "top-down-agentic", "swe-agent", "codex", "opencode"], required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
     parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
     parser.add_argument("--output-id", type=int, required=True, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
@@ -53,6 +54,10 @@ def get_args():
     codex_args = parser.add_argument_group("Codex translation")
     CodexTranslator.add_args(codex_args)
 
+    # subgroup for OpenCode translation method
+    opencode_args = parser.add_argument_group("OpenCode translation")
+    OpenCodeTranslator.add_args(opencode_args)
+
     return parser.parse_args()
 
 def get_translator_cls(method: str):
@@ -64,6 +69,8 @@ def get_translator_cls(method: str):
         return SWEAgentTranslator
     if method == "codex":
         return CodexTranslator
+    if method == "opencode":
+        return OpenCodeTranslator
     raise ValueError(f"Translation method {method} not recognized.")
 
 
