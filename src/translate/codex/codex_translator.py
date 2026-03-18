@@ -220,7 +220,11 @@ class CodexTranslator(Translator):
         """Build the Codex CLI command with all required parameters."""
         cmd = ["codex", "exec", "--sandbox", "workspace-write"]
         if self._codex_model_name:
-            cmd.extend(["--model", self._codex_model_name])
+            # Strip "openai/" prefix: Codex CLI interprets it as a signal to
+            # use the OpenAI Responses API (type:"custom" tools), which vLLM
+            # does not support.  The bare model name is sufficient for vLLM.
+            model_for_codex = self._codex_model_name.removeprefix("openai/")
+            cmd.extend(["--model", model_for_codex])
         cmd.append(prompt)
         return cmd
 
