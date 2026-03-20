@@ -52,7 +52,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             backend: Literal["openai", "gemini", "hf", "vllm", "local"] = "openai",
             log_interactions: bool = False,
             dry: bool = False,
-            hide_progress: bool = False
+            hide_progress: bool = False,
+            api_key: Optional[str] = None,
+            api_base_url: Optional[str] = None,
+            vllm_environment: Optional[str] = None,
+            vllm_yaml_config: Optional[str] = None,
+            vllm_keepalive_id: Optional[int] = None,
     ):
         """Initialize the top-down agent translator.
 
@@ -67,6 +72,11 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             log_interactions: Whether to log LLM interactions
             dry: Whether to run in dry-run mode
             hide_progress: Whether to hide progress bars
+            api_key: API key for the LLM backend
+            api_base_url: Base URL for the LLM backend API endpoint
+            vllm_environment: Path to the Python venv for launching a vLLM server
+            vllm_yaml_config: Path to a vLLM YAML configuration file
+            vllm_keepalive_id: If set, write vLLM server PID to a file with this ID
         """
         super().__init__(input_repo, output_repos, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
@@ -76,7 +86,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             dst_model=self._dst_model)
 
         GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt,
-                                async_mode=True)
+                                async_mode=True,
+                                api_key=api_key,
+                                api_base_url=api_base_url,
+                                vllm_environment=vllm_environment,
+                                vllm_yaml_config=vllm_yaml_config,
+                                vllm_keepalive_id=vllm_keepalive_id)
 
         self._interactions_paths = self._setup_interaction_logging()
         self._dependency_agent = self._create_dependency_agent()
@@ -142,7 +157,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
         """
         return {
             "backend": args.top_down_agentic_backend,
-            "llm_name": args.top_down_agentic_llm_name
+            "llm_name": args.top_down_agentic_llm_name,
+            "api_key": args.api_key,
+            "api_base_url": args.api_base_url,
+            "vllm_environment": args.vllm_environment,
+            "vllm_yaml_config": args.vllm_yaml_config,
+            "vllm_keepalive_id": args.vllm_keepalive_id,
         }
 
 
@@ -529,7 +549,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
     def _generate_translations(self, prompts: List[str]) -> Tuple[List[str], List[Union[str, None]]]:
         """Generate translations using the LLM."""
-        response_obs = self.generate_async(prompts, temperature=0.2, top_p=0.95)
+        response_obs = self.generate_async(prompts)
         responses = [r.response for r in response_obs]
         reasonings = [r.reasoning for r in response_obs]
         return responses, reasonings

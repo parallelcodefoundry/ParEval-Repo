@@ -11,4 +11,5 @@ dependencies = [
     "langchain-text-splitters>=0.3.11",
     "openai>=1.107.3",
     "pandas>=2.3.2",
+    "tiktoken>=0.9.0",
 ]

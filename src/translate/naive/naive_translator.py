@@ -21,8 +21,6 @@ from top_down_agentic.chunk_agent import ChunkFileAgent
 
 # Constants
 DEFAULT_TERMINAL_COLS = 80
-DEFAULT_TEMPERATURE = 0.2
-DEFAULT_TOP_P = 0.95
 DEFAULT_CHUNK_MAX_TOKENS = 1024
 CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
 INTERACTIONS_DIR = "interactions"
@@ -51,7 +49,12 @@ class NaiveTranslator(Translator, GeneratorMixin):
             enable_chunking: bool = False,
             log_interactions: bool = False,
             dry: bool = False,
-            hide_progress: bool = False
+            hide_progress: bool = False,
+            api_key: Optional[str] = None,
+            api_base_url: Optional[str] = None,
+            vllm_environment: Optional[str] = None,
+            vllm_yaml_config: Optional[str] = None,
+            vllm_keepalive_id: Optional[int] = None,
     ):
         # Validate inputs
         self._validate_inputs(input_repo, output_repos, src_model, dst_model,
@@ -61,7 +64,12 @@ class NaiveTranslator(Translator, GeneratorMixin):
                          dst_config, log_interactions, dry, hide_progress)
 
         GeneratorMixin.__init__(self, backend, llm_name,
-                                system_prompt=self._get_system_prompt())
+                                system_prompt=self._get_system_prompt(),
+                                api_key=api_key,
+                                api_base_url=api_base_url,
+                                vllm_environment=vllm_environment,
+                                vllm_yaml_config=vllm_yaml_config,
+                                vllm_keepalive_id=vllm_keepalive_id)
 
         if enable_chunking:
             self._chunk_agent = ChunkFileAgent(self, max_tokens=DEFAULT_CHUNK_MAX_TOKENS)
@@ -128,6 +136,11 @@ class NaiveTranslator(Translator, GeneratorMixin):
             "backend": args.naive_backend,
             "llm_name": args.naive_llm_name,
             "enable_chunking": args.naive_enable_chunking,
+            "api_key": args.api_key,
+            "api_base_url": args.api_base_url,
+            "vllm_environment": args.vllm_environment,
+            "vllm_yaml_config": args.vllm_yaml_config,
+            "vllm_keepalive_id": args.vllm_keepalive_id,
         }
 
 
@@ -512,12 +525,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             self._handle_dry_run(prompt, fpath, output_fpaths)
             return
 
-        responses = self.generate(
-            prompt,
-            temperature=DEFAULT_TEMPERATURE,
-            top_p=DEFAULT_TOP_P,
-            n=len(self._output_paths)
-        )
+        responses = [self.generate(prompt)[0] for _ in self._output_paths]
 
         self._process_responses(responses, prompt, fpath, output_fpaths, chunk, chunk_id)
 

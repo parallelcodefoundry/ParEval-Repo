@@ -97,11 +97,7 @@ class ContextAgent:
     def _generate_contexts(self, prompts: List[str]) -> List[str]:
         """Generate context responses using the LLM."""
         try:
-            response_obs = self._generator.generate_async(
-                prompts,
-                temperature=0.2,
-                top_p=0.95
-            )
+            response_obs = self._generator.generate_async(prompts)
             return [r.response.strip() if r.response else "" for r in response_obs]
         except Exception as e:
             print(f"Error generating contexts: {e}")

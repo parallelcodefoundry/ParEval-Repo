@@ -36,6 +36,18 @@ def get_args():
     parser.add_argument("--hide-progress", action="store_true", help="Hide the progress bar.")
     parser.add_argument("--tar-outputs", action="store_true", help="Create a tarball of the output directories.")
 
+    # GeneratorMixin arguments shared across all LLM-based translation methods
+    parser.add_argument("--api-key", type=str, default=None,
+                        help="API key for the LLM backend, overriding any backend-specific environment variable.")
+    parser.add_argument("--api-base-url", type=str, default=None,
+                        help="Base URL for the LLM backend API endpoint.")
+    parser.add_argument("--vllm-environment", type=str, default=None,
+                        help="Path to the Python virtual environment to use when launching a vLLM server.")
+    parser.add_argument("--vllm-yaml-config", type=str, default=None,
+                        help="Path to a vLLM YAML configuration file passed to the server via --config.")
+    parser.add_argument("--vllm-keepalive-id", type=int, default=None,
+                        help="If set, write the vLLM server PID to a file with this ID instead of terminating the server on exit.")
+
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
     NaiveTranslator.add_args(naive_args)

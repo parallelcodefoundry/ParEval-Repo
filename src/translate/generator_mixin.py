@@ -4,9 +4,12 @@
     date: November 2024
 """
 import os
+import sys
 import time
 import pickle
 import atexit
+import subprocess
+from pathlib import Path
 from typing import Optional, Literal, Callable, List, Tuple, Dict, Union, Any
 from math import ceil
 from dataclasses import dataclass
@@ -30,11 +33,11 @@ DEFAULT_GEMINI_TPM = 6000
 VLLM_BASE_URL = "http://127.0.0.1:8000/v1"
 VLLM_API_KEY = "token_abc123"
 VLLM_TIMEOUT = 1200
-REASONING_TEMP = 0.6
-REASONING_TOP_P = 0.95
-REASONING_MAX_TOKENS = 8192
-RETRY_DELAY = 15
+BASE_COOLDOWN = 10
 CACHE_RETENTION_TIME = 60
+VLLM_SERVE_CHECK_COOLDOWN = 10
+VLLM_MAX_SERVE_CHECK_ATTEMPTS = 200
+VLLM_MAX_TIMEOUT_RETRIES = 3
 
 
 @dataclass
@@ -49,6 +52,10 @@ class BackendConfig:
 class GeneratorMixin:
     """ Mixin class for providing a unified generative interface within other classes.
     """
+
+    # Token limit constants (match keet's values)
+    _REASONING_OUTPUT_RESERVE: int = 32000  # tokens reserved for reasoning and output
+    _MAX_TOKEN_COUNT: int = 131072          # 128k tokens, limit for most models
 
     _backend: Literal["openai", "gemini", "hf", "vllm", "local"]
     _llm_name: str
@@ -70,6 +77,12 @@ class GeneratorMixin:
     _hf_inference_client: Optional["InferenceClient"] = None  # type: ignore # noqa: F821
     _vllm_client: Optional['OpenAI'] = None  # type: ignore # noqa: F821
     _async_mode: bool = False
+    _vllm_environment: Optional[str] = None
+    _vllm_yaml_config: Optional[str] = None
+    _vllm_keepalive_id: Optional[int] = None
+    _api_key: Optional[str] = None
+    _api_base_url: Optional[str] = None
+    _encoder: Optional[Any] = None
 
     # Backend configurations
     _BACKEND_CONFIGS = {
@@ -105,6 +118,11 @@ class GeneratorMixin:
         system_prompt: Optional[str] = None,
         disable_request_cache: Optional[bool] = False,
         async_mode: bool = False,
+        vllm_environment: Optional[str] = None,
+        vllm_yaml_config: Optional[str] = None,
+        vllm_keepalive_id: Optional[int] = None,
+        api_key: Optional[str] = None,
+        api_base_url: Optional[str] = None,
     ):
         self._backend = backend
         self._llm_name = llm_name
@@ -114,10 +132,17 @@ class GeneratorMixin:
         self._system_prompt = system_prompt
         self._disable_request_cache = disable_request_cache
         self._async_mode = async_mode
+        self._vllm_environment = vllm_environment
+        self._vllm_yaml_config = vllm_yaml_config
+        self._vllm_keepalive_id = vllm_keepalive_id
+        self._api_key = api_key
+        self._api_base_url = api_base_url
+        self._encoder = None
 
         self._validate_backend()
         self._configure_backend(rpm_limit, tpm_limit)
         self._setup_rate_limiting()
+        self._setup_encoder()
 
 
     def _validate_backend(self) -> None:
@@ -134,8 +159,8 @@ class GeneratorMixin:
         self._rpm_limit = rpm_limit or config.rpm_limit
         self._tpm_limit = tpm_limit or config.tpm_limit
 
-        # Check API key requirements
-        if config.requires_api_key and config.api_key_env_var:
+        # Check API key requirements (skip if a generic api_key was provided)
+        if config.requires_api_key and config.api_key_env_var and self._api_key is None:
             if not os.environ.get(config.api_key_env_var):
                 raise ValueError(f"{config.api_key_env_var} environment variable not set.")
 
@@ -152,10 +177,28 @@ class GeneratorMixin:
             raise NotImplementedError(f"backend '{self._backend}' not implemented.")
 
 
+    def _setup_encoder(self) -> None:
+        """Set up a tiktoken encoder for token counting if the backend supports it."""
+        if self._backend not in ("openai", "vllm"):
+            return
+        try:
+            import tiktoken
+            query_str = self._llm_name
+            if "/" in query_str:
+                query_str = query_str.split("/")[-1]
+            self._encoder = tiktoken.encoding_for_model(query_str)
+        except Exception:
+            # Model not in tiktoken's registry; get_token_count will use a default encoding
+            self._encoder = None
+
+
     def _setup_openai(self) -> None:
         """Setup OpenAI client and generator."""
         from openai import OpenAI
-        self._openai_client = OpenAI()
+        self._openai_client = OpenAI(
+            api_key=self._api_key,  # None → SDK reads OPENAI_API_KEY env var
+            base_url=self._api_base_url,  # None → SDK uses default
+        )
         self._generator = self._generate_openai
 
 
@@ -165,18 +208,116 @@ class GeneratorMixin:
             from openai import AsyncOpenAI as OpenAI
         else:
             from openai import OpenAI
+
+        api_key = self._api_key or os.environ.get("VLLM_API_KEY", VLLM_API_KEY)
+        base_url = self._api_base_url or VLLM_BASE_URL
+
         self._vllm_client = OpenAI(
-            base_url=VLLM_BASE_URL,
-            api_key=VLLM_API_KEY,
+            base_url=base_url,
+            api_key=api_key,
             timeout=VLLM_TIMEOUT
         )
         self._generator = self._generate_vllm
+
+        if self._vllm_environment:
+            self._launch_vllm_server(
+                Path(self._vllm_environment),
+                self._vllm_yaml_config,
+                self._vllm_keepalive_id,
+            )
+        elif not self._test_vllm_server():
+            self._wait_for_vllm_server()
+
+
+    def _test_vllm_server(self) -> bool:
+        """Test if the vLLM server is running."""
+        base = (self._api_base_url or VLLM_BASE_URL).rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3]
+        health_url = base + "/health"
+        return (
+            subprocess.run(
+                ["curl", health_url],
+                capture_output=True,
+                text=True,
+                check=False,
+            ).returncode == 0
+        )
+
+
+    def _wait_for_vllm_server(self) -> None:
+        """Poll until the vLLM server is ready or max attempts are exceeded."""
+        num_attempts = 0
+        while num_attempts < VLLM_MAX_SERVE_CHECK_ATTEMPTS:
+            if self._test_vllm_server():
+                return
+            print(f"vLLM server not ready, checking again after {VLLM_SERVE_CHECK_COOLDOWN} seconds...")
+            time.sleep(VLLM_SERVE_CHECK_COOLDOWN)
+            num_attempts += 1
+        raise RuntimeError("vLLM server not ready after max attempts.")
+
+
+    def _launch_vllm_server(
+        self,
+        environment_path: Path,
+        yaml_config: Optional[str] = None,
+        keepalive_id: Optional[int] = None,
+    ) -> Optional[subprocess.Popen]:
+        """Launch a vLLM server in the background using the given Python environment.
+
+        Args:
+            environment_path: Path to the Python virtual environment directory.
+            yaml_config: Optional path to a vLLM YAML configuration file.
+            keepalive_id: If set, write the server PID to a file instead of registering
+                an atexit handler so the process can outlive this Python session.
+
+        Returns:
+            The Popen object for the vLLM server, or None if the server was already running.
+        """
+        if self._test_vllm_server():
+            return None
+
+        py_executable = environment_path / "bin" / "python"
+        vllm_executable = environment_path / "bin" / "vllm"
+
+        api_key = self._api_key or os.environ.get("VLLM_API_KEY", VLLM_API_KEY)
+        vllm_command = [
+            str(py_executable),
+            str(vllm_executable),
+            "serve",
+            "--model", self._llm_name,
+            "--host", "127.0.0.1",
+            "--port", "8000",
+            "--api-key", api_key,
+        ]
+        if self._is_reasoning_model():
+            vllm_command.extend(["--reasoning-parser", "deepseek_r1"])
+        if yaml_config:
+            vllm_command.extend(["--config", yaml_config])
+
+        print(f"Launching vLLM server: {' '.join(vllm_command)}")
+        vllm_server = subprocess.Popen(
+            vllm_command,
+            start_new_session=(keepalive_id is not None),
+        )
+
+        self._wait_for_vllm_server()
+
+        if keepalive_id is not None:
+            pid_file = Path(sys.argv[0]).resolve().parent / f"vllm-server-{keepalive_id}.pid"
+            pid_file.write_text(str(vllm_server.pid), encoding="utf-8")
+        else:
+            atexit.register(vllm_server.terminate)
+
+        print("vLLM server ready.")
+        return vllm_server
 
 
     def _setup_gemini(self) -> None:
         """Setup Gemini client and generator."""
         import google.generativeai as genai
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        api_key = self._api_key or os.environ["GEMINI_API_KEY"]
+        genai.configure(api_key=api_key)
         self._gemini_client = genai.GenerativeModel(
             self._llm_name,
             system_instruction=self._system_prompt
@@ -187,7 +328,8 @@ class GeneratorMixin:
     def _setup_huggingface(self) -> None:
         """Setup Hugging Face client and generator."""
         from huggingface_hub import InferenceClient
-        self._hf_inference_client = InferenceClient(api_key=os.environ["HF_API_KEY"])
+        api_key = self._api_key or os.environ["HF_API_KEY"]
+        self._hf_inference_client = InferenceClient(api_key=api_key)
         self._generator = self._generate_hf
 
 
@@ -234,104 +376,63 @@ class GeneratorMixin:
         return messages
 
 
-    def _generate_openai(
-            self,
-            prompt: str,
-            system_prompt: str,
-            max_new_tokens: int = 2048,
-            temperature: Optional[float] = None,
-            top_p: Optional[float] = None,
-            n: int = 1,
-            **kwargs
-    ) -> List[GenericResponse]:
-        """ Generate text using the OpenAI API.
+    def _is_reasoning_model(self) -> bool:
+        """Check if the current model is a reasoning model."""
+        name_lower = self._llm_name.lower()
+        return any(m in name_lower for m in ["qwq", "deepseek_r1", "deepseek-r1"])
+
+
+    def _generate_openai(self, prompt: str, system_prompt: str, **kwargs) -> List[GenericResponse]:
+        """ Generate text using the OpenAI responses API.
         """
         if not self._openai_client:
             raise ValueError("OpenAI client not initialized.")
 
-        completion = self._openai_client.chat.completions.create(
-            model=self._llm_name,
-            messages=self._format_messages_list(prompt, system_prompt),
-            max_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            n=1,
-            **kwargs
-        )
+        messages = self._format_messages_list(prompt, system_prompt)
+        gen_kwargs: Dict[str, Any] = {"model": self._llm_name, "input": messages, **kwargs}
+        if self._llm_name.endswith("-thinking"):
+            gen_kwargs["model"] = self._llm_name.replace("-thinking", "")
+            gen_kwargs["reasoning"] = {"effort": "high"}
 
-        if not (completion and completion.choices):
-            raise ValueError("No completions returned from OpenAI.")
+        response = self._openai_client.responses.create(**gen_kwargs)
 
-        return [GenericResponse(c.message.content,
-                                completion.usage.prompt_tokens // n,
-                                completion.usage.completion_tokens // n
-                                ) for c in completion.choices]
+        return [GenericResponse(
+            response.output_text,
+            response.usage.input_tokens,
+            response.usage.output_tokens,
+        )]
 
 
-    def _is_reasoning_model(self) -> bool:
-        """Check if the current model is a reasoning model."""
-        return "QwQ" in self._llm_name or "qwq" in self._llm_name
-
-
-    def _adjust_parameters_for_reasoning(self, temperature: Optional[float],
-                                       top_p: Optional[float],
-                                       max_new_tokens: int) -> Tuple[float, float, int]:
-        """Adjust parameters for reasoning models."""
-        if self._is_reasoning_model():
-            return REASONING_TEMP, REASONING_TOP_P, REASONING_MAX_TOKENS
-        return temperature, top_p, max_new_tokens
-
-
-    def _prepare_messages_for_reasoning(self, prompt: str, system_prompt: Optional[str]) -> List[Dict[str, str]]:
-        """Prepare messages for reasoning models by merging system prompt."""
-        if self._is_reasoning_model() and system_prompt is not None:
-            return self._format_messages_list(system_prompt + "\n" + prompt, None)
-        return self._format_messages_list(prompt, system_prompt)
-
-
-    def _generate_vllm(
-            self,
-            prompt: str,
-            system_prompt: str,
-            max_new_tokens: int = 2048,
-            temperature: Optional[float] = None,
-            top_p: Optional[float] = None,
-            n: int = 1,
-            **kwargs
-    ) -> List[GenericResponse]:
-        """ Generate text using the vLLM via the OpenAI server API.
+    def _generate_vllm(self, prompt: str, system_prompt: str, **kwargs) -> List[GenericResponse]:
+        """ Generate text using the vLLM via the OpenAI responses API.
         """
+        from openai import APITimeoutError
         if not self._vllm_client:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
-        # Adjust parameters for reasoning models
-        temperature, top_p, max_new_tokens = self._adjust_parameters_for_reasoning(
-            temperature, top_p, max_new_tokens
-        )
+        messages = self._format_messages_list(prompt, system_prompt)
+        gen_kwargs: Dict[str, Any] = {"model": self._llm_name, "input": messages, **kwargs}
+        if "gpt-oss" in self._llm_name:
+            gen_kwargs["reasoning"] = {"effort": "high"}
 
-        # Prepare messages
-        messages = self._prepare_messages_for_reasoning(prompt, system_prompt)
-        is_reasoning = self._is_reasoning_model()
-
-        completion = self._vllm_client.chat.completions.create(
-            model=self._llm_name,
-            messages=messages,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_new_tokens,
-            n=n,
-            **kwargs
-        )
-
-        if not (completion and completion.choices):
-            raise ValueError("No completions returned from vLLM.")
+        for _ in range(VLLM_MAX_TIMEOUT_RETRIES):
+            try:
+                response = self._vllm_client.responses.create(**gen_kwargs)
+                break
+            except (TimeoutError, APITimeoutError) as e:
+                print(f"vLLM request timeout ({e}), retrying...")
+                time.sleep(BASE_COOLDOWN)
+                continue
+        else:
+            raise RuntimeError(
+                f"vLLM request failed after {VLLM_MAX_TIMEOUT_RETRIES} timeout retries."
+            )
 
         return [GenericResponse(
-            c.message.content if c.message.content else "",
-            completion.usage.prompt_tokens // n if completion.usage else 0,
-            completion.usage.completion_tokens // n if completion.usage else 0,
-            c.message.reasoning_content if is_reasoning else None
-        ) for c in completion.choices]
+            response.output_text,
+            response.usage.input_tokens if response.usage else 0,
+            response.usage.output_tokens if response.usage else 0,
+        )]
 
 
     def _parse_reasoning_response(self, response: str) -> Tuple[str, Optional[str]]:
@@ -346,32 +447,22 @@ class GeneratorMixin:
             self,
             prompts: List[str],
             system_prompt: str,
-            max_new_tokens: int = 2048,
-            temperature: Optional[float] = None,
-            top_p: Optional[float] = None,
             **kwargs
     ) -> List[GenericResponse]:
-        """ Generate text using the vLLM via the OpenAI server API in async mode.
+        """ Generate text using the vLLM via the OpenAI completions API in async batch mode.
         """
         if not self._vllm_client:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
-        # Adjust parameters for reasoning models
-        temperature, top_p, max_new_tokens = self._adjust_parameters_for_reasoning(
-            temperature, top_p, max_new_tokens
-        )
         is_reasoning = self._is_reasoning_model()
 
-        # Prepare prompts for reasoning models
+        # Merge system prompt into user prompts for reasoning models
         if is_reasoning and system_prompt is not None:
             prompts = [system_prompt + "\n" + p for p in prompts]
 
         completion = await self._vllm_client.completions.create(
             model=self._llm_name,
             prompt=prompts,
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_new_tokens,
             **kwargs
         )
 
@@ -381,11 +472,8 @@ class GeneratorMixin:
         results = []
         for c in completion.choices:
             response, reasoning = c.text, None
-            print(f"Raw response: {response}")
-
             if is_reasoning:
                 response, reasoning = self._parse_reasoning_response(response)
-
             results.append(GenericResponse(
                 response,
                 completion.usage.prompt_tokens // len(prompts),
@@ -396,16 +484,7 @@ class GeneratorMixin:
         return results
 
 
-    def _generate_gemini(
-            self,
-            prompt: str,
-            system_prompt: str,
-            max_new_tokens: int = 2048,
-            temperature: Optional[float] = None,
-            top_p: Optional[float] = None,
-            n: int = 1,
-            **kwargs
-    ) -> List[GenericResponse]:
+    def _generate_gemini(self, prompt: str, system_prompt: str, **kwargs) -> List[GenericResponse]:
         """ Generate text using the Gemini API.
         """
         import google.generativeai as genai
@@ -420,28 +499,14 @@ class GeneratorMixin:
 
         response = self._gemini_client.generate_content(
             prompt,
-            generation_config=genai.types.GenerationConfig(
-                candidate_count=1,
-                max_output_tokens=max_new_tokens,
-                temperature=temperature,
-                top_p=top_p,
-            )
+            generation_config=genai.types.GenerationConfig(candidate_count=1),
         )
         return [GenericResponse(response.text,
                                 response.usage_metadata.prompt_token_count,
                                 response.usage_metadata.candidates_token_count)]
 
 
-    def _generate_hf(
-        self,
-        prompt: str,
-        system_prompt: str,
-        max_new_tokens: int = 2048,
-        temperature: Optional[float] = None,
-        top_p: Optional[float] = None,
-        n: int = 1,
-        **kwargs
-    ) -> List[GenericResponse]:
+    def _generate_hf(self, prompt: str, system_prompt: str, **kwargs) -> List[GenericResponse]:
         """ Generate text using the Hugging Face API.
         """
         if not self._hf_inference_client:
@@ -450,10 +515,6 @@ class GeneratorMixin:
         response = self._hf_inference_client.chat.completions.create(
             model=self._llm_name,
             messages=self._format_messages_list(prompt, system_prompt),
-            max_tokens=max_new_tokens,
-            temperature=temperature,
-            top_p=top_p,
-            n=1,
             **kwargs
         )
 
@@ -463,6 +524,31 @@ class GeneratorMixin:
         return [GenericResponse(response.choices[0].message.content,
                                 response.usage.prompt_tokens,
                                 response.usage.completion_tokens)]
+
+
+    def get_token_count(self, prompt: str, default_encoding: str = "o200k_base") -> int:
+        """Return the number of tokens in the prompt according to tiktoken.
+
+        Uses the model-specific encoding if available, falling back to default_encoding.
+        """
+        import tiktoken
+        if self._encoder is None:
+            encoder = tiktoken.get_encoding(default_encoding)
+            return len(encoder.encode(prompt, disallowed_special=()))
+        return len(self._encoder.encode(prompt, disallowed_special=()))
+
+
+    def get_max_tokens(self) -> int:
+        """Return the effective maximum number of input tokens for the current model.
+
+        Reserves _REASONING_OUTPUT_RESERVE tokens from the true maximum for reasoning
+        and output, matching keet's implementation.
+        """
+        if "gpt-5" in self._llm_name:
+            if "thinking" in self._llm_name:
+                return 196000 - self._REASONING_OUTPUT_RESERVE
+            return 272000 - self._REASONING_OUTPUT_RESERVE
+        return self._MAX_TOKEN_COUNT - self._REASONING_OUTPUT_RESERVE
 
 
     @property
@@ -547,9 +633,6 @@ class GeneratorMixin:
             self,
             prompts: List[str],
             system_prompt: Optional[str] = None,
-            max_new_tokens: int = 2048,
-            temperature: Optional[float] = None,
-            top_p: Optional[float] = None,
             **kwargs
     ) -> List[GenericResponse]:
         """ Generate text using the specified backend in async mode.
@@ -563,16 +646,13 @@ class GeneratorMixin:
 
         # Fall back to synchronous generation for non-async backends or single prompts
         if not self._async_mode or len(prompts) < 2 or self._backend != "vllm":
-            return [self.generate(p, system_prompt, max_new_tokens, temperature, top_p, **kwargs)[0]
-                   for p in prompts]
+            return [self.generate(p, system_prompt, **kwargs)[0] for p in prompts]
 
-        # Use async vLLM generation for multiple prompts
-        batch = asyncio.run(self._generate_vllm_async(
-            prompts, system_prompt, max_new_tokens, temperature, top_p, **kwargs
-        ))
+        # Use async vLLM batch generation for multiple prompts
+        batch = asyncio.run(self._generate_vllm_async(prompts, system_prompt, **kwargs))
 
         # Update token counts
-        self._update_token_counts(batch, len(batch))
+        self._update_token_counts(batch)
         return batch
 
 
@@ -585,34 +665,31 @@ class GeneratorMixin:
 
 
     def _handle_generation_error(self, error: Exception, attempt: int) -> None:
-        """Handle generation errors with retry logic."""
+        """Handle generation errors with exponential backoff retry logic."""
+        cooldown = BASE_COOLDOWN * (2 ** (attempt - 1))
         print(f"{type(error)} when generating response:")
         print(error)
-        print(f"Attempt {attempt} of {MAX_ATTEMPTS}, retrying in {RETRY_DELAY} seconds...")
-        time.sleep(RETRY_DELAY)
+        print(f"Attempt {attempt} of {MAX_ATTEMPTS}, retrying in {cooldown} seconds...")
+        time.sleep(cooldown)
 
         if attempt == MAX_ATTEMPTS:
             raise RuntimeError("Max attempts reached, unable to generate response.") from error
 
 
-    def _update_token_counts(self, responses: List[GenericResponse], n: int) -> None:
+    def _update_token_counts(self, responses: List[GenericResponse]) -> None:
         """Update internal token and request counts."""
         in_tokens = int(sum(r.prompt_tokens for r in responses))
         out_tokens = int(sum(r.completion_tokens for r in responses))
 
         self._input_token_count += in_tokens
         self._output_token_count += out_tokens
-        self._request_count += n
+        self._request_count += len(responses)
 
 
     def generate(
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        max_new_tokens: int = 2048,
-        temperature: Optional[float] = None,
-        top_p: Optional[float] = None,
-        n: int = 1,
         **kwargs
     ) -> List[GenericResponse]:
         """ Generate text using the specified backend.
@@ -635,9 +712,7 @@ class GeneratorMixin:
             try:
                 # Generate response
                 start_time = time.time()
-                responses = self._generator(
-                    prompt, system_prompt, max_new_tokens, temperature, top_p, n, **kwargs
-                )
+                responses = self._generator(prompt, system_prompt, **kwargs)
 
                 # Add request to recent requests for rate limiting
                 if self._rpm_limit is not None:
@@ -646,7 +721,7 @@ class GeneratorMixin:
                         self._recent_requests.append((start_time, out_tokens))
 
                 # Update token counts and return
-                self._update_token_counts(responses, n)
+                self._update_token_counts(responses)
                 return responses
 
             except google.api_core.exceptions.GoogleAPIError as e:
