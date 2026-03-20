@@ -8,6 +8,7 @@
 """
 # std imports
 from argparse import ArgumentParser
+import logging
 import os
 import json
 import shutil
@@ -18,6 +19,9 @@ from repo import Repo
 from naive.naive_translator import NaiveTranslator
 from top_down_agentic.top_down_agentic import TopDownAgenticTranslator
 from swe_agent.swe_agent_translator import SWEAgentTranslator
+
+logger = logging.getLogger("pareval-repo")
+
 
 def get_args():
     parser = ArgumentParser(description=__doc__)
@@ -35,6 +39,9 @@ def get_args():
     parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
     parser.add_argument("--hide-progress", action="store_true", help="Hide the progress bar.")
     parser.add_argument("--tar-outputs", action="store_true", help="Create a tarball of the output directories.")
+    parser.add_argument("-l", "--log-level", type=str, default="INFO",
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help="Logging level (default: INFO).")
 
     # GeneratorMixin arguments shared across all LLM-based translation methods
     parser.add_argument("--api-key", type=str, default=None,
@@ -74,6 +81,14 @@ def get_translator_cls(method: str):
 
 def main():
     args = get_args()
+
+    # Configure the package logger
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
+    ))
+    logger.addHandler(_handler)
+    logger.setLevel(getattr(logging, args.log_level))
 
     # check if the input directory exists
     if not os.path.exists(args.input):
@@ -137,7 +152,7 @@ def main():
             if os.path.exists(output_dir):
                 create_tarball(output_dir)
             else:
-                print(f"Output directory {output_dir} does not exist. Skipping tarball creation.")
+                logger.warning("Output directory %s does not exist. Skipping tarball creation.", output_dir)
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):

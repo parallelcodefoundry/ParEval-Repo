@@ -4,9 +4,12 @@ This agent is responsible for gathering context from already-translated files
 to help with the translation of subsequent files in the dependency chain.
 """
 
+import logging
 import os
 from typing import List, Optional, Union
 from generator_mixin import GeneratorMixin
+
+logger = logging.getLogger("pareval-repo")
 from .dependency_agent import FileNode
 from .utils import read_file_safely
 
@@ -42,7 +45,7 @@ class ContextAgent:
         Returns:
             List of context strings for each output path
         """
-        print("Extracting context for dependent files...")
+        logger.debug("Extracting context from %d dependent file(s)...", len(dependencies))
 
         if not dependencies:
             return ["" for _ in self._output_paths]
@@ -100,7 +103,7 @@ class ContextAgent:
             response_obs = self._generator.generate_async(prompts)
             return [r.response.strip() if r.response else "" for r in response_obs]
         except Exception as e:
-            print(f"Error generating contexts: {e}")
+            logger.error("Error generating contexts: %s", e)
             return ["" for _ in prompts]
 
 

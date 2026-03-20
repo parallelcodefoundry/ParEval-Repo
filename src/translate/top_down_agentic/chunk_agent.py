@@ -4,9 +4,12 @@ This agent handles the splitting of large source code files into manageable chun
 that can be processed by LLMs within token limits.
 """
 
+import logging
 from typing import List, Union, Optional
 import os
 from math import ceil
+
+logger = logging.getLogger("pareval-repo")
 
 # Third-party imports
 from langchain_text_splitters import Language
@@ -72,14 +75,14 @@ class ChunkFileAgent:
             return [""]
 
         if self._is_too_long(source_code):
-            print("Chunking file...")
+            logger.debug("File exceeds token limit; chunking...")
             try:
                 docs = self._splitter.create_documents([source_code])
                 chunks = [doc.page_content for doc in docs]
-                print(f"Split into {len(chunks)} chunks")
+                logger.debug("Split into %d chunks.", len(chunks))
                 return chunks
             except Exception as e:
-                print(f"Error chunking file: {e}")
+                logger.warning("Error chunking file: %s", e)
                 # Fallback: return original code if chunking fails
                 return [source_code]
 

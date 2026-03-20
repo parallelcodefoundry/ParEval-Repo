@@ -2,11 +2,14 @@
     as much context in the prompt as possible.
 """
 # std imports
+import logging
 import os
 import sys
 import re
 import json
 from typing import Dict, Tuple, Union, Literal, List, Optional
+
+logger = logging.getLogger("pareval-repo")
 
 # tpl imports
 from alive_progress import alive_it
@@ -242,7 +245,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             Formatted base prompt
         """
         if chunk:
-            print(chunk)  # Debug output for chunking
+            logger.debug("Chunk content:\n%s", chunk)
             return nc.CHUNK_PROMPT_TEMPLATE.format(
                 src_model=self._src_model,
                 dst_model=self._dst_model,
@@ -374,7 +377,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """
         match = CODE_BLOCK_PATTERN.search(output)
         if match is None:
-            print(f"No code block found in output:\n{output}")
+            logger.warning("No code block found in output:\n%s", output)
             return None
         return match.group(1)
 
@@ -477,9 +480,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
             with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
                 json.dump(exp_meta_dict, f, indent=4)
-            print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
+            logger.debug("Wrote translation experiment metadata to %s", exp_meta_fpath)
         except (OSError, json.JSONEncodeError) as e:
-            print(f"Error writing metadata file: {e}")
+            logger.error("Error writing metadata file: %s", e)
             raise
 
 
@@ -539,9 +542,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
             fpath: The file path being translated
             output_fpaths: List of output file paths
         """
-        print(prompt)
-        print(f"Skipped translation of {fpath} to " +
-              f"{output_fpaths[0]}..{output_fpaths[-1]} for dry run.")
+        logger.debug("Dry-run prompt:\n%s", prompt)
+        logger.info("Skipped translation of %s to %s..%s for dry run.",
+                    fpath, output_fpaths[0], output_fpaths[-1])
 
 
     def _process_responses(self, responses: List[GenericResponse], prompt: str,
@@ -568,7 +571,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             # Process output
             output = self._postprocess(response.response)
             if output is None:
-                print(f"Failed to translate {fpath} to {output_fpath}")
+                logger.warning("Failed to translate %s to %s.", fpath, output_fpath)
                 continue
 
             # Write to file
@@ -595,25 +598,17 @@ class NaiveTranslator(Translator, GeneratorMixin):
             with open(output_fpath, open_mode, encoding="UTF-8") as f:
                 f.write(output)
         except OSError as e:
-            print(f"Error writing file {output_fpath}: {e}")
+            logger.error("Error writing file %s: %s", output_fpath, e)
             raise
 
 
     def _print_translation_status(self, fpath: os.PathLike, output_fpath: os.PathLike,
                                  chunk: Optional[str], chunk_id: int) -> None:
-        """Print translation status message.
-
-        Args:
-            fpath: Original file path
-            output_fpath: Output file path
-            chunk: Optional chunk being translated
-            chunk_id: ID of the chunk
-        """
-        print(f"Translated {fpath} to {output_fpath}", end="")
+        """Log translation status message."""
         if chunk:
-            print(f" (chunk {chunk_id})")
+            logger.info("Translated %s to %s (chunk %d).", fpath, output_fpath, chunk_id)
         else:
-            print("")
+            logger.info("Translated %s to %s.", fpath, output_fpath)
 
 
     def translate(self) -> None:
@@ -652,9 +647,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
             repo_paths: List of repository paths
             all_files: List of files to translate
         """
-        print(f"Beginning {num_translations} batched translation(s) " +
-              f"starting from {repo_paths[0]} using {self._llm_name} with NaiveTranslator.")
-        print(f"Files to translate: {all_files}")
+        logger.info("Beginning %d batched translation(s) starting from %s using %s with NaiveTranslator.",
+                    num_translations, repo_paths[0], self._llm_name)
+        logger.debug("Files to translate: %s", all_files)
 
 
     def _translate_single_file(self, fpath: os.PathLike) -> None:
@@ -668,10 +663,10 @@ class NaiveTranslator(Translator, GeneratorMixin):
             return
 
         # Handle chunking
-        print(f"Chunking file {fpath}...")
+        logger.debug("Chunking file %s...", fpath)
         source_code = self._input_repo.get_file_contents(rel_path=fpath)
         chunks = self._chunk_agent.chunk_file(source_code)
-        print(f"Chunked {fpath} into {len(chunks)} chunks.")
+        logger.debug("Chunked %s into %d chunk(s).", fpath, len(chunks))
 
         if len(chunks) > 1:
             for i, chunk in enumerate(chunks):

@@ -4,10 +4,13 @@ This module contains shared utilities, constants, and helper functions
 used across the different agent classes to reduce code duplication.
 """
 
+import logging
 import os
 import re
 from typing import List, Optional, Union, Dict, Any
 from enum import Enum
+
+logger = logging.getLogger("pareval-repo")
 
 
 class FileType(Enum):
@@ -68,7 +71,7 @@ def extract_code_block(output: str) -> Optional[str]:
     CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
     match = CODE_BLOCK_PATTERN.search(output)
     if match is None:
-        print(f"No code block found in output:\n{output}")
+        logger.warning("No code block found in output:\n%s", output)
         return None
     return match.group(1)
 
@@ -88,7 +91,7 @@ def read_file_safely(file_path: Union[str, os.PathLike], encoding: str = "UTF-8"
     except FileNotFoundError:
         return ""
     except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
+        logger.error("Error reading file %s: %s", file_path, e)
         return ""
 
 
@@ -100,7 +103,7 @@ def write_file_safely(file_path: Union[str, os.PathLike], contents: str, encodin
             f.write(contents)
         return True
     except Exception as e:
-        print(f"Error writing file {file_path}: {e}")
+        logger.error("Error writing file %s: %s", file_path, e)
         return False
 
 

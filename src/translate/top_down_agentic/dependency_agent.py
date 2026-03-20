@@ -13,6 +13,8 @@ Date: November 2024
 import logging
 import os
 import subprocess
+
+logger = logging.getLogger("pareval-repo")
 from glob import glob
 from typing import List, Optional, Union, Callable
 from graphlib import TopologicalSorter, CycleError
@@ -193,7 +195,7 @@ class DependencyAgent:
         Returns:
             List of dependencies or None if failed
         """
-        print(f"Getting dependencies for {source_file} using clang -MM")
+        logger.debug("Getting dependencies for %s using clang -MM", source_file)
 
         compiler = self._get_compiler_for_file(source_file)
         if not compiler:
@@ -230,7 +232,7 @@ class DependencyAgent:
             for d in include_dirs:
                 cmd.append(f"-I{d}")
         except OSError as e:
-            logging.warning(f"Could not list directories in {repo_path}: {e}")
+            logger.warning("Could not list directories in %s: %s", repo_path, e)
 
         return cmd
 
@@ -247,7 +249,7 @@ class DependencyAgent:
             )
 
             if run_result.returncode != 0:
-                print(f"Error running command: {run_result.stderr}")
+                logger.warning("clang -MM failed: %s", run_result.stderr.strip())
                 return None
 
             deps = run_result.stdout.strip()
@@ -261,7 +263,7 @@ class DependencyAgent:
             return []
 
         except Exception as e:
-            logging.error(f"Error running clang command: {e}")
+            logger.error("Error running clang command: %s", e)
             return None
 
 
@@ -278,10 +280,10 @@ class DependencyAgent:
         Returns:
             List of dependencies or None if failed
         """
-        print(f"Getting dependencies for {source_file} using LLM")
+        logger.debug("Getting dependencies for %s using LLM", source_file)
 
         if source_files is None:
-            logging.warning("No source files provided to LLM")
+            logger.warning("No source files provided to LLM dependency analysis.")
             source_files = [""]
 
         try:
@@ -298,7 +300,7 @@ class DependencyAgent:
             return deps
 
         except Exception as e:
-            logging.error(f"Error getting LLM dependencies for {source_file}: {e}")
+            logger.error("Error getting LLM dependencies for %s: %s", source_file, e)
             return None
 
 
@@ -309,7 +311,7 @@ class DependencyAgent:
                 lines = f.readlines()[:num_lines]
                 return "```\n" + "".join(lines) + "\n```"
         except Exception as e:
-            logging.error(f"Error reading file {source_file}: {e}")
+            logger.error("Error reading file %s: %s", source_file, e)
             return "```\n```"
 
 
@@ -332,7 +334,7 @@ class DependencyAgent:
         """Parse the LLM response to extract dependencies."""
         deps = response.strip().split("\n")
         deps = [dep.strip() for dep in deps if dep.strip()]
-        print(f"LLM identified dependencies: {format_dependency_list(deps)}")
+        logger.debug("LLM identified dependencies: %s", format_dependency_list(deps))
         return deps
 
 
@@ -349,7 +351,7 @@ class DependencyAgent:
                     f.write(f"Prompt:\n{prompt}\n")
                     f.write(f"Dependencies:\n{format_dependency_list(deps)}\n\n")
             except Exception as e:
-                logging.warning(f"Could not log interaction to {path}: {e}")
+                logger.warning("Could not log interaction to %s: %s", path, e)
 
 
     def get_source_file_dependencies(self, source_file: Union[str, os.PathLike],
@@ -376,7 +378,7 @@ class DependencyAgent:
         if deps is not None:
             return [os.path.join(repo_path, dep) for dep in deps]
 
-        logging.warning("Could not get dependencies for %s", source_file)
+        logger.warning("Could not get dependencies for %s", source_file)
         return None
 
 
@@ -402,8 +404,8 @@ class DependencyAgent:
         # Construct the graph
         roots = self._construct_file_nodes(sorted_files, dependencies)
 
-        print(f"Constructed dependency graph with {len(roots)} roots")
-        print(f"Roots: {[root.rel_path for root in roots]}")
+        logger.debug("Constructed dependency graph with %d root(s): %s",
+                     len(roots), [root.rel_path for root in roots])
         return roots
 
 
@@ -413,8 +415,8 @@ class DependencyAgent:
         build_files = self.get_all_build_files(repo_path)
         all_files = list(set(source_files + build_files))
 
-        print(f"Source files: {source_files}")
-        print(f"Build files: {build_files}")
+        logger.debug("Source files: %s", source_files)
+        logger.debug("Build files: %s", build_files)
 
         return source_files, build_files, all_files
 

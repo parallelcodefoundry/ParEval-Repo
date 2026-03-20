@@ -11,11 +11,14 @@ Author: Daniel Nichols
 Date: November 2024
 """
 
+import logging
 import os
 import sys
 import json
 from typing import Dict, Literal, Optional, List, Union, Tuple
 import re
+
+logger = logging.getLogger("pareval-repo")
 
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -226,7 +229,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
         success = write_file_safely(output_file_path, contents)
         if success:
-            print(f"Wrote file {output_file_path}")
+            logger.debug("Wrote file %s.", output_file_path)
         return success
 
 
@@ -255,11 +258,11 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
             success = write_file_safely(exp_meta_fpath, json.dumps(exp_meta_dict, indent=4))
             if success:
-                print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
+                logger.debug("Wrote translation experiment metadata to %s.", exp_meta_fpath)
             return success
 
         except Exception as e:
-            print(f"Error writing metadata: {e}")
+            logger.error("Error writing metadata: %s", e)
             return False
 
 
@@ -286,12 +289,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
                     f.write("RESPONSE:\n")
                     f.write(responses[i] + "\n\n")
             except Exception as e:
-                print(f"Error logging interaction to {output_path}: {e}")
+                logger.error("Error logging interaction to %s: %s", output_path, e)
 
 
     def translate(self):
         """Use the top-down method to translate the entire repository."""
-        print(f"Constructing dependency graph on {self._input_repo.path}...")
+        logger.info("Constructing dependency graph on %s...", self._input_repo.path)
 
         # Build dependency graph and prepare for translation
         dep_graph = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
@@ -336,7 +339,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             graph: Optional dependency graph for build files
             tree: Optional file tree for build files
         """
-        print(f"Translating file {node.rel_path}...")
+        logger.info("Translating file %s...", node.rel_path)
 
         # Get source code and context
         source_code = self._read_file(node.rel_path)
@@ -349,6 +352,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
         # Write translations to output files
         self._write_translations(node, translations, trigger_rename)
+        logger.debug("Completed translation of %s.", node.rel_path)
 
 
     def _translate_file_content(self, source_code: str, contexts: List[str],
@@ -367,7 +371,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
                                node: FileNode, graph: Optional[List[FileNode]] = None,
                                tree: Optional[str] = None) -> Tuple[List[str], Optional[str]]:
         """Translate a single chunk of code."""
-        print("Requesting whole file translation...")
+        logger.debug("Requesting whole-file translation.")
         responses, trigger_rename = self._get_translations(contexts, chunk, node, graph, tree)
         translations = [extract_code_block(response) for response in responses]
         return translations, trigger_rename
@@ -382,7 +386,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
         trigger_rename = None
 
         for i, chunk in enumerate(chunks):
-            print(f"Requesting chunk translation... [{i + 1}/{len(chunks)}]")
+            logger.debug("Requesting chunk translation [%d/%d].", i + 1, len(chunks))
             responses, trigger_rename = self._get_translations(
                 contexts, chunk, node, graph, tree, prev_chunks=prev_chunks
             )

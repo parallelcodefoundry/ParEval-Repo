@@ -3,6 +3,7 @@
     author: Daniel Nichols
     date: November 2024
 """
+import logging
 import os
 import sys
 import time
@@ -13,6 +14,8 @@ from pathlib import Path
 from typing import Optional, Literal, Callable, List, Tuple, Dict, Union, Any
 from math import ceil
 from dataclasses import dataclass
+
+logger = logging.getLogger("pareval-repo")
 
 @dataclass
 class GenericResponse:
@@ -251,7 +254,7 @@ class GeneratorMixin:
         while num_attempts < VLLM_MAX_SERVE_CHECK_ATTEMPTS:
             if self._test_vllm_server():
                 return
-            print(f"vLLM server not ready, checking again after {VLLM_SERVE_CHECK_COOLDOWN} seconds...")
+            logger.info("vLLM server not ready, checking again after %d seconds...", VLLM_SERVE_CHECK_COOLDOWN)
             time.sleep(VLLM_SERVE_CHECK_COOLDOWN)
             num_attempts += 1
         raise RuntimeError("vLLM server not ready after max attempts.")
@@ -295,7 +298,7 @@ class GeneratorMixin:
         if yaml_config:
             vllm_command.extend(["--config", yaml_config])
 
-        print(f"Launching vLLM server: {' '.join(vllm_command)}")
+        logger.info("Launching vLLM server: %s", " ".join(vllm_command))
         vllm_server = subprocess.Popen(
             vllm_command,
             start_new_session=(keepalive_id is not None),
@@ -309,7 +312,7 @@ class GeneratorMixin:
         else:
             atexit.register(vllm_server.terminate)
 
-        print("vLLM server ready.")
+        logger.info("vLLM server ready.")
         return vllm_server
 
 
@@ -350,7 +353,7 @@ class GeneratorMixin:
         try:
             with open(f".request_cache_{self._backend}.pkl", "rb") as f:
                 self._recent_requests = pickle.load(f)
-                print(f"Loaded {len(self._recent_requests)} recent requests from cache.")
+                logger.debug("Loaded %d recent requests from cache.", len(self._recent_requests))
         except FileNotFoundError:
             pass
 
@@ -420,7 +423,7 @@ class GeneratorMixin:
                 response = self._vllm_client.responses.create(**gen_kwargs)
                 break
             except (TimeoutError, APITimeoutError) as e:
-                print(f"vLLM request timeout ({e}), retrying...")
+                logger.warning("vLLM request timeout (%s), retrying...", e)
                 time.sleep(BASE_COOLDOWN)
                 continue
         else:
@@ -588,10 +591,10 @@ class GeneratorMixin:
     def print_stats(self):
         """ Print the current statistics for the generator.
         """
-        print(f"Input token count: {self._input_token_count}")
-        print(f"Output token count: {self._output_token_count}")
-        print(f"Total token count: {self._input_token_count + self._output_token_count}")
-        print(f"Request count: {self._request_count}")
+        logger.info("Input token count: %d", self._input_token_count)
+        logger.info("Output token count: %d", self._output_token_count)
+        logger.info("Total token count: %d", self._input_token_count + self._output_token_count)
+        logger.info("Request count: %d", self._request_count)
 
 
     def _enforce_limits(self) -> None:
@@ -607,7 +610,7 @@ class GeneratorMixin:
 
         wait_time = time.time() - self._recent_requests[0][0]
         if wait_time < CACHE_RETENTION_TIME:
-            print(f"Request limit met, waiting {ceil(CACHE_RETENTION_TIME - wait_time)} seconds...")
+            logger.warning("Request limit met, waiting %d seconds...", ceil(CACHE_RETENTION_TIME - wait_time))
 
         while time.time() - self._recent_requests[0][0] < CACHE_RETENTION_TIME:
             time.sleep(1)
@@ -622,7 +625,7 @@ class GeneratorMixin:
         while sum(out_tokens for _, out_tokens in self._recent_requests) >= self._tpm_limit:
             wait_time = time.time() - self._recent_requests[0][0]
             if wait_time < CACHE_RETENTION_TIME:
-                print(f"Token limit met, waiting {ceil(CACHE_RETENTION_TIME - wait_time)} seconds...")
+                logger.warning("Token limit met, waiting %d seconds...", ceil(CACHE_RETENTION_TIME - wait_time))
 
             while time.time() - self._recent_requests[0][0] < CACHE_RETENTION_TIME:
                 time.sleep(1)
@@ -638,7 +641,7 @@ class GeneratorMixin:
         """ Generate text using the specified backend in async mode.
         """
         import asyncio
-        print("Generating in async mode...")
+        logger.debug("Generating %d prompts in async mode.", len(prompts))
 
         # Set system prompt if not provided
         if self._system_prompt is not None and system_prompt is None:
@@ -667,9 +670,8 @@ class GeneratorMixin:
     def _handle_generation_error(self, error: Exception, attempt: int) -> None:
         """Handle generation errors with exponential backoff retry logic."""
         cooldown = BASE_COOLDOWN * (2 ** (attempt - 1))
-        print(f"{type(error)} when generating response:")
-        print(error)
-        print(f"Attempt {attempt} of {MAX_ATTEMPTS}, retrying in {cooldown} seconds...")
+        logger.warning("%s when generating response: %s — attempt %d of %d, retrying in %d seconds...",
+                       type(error).__name__, error, attempt, MAX_ATTEMPTS, cooldown)
         time.sleep(cooldown)
 
         if attempt == MAX_ATTEMPTS:
@@ -722,6 +724,9 @@ class GeneratorMixin:
 
                 # Update token counts and return
                 self._update_token_counts(responses)
+                logger.debug("Generation complete: %d prompt tokens, %d completion tokens.",
+                             int(sum(r.prompt_tokens for r in responses)),
+                             int(sum(r.completion_tokens for r in responses)))
                 return responses
 
             except google.api_core.exceptions.GoogleAPIError as e:
