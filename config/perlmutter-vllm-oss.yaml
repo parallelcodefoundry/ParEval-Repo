@@ -1,0 +1,12 @@
+# vLLM config file for Perlmutter when using openai/gpt-oss-120b
+
+tensor-parallel-size: 4
+async-scheduling: true
+no-enable-prefix-caching: true
+max-model-len: 131072
+gpu-memory-utilization: 0.95
+max-num-seqs: 4
+max-num-batched-tokens: 2048
+tool-call-parser: openai
+reasoning-parser: openai_gptoss
+enable-auto-tool-choice: true

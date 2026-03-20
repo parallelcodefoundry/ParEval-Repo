@@ -1,0 +1,10 @@
+# vLLM config file for Perlmutter when using nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
+
+tensor-parallel-size: 4
+max-model-len: 262144
+max-num-seqs: 8
+reasoning-parser-plugin: config/nano_v3_reasoning_parser.py
+reasoning-parser: nano_v3
+enable-auto-tool-choice: true
+tool-call-parser: qwen3_coder
+trust-remote-code: true

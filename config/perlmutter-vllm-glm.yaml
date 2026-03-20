@@ -1,0 +1,8 @@
+# vLLM config file for Perlmutter when using GLM-4.7-GGUF:Q4_K_M
+
+tensor-parallel-size: 4
+max-model-len: 131072
+max-num-seqs: 2
+enable-auto-tool-choice: true
+tool-call-parser: glm45
+reasoning-parser: glm45
