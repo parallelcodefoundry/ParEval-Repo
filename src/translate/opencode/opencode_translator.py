@@ -300,6 +300,7 @@ class OpenCodeTranslator(Translator):
                 "build": {"temperature": self._temperature},
                 "plan": {"temperature": self._temperature},
             },
+            "tools": {"*": True},
             "provider": {
                 self._provider_id: {
                     "npm": "@ai-sdk/openai-compatible",
@@ -310,7 +311,11 @@ class OpenCodeTranslator(Translator):
                     },
                     "models": {
                         self._model_id: {
+                            "id": self._model_id,
                             "name": f"{self._model_id} via vLLM",
+                            "reasoning": True,
+                            "tool_call": True,
+                            "tools": True,
                             "capabilities": {"temperature": True},
                         }
                     },
