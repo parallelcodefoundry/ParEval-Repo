@@ -133,6 +133,7 @@ class CodexTranslator(Translator):
             self.save_output(self._output_path)
             self.remove_unnecessary_output_files()
             self.write_experiment_metadata()
+            self._save_codex_log()
         else:
             print("Translation failed.")
 
@@ -209,22 +210,29 @@ class CodexTranslator(Translator):
         print(f"Running Codex command: {' '.join(command[:4])} ...")
 
         try:
-            subprocess.run(command, text=True, cwd=self._temp_repo_path, env=env, check=True)
+            result = subprocess.run(
+                command, text=True, cwd=self._temp_repo_path, env=env,
+                check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            self._codex_log = result.stdout
+            print(self._codex_log)
             print("Codex command executed successfully.")
             return True
+        except subprocess.CalledProcessError as e:
+            self._codex_log = e.stdout or ""
+            print(self._codex_log)
+            print(f"An error occurred running Codex: {e}")
+            return False
         except Exception as e:
+            self._codex_log = ""
             print(f"An error occurred running Codex: {e}")
             return False
 
     def _build_codex_command(self, prompt: str) -> List[str]:
         """Build the Codex CLI command with all required parameters."""
-        cmd = ["codex", "exec", "--sandbox", "workspace-write"]
+        cmd = ["codex", "exec", "--sandbox", "danger-full-access"]
         if self._codex_model_name:
-            # Strip "openai/" prefix: Codex CLI interprets it as a signal to
-            # use the OpenAI Responses API (type:"custom" tools), which vLLM
-            # does not support.  The bare model name is sufficient for vLLM.
-            model_for_codex = self._codex_model_name.removeprefix("openai/")
-            cmd.extend(["--model", model_for_codex])
+            cmd.extend(["--model", self._codex_model_name])
         cmd.append(prompt)
         return cmd
 
@@ -238,7 +246,7 @@ class CodexTranslator(Translator):
             env["OPENAI_BASE_URL"] = base_url
             env["OPENAI_API_BASE"] = base_url
         if "OPENAI_API_KEY" not in env:
-            env["OPENAI_API_KEY"] = "dummy-local-key"
+            env["OPENAI_API_KEY"] = "dummy-local-ok"
         # Prevent interactive pagers from blocking Codex when it runs
         # git log, man, or other pager-triggering commands internally.
         env.setdefault("PAGER", "cat")
@@ -354,6 +362,16 @@ class CodexTranslator(Translator):
             "output_number": output_number,
             "path": self._output_path,
         }
+
+    def _save_codex_log(self) -> None:
+        """Save the captured Codex CLI output to a log file in the output directory."""
+        log_path = os.path.join(self._output_path, "..", "codex_log.txt")
+        try:
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(getattr(self, "_codex_log", ""))
+            print(f"Codex log saved to {log_path}")
+        except OSError as e:
+            print(f"Error saving Codex log: {e}")
 
     def cleanup_temp_repo(self) -> None:
         """Remove the temporary repository."""
