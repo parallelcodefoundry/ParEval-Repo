@@ -210,21 +210,23 @@ class CodexTranslator(Translator):
         print(f"Running Codex command: {' '.join(command[:4])} ...")
 
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 command, text=True, cwd=self._temp_repo_path, env=env,
-                check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             )
-            self._codex_log = result.stdout
-            print(self._codex_log)
+            log_lines = []
+            for line in proc.stdout:
+                print(line, end="", flush=True)
+                log_lines.append(line)
+            proc.wait()
+            self._codex_log = "".join(log_lines)
+            if proc.returncode != 0:
+                print(f"Codex exited with return code {proc.returncode}")
+                return False
             print("Codex command executed successfully.")
             return True
-        except subprocess.CalledProcessError as e:
-            self._codex_log = e.stdout or ""
-            print(self._codex_log)
-            print(f"An error occurred running Codex: {e}")
-            return False
         except Exception as e:
-            self._codex_log = ""
+            self._codex_log = "".join(log_lines) if 'log_lines' in dir() else ""
             print(f"An error occurred running Codex: {e}")
             return False
 
