@@ -58,7 +58,6 @@ class OpenCodeTranslator(Translator):
     _provider_id: str
     _model_id: str
     _provider_base_url: str
-    _temperature: float
     _xdg_scratch_dir: str
     _vllm_environment: Optional[str]
     _vllm_yaml_config: Optional[str]
@@ -79,8 +78,7 @@ class OpenCodeTranslator(Translator):
         dry: bool = False,
         hide_progress: bool = False,
         opencode_model_name: str = "localvllm/openai/gpt-oss-120b",
-        opencode_provider_base_url: str = "http://127.0.0.1:8000/v1",
-        opencode_temperature: float = 0.7,
+        opencode_provider_base_url: str = "http://127.0.0.1:8008/v1",
         opencode_xdg_scratch_dir: Optional[str] = None,
         opencode_vllm_environment: Optional[str] = None,
         opencode_vllm_yaml_config: Optional[str] = None,
@@ -99,7 +97,6 @@ class OpenCodeTranslator(Translator):
         self._opencode_model_name = opencode_model_name
         self._provider_id, self._model_id = _parse_provider_model(opencode_model_name)
         self._provider_base_url = opencode_provider_base_url
-        self._temperature = opencode_temperature
         self._xdg_scratch_dir = opencode_xdg_scratch_dir or os.environ.get("PSCRATCH", "/tmp/opencode_xdg")
         self._vllm_environment = opencode_vllm_environment
         self._vllm_yaml_config = opencode_vllm_yaml_config
@@ -127,9 +124,6 @@ class OpenCodeTranslator(Translator):
         parser.add_argument("--opencode-provider-base-url", type=str,
                             default="http://127.0.0.1:8000/v1",
                             help="Base URL of the OpenAI-compatible vLLM server (e.g. 'http://127.0.0.1:8008/v1').")
-        parser.add_argument("--opencode-temperature", type=float,
-                            default=0.7,
-                            help="Sampling temperature for OpenCode agent (0=deterministic, 0.7=balanced diversity).")
         parser.add_argument("--opencode-xdg-scratch-dir", type=str,
                             help="Base directory for OpenCode XDG data/config. Defaults to $PSCRATCH if set, else /tmp/opencode_xdg.")
         parser.add_argument("--opencode-vllm-environment", type=str,
@@ -143,7 +137,6 @@ class OpenCodeTranslator(Translator):
         return {
             "opencode_model_name": args.opencode_model_name,
             "opencode_provider_base_url": args.opencode_provider_base_url,
-            "opencode_temperature": args.opencode_temperature,
             "opencode_xdg_scratch_dir": args.opencode_xdg_scratch_dir,
             "opencode_vllm_environment": args.opencode_vllm_environment,
             "opencode_vllm_yaml_config": args.opencode_vllm_yaml_config,
@@ -243,19 +236,23 @@ class OpenCodeTranslator(Translator):
         print(f"Running OpenCode command: {' '.join(command[:4])} ...")
 
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 command, text=True, cwd=self._temp_repo_path, env=env,
-                check=True, capture_output=True
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
             )
+            log_lines = []
+            for line in proc.stdout:
+                print(line, end="", flush=True)
+                log_lines.append(line)
+            proc.wait()
+            if proc.returncode != 0:
+                print(f"OpenCode exited with non-zero status: {proc.returncode}")
+                return False
             print("OpenCode command executed successfully.")
             if self._log_interactions:
-                self._write_interaction_log(result.stdout)
+                self._write_interaction_log("".join(log_lines))
             return True
-        except subprocess.CalledProcessError as e:
-            print(f"OpenCode exited with non-zero status: {e.returncode}")
-            if e.stdout:
-                print(e.stdout[-2000:])
-            return False
         except Exception as e:
             print(f"An error occurred running OpenCode: {e}")
             return False
@@ -296,10 +293,6 @@ class OpenCodeTranslator(Translator):
         """Write opencode.json with the local vLLM provider configuration."""
         config = {
             "$schema": "https://opencode.ai/config.json",
-            "agent": {
-                "build": {"temperature": self._temperature},
-                "plan": {"temperature": self._temperature},
-            },
             "tools": {"*": True},
             "provider": {
                 self._provider_id: {
