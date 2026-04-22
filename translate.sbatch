@@ -34,7 +34,7 @@ for method in "${methods[@]}"; do
                     -c "targets/${app_name}/${dst_model}/" \
                     --method "${method}" \
                     --src-model "${src_model}" \
-                    --dst-mode "${dst_model}" \
+                    --dst-model "${dst_model}" \
                     -n 1 \
                     --output-id "${i}" \
                     --app-name "${app_name}" \
