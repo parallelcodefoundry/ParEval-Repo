@@ -232,7 +232,7 @@ class CodexTranslator(Translator):
 
     def _build_codex_command(self, prompt: str) -> List[str]:
         """Build the Codex CLI command with all required parameters."""
-        cmd = ["codex", "exec", "--sandbox", "danger-full-access"]
+        cmd = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox"]
         if self._codex_model_name:
             cmd.extend(["--model", self._codex_model_name])
         cmd.append(prompt)
