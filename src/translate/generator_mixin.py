@@ -451,35 +451,32 @@ class GeneratorMixin:
             system_prompt: str | None,
             **kwargs
     ) -> list[GenericResponse]:
-        """ Generate text using the vLLM via the OpenAI completions API in async batch mode.
+        """Generate text using vLLM via the OpenAI Responses API in async batch mode.
         """
+        import asyncio
         if not self._vllm_client:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
-        # Merge system prompt into user prompts
-        if system_prompt is not None:
-            prompts = [system_prompt + "\n" + p for p in prompts]
+        async def _generate_single(prompt: str) -> GenericResponse:
+            messages = self._format_messages_list(prompt, system_prompt)
+            gen_kwargs: dict[str, Any] = {"model": self._llm_name, "input": messages, **kwargs}
+            if "gpt-oss" in self._llm_name:
+                gen_kwargs["reasoning"] = {"effort": "high"}
 
-        completion = await self._vllm_client.completions.create(
-            model=self._llm_name,
-            prompt=prompts,
-            **kwargs
-        )
+            response_obj = await self._vllm_client.responses.create(**gen_kwargs)
 
-        if not (completion and completion.choices):
-            raise ValueError("No completions returned from vLLM.")
-
-        results = []
-        for c in completion.choices:
-            response, reasoning = c.text, None
+            response_text, reasoning = response_obj.output_text, None
             if self._is_reasoning_model():
-                response, reasoning = self._parse_reasoning_response(response)
-            results.append(GenericResponse(
-                response,
-                completion.usage.prompt_tokens // len(prompts),
-                completion.usage.completion_tokens // len(prompts),
+                response_text, reasoning = self._parse_reasoning_response(response_text)
+
+            return GenericResponse(
+                response_text,
+                response_obj.usage.input_tokens if response_obj.usage else 0,
+                response_obj.usage.output_tokens if response_obj.usage else 0,
                 reasoning
-            ))
+            )
+
+        results = await asyncio.gather(*(_generate_single(prompt) for prompt in prompts))
 
         return results
 
