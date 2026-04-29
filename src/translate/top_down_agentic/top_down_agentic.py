@@ -16,9 +16,7 @@ import os
 import sys
 import json
 from typing import Dict, Literal, Optional, List, Union, Tuple
-import re
-
-logger = logging.getLogger("pareval-repo")
+from pathlib import Path
 
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -40,6 +38,7 @@ from repo import Repo
 # Third-party imports
 from alive_progress import alive_it
 
+logger = logging.getLogger("pareval-repo")
 
 class TopDownAgenticTranslator(Translator, GeneratorMixin):
     """Translator for entire repositories using the top-down agent method."""
@@ -47,7 +46,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
     def __init__(
             self,
             input_repo: Repo,
-            output_repos: List[Union[str, os.PathLike]],
+            output_repos: List[os.PathLike],
             src_model: str,
             dst_model: str,
             dst_config: dict,
@@ -60,7 +59,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             api_base_url: Optional[str] = None,
             vllm_environment: Optional[str] = None,
             vllm_yaml_config: Optional[str] = None,
-            vllm_keepalive_id: Optional[int] = None,
+            vllm_keepalive_id: Optional[str] = None,
     ):
         """Initialize the top-down agent translator.
 
@@ -107,7 +106,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
         if not self._log_interactions:
             return None
 
-        interactions_paths = []
+        interactions_paths: List[str | os.PathLike] = []
         for output_repo in self._output_paths:
             interactions_path = os.path.join(output_repo, "interactions.txt")
             interactions_paths.append(interactions_path)

@@ -8,8 +8,7 @@ import sys
 import re
 import json
 from typing import Dict, Tuple, Union, Literal, List, Optional
-
-logger = logging.getLogger("pareval-repo")
+from pathlib import Path
 
 # tpl imports
 from alive_progress import alive_it
@@ -21,6 +20,8 @@ from generator_mixin import GeneratorMixin, GenericResponse
 from repo import Repo
 from naive import naive_constants as nc
 from top_down_agentic.chunk_agent import ChunkFileAgent
+
+logger = logging.getLogger("pareval-repo")
 
 # Constants
 DEFAULT_TERMINAL_COLS = 80
@@ -57,7 +58,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             api_base_url: Optional[str] = None,
             vllm_environment: Optional[str] = None,
             vllm_yaml_config: Optional[str] = None,
-            vllm_keepalive_id: Optional[int] = None,
+            vllm_keepalive_id: Optional[str] = None,
     ):
         # Validate inputs
         self._validate_inputs(input_repo, output_repos, src_model, dst_model,
@@ -462,7 +463,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             f.write(response + "\n\n")
 
 
-    def _write_metadata(self, repo_path: os.PathLike) -> None:
+    def _write_metadata(self, repo_path: Path) -> None:
         """Write experiment metadata to JSON file.
 
         Args:
@@ -481,7 +482,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
                 json.dump(exp_meta_dict, f, indent=4)
             logger.debug("Wrote translation experiment metadata to %s", exp_meta_fpath)
-        except (OSError, json.JSONEncodeError) as e:
+        except (OSError, UnicodeEncodeError, AttributeError, ValueError, TypeError) as e:
             logger.error("Error writing metadata file: %s", e)
             raise
 
@@ -522,7 +523,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """
         prompt, trigger_rename = self._get_prompt(fpath, chunk=chunk)
         updated_fname = self._update_file_ext(fpath, trigger_rename=trigger_rename)
-        output_fpaths = [os.path.join(rp, "repo", updated_fname) for rp in self._output_paths]
+        output_fpaths = [Path(rp) / "repo" / updated_fname for rp in self._output_paths]
 
         if self._dry:
             self._handle_dry_run(prompt, fpath, output_fpaths)
@@ -534,7 +535,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
 
     def _handle_dry_run(self, prompt: str, fpath: os.PathLike,
-                       output_fpaths: List[str]) -> None:
+                       output_fpaths: List[Path]) -> None:
         """Handle dry run mode.
 
         Args:
@@ -548,7 +549,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
 
     def _process_responses(self, responses: List[GenericResponse], prompt: str,
-                          fpath: os.PathLike, output_fpaths: List[str],
+                          fpath: os.PathLike, output_fpaths: List[Path],
                           chunk: Optional[str], chunk_id: int) -> None:
         """Process LLM responses and write to files.
 
@@ -618,9 +619,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
         in the repository, handling chunking if enabled, and generates
         experiment metadata.
         """
-        all_files = self._input_repo.get_all_filenames(relpaths=True)
+        all_files = [Path(f) for f in self._input_repo.get_all_filenames(relpaths=True)]
         num_translations = len(self._output_paths)
-        repo_paths = [os.path.join(self._output_paths[i], "repo")
+        repo_paths = [Path(self._output_paths[i]) / "repo"
                       for i in range(num_translations)]
         max_cols = self._safe_get_columns()
 
@@ -638,8 +639,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
 
     def _print_translation_start(self, num_translations: int,
-                                repo_paths: List[str],
-                                all_files: List[os.PathLike]) -> None:
+                                repo_paths: List[Path],
+                                all_files: List[Path]) -> None:
         """Print translation start information.
 
         Args:
@@ -676,7 +677,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             self._translate_file(fpath)
 
 
-    def _write_all_metadata(self, repo_paths: List[str]) -> None:
+    def _write_all_metadata(self, repo_paths: List[Path]) -> None:
         """Write experiment metadata for all repositories.
 
         Args:

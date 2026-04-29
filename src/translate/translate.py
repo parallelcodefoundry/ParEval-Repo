@@ -73,7 +73,7 @@ def get_args():
     parser.add_argument("--vllm-yaml-config", type=str, default=None,
                         help="Path to a vLLM YAML configuration file passed to the server via "
                         "--config.")
-    parser.add_argument("--vllm-keepalive-id", type=int, default=None,
+    parser.add_argument("--vllm-keepalive-id", type=str, default=None,
                         help="If set, write the vLLM server PID to a file with this ID instead of "
                         "terminating the server on exit.")
 
