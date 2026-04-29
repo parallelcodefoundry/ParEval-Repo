@@ -10,6 +10,7 @@ import time
 import pickle
 import atexit
 import subprocess
+import requests
 from pathlib import Path
 from typing import Literal, Callable, Any
 from math import ceil
@@ -238,14 +239,11 @@ class GeneratorMixin:
         if base.endswith("/v1"):
             base = base[:-3]
         health_url = base + "/health"
-        return (
-            subprocess.run(
-                ["curl", health_url],
-                capture_output=True,
-                text=True,
-                check=False,
-            ).returncode == 0
-        )
+        try:
+            response = requests.get(health_url, timeout=5)
+            return response.ok
+        except requests.RequestException:
+            return False
 
 
     def _wait_for_vllm_server(self) -> None:
