@@ -530,6 +530,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             return
 
         responses = [self.generate(prompt)[0] for _ in self._output_paths]
+        #TODO: parallelize multiple responses
 
         self._process_responses(responses, prompt, fpath, output_fpaths, chunk, chunk_id)
 
