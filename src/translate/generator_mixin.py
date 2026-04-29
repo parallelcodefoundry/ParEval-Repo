@@ -456,10 +456,8 @@ class GeneratorMixin:
         if not self._vllm_client:
             raise ValueError("vLLM (OpenAI) client not initialized.")
 
-        is_reasoning = self._is_reasoning_model()
-
-        # Merge system prompt into user prompts for reasoning models
-        if is_reasoning and system_prompt is not None:
+        # Merge system prompt into user prompts
+        if system_prompt is not None:
             prompts = [system_prompt + "\n" + p for p in prompts]
 
         completion = await self._vllm_client.completions.create(
@@ -474,7 +472,7 @@ class GeneratorMixin:
         results = []
         for c in completion.choices:
             response, reasoning = c.text, None
-            if is_reasoning:
+            if self._is_reasoning_model():
                 response, reasoning = self._parse_reasoning_response(response)
             results.append(GenericResponse(
                 response,
