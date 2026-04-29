@@ -105,11 +105,12 @@ def main():
     args = get_args()
 
     # Configure the package logger
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
-    ))
-    logger.addHandler(_handler)
+    if not logger.hasHandlers():
+        _handler = logging.StreamHandler()
+        _handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
+        ))
+        logger.addHandler(_handler)
     logger.setLevel(getattr(logging, args.log_level))
 
     # check if the input directory exists
