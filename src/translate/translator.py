@@ -6,8 +6,11 @@
 """
 # std imports
 from abc import ABC, abstractmethod
+import logging
 import os
 from typing import List
+
+logger = logging.getLogger("pareval-repo")
 
 # local imports
 from repo import Repo

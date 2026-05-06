@@ -17,3 +17,5 @@ tmp*
 
 enqueue_jobs.sh
 gen_*.slurm
+test-output/
+test-output.json
