@@ -400,9 +400,6 @@ class CodexTranslator(Translator):
         py_executable = os.path.join(environment_path, "bin", "python")
         vllm_command = [
             py_executable, "-m", "vllm.entrypoints.openai.api_server",
-            "--tool-call-parser", "openai",
-            "--enable-auto-tool-choice",
-            "--reasoning-parser", "openai_gptoss",
             "--host", self.VLLM_HOST,
             "--port", str(self.VLLM_PORT),
         ]

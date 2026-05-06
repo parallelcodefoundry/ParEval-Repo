@@ -27,7 +27,7 @@ DEFAULT_OPENAI_RPM = 100
 DEFAULT_OPENAI_TPM = 150000
 DEFAULT_GEMINI_RPM = 7
 DEFAULT_GEMINI_TPM = 6000
-VLLM_BASE_URL = "http://127.0.0.1:8000/v1"
+VLLM_BASE_URL = os.environ.get("OPENAI_API_BASE", "http://127.0.0.1:8000/v1")
 VLLM_API_KEY = "token_abc123"
 VLLM_TIMEOUT = 1200
 REASONING_TEMP = 0.6
@@ -617,8 +617,6 @@ class GeneratorMixin:
     ) -> List[GenericResponse]:
         """ Generate text using the specified backend.
         """
-        import google.api_core.exceptions
-
         self._check_limits()
 
         # Set system prompt if not provided
@@ -649,5 +647,9 @@ class GeneratorMixin:
                 self._update_token_counts(responses, n)
                 return responses
 
-            except google.api_core.exceptions.GoogleAPIError as e:
+            except Exception as e:
+                if self._backend == "gemini":
+                    import google.api_core.exceptions
+                    if not isinstance(e, google.api_core.exceptions.GoogleAPIError):
+                        raise
                 self._handle_generation_error(e, attempt)

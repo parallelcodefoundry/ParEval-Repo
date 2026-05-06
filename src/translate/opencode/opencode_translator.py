@@ -77,7 +77,7 @@ class OpenCodeTranslator(Translator):
         log_interactions: bool = False,
         dry: bool = False,
         hide_progress: bool = False,
-        opencode_model_name: str = "localvllm/openai/gpt-oss-120b",
+        opencode_model_name: Optional[str] = None,
         opencode_provider_base_url: str = "http://127.0.0.1:8008/v1",
         opencode_xdg_scratch_dir: Optional[str] = None,
         opencode_vllm_environment: Optional[str] = None,
@@ -94,6 +94,8 @@ class OpenCodeTranslator(Translator):
             hide_progress=hide_progress,
         )
 
+        if opencode_model_name is None:
+            raise ValueError("--opencode-model-name is required (e.g. 'localvllm/google/gemma-4-27b-it')")
         self._opencode_model_name = opencode_model_name
         self._provider_id, self._model_id = _parse_provider_model(opencode_model_name)
         self._provider_base_url = opencode_provider_base_url
@@ -119,8 +121,7 @@ class OpenCodeTranslator(Translator):
     def add_args(parser: Any) -> None:
         """Add command line arguments for OpenCode configuration."""
         parser.add_argument("--opencode-model-name", type=str,
-                            default="localvllm/openai/gpt-oss-120b",
-                            help="Model name in provider/model format (e.g. 'localvllm/openai/gpt-oss-120b').")
+                            help="Model name in provider/model format (e.g. 'localvllm/google/gemma-4-31b-it').")
         parser.add_argument("--opencode-provider-base-url", type=str,
                             default="http://127.0.0.1:8000/v1",
                             help="Base URL of the OpenAI-compatible vLLM server (e.g. 'http://127.0.0.1:8008/v1').")
@@ -437,9 +438,6 @@ class OpenCodeTranslator(Translator):
         py_executable = os.path.join(environment_path, "bin", "python")
         vllm_command = [
             py_executable, "-m", "vllm.entrypoints.openai.api_server",
-            "--tool-call-parser", "openai",
-            "--enable-auto-tool-choice",
-            "--reasoning-parser", "openai_gptoss",
             "--host", self.VLLM_HOST,
             "--port", str(self.VLLM_PORT),
             "--model", self._model_id,
