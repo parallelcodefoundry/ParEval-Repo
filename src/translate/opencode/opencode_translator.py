@@ -311,6 +311,7 @@ class OpenCodeTranslator(Translator):
                             "tool_call": True,
                             "tools": True,
                             "capabilities": {"temperature": True},
+                            "maxTokens": 16384,
                         }
                     },
                 }
