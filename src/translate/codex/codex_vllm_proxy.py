@@ -22,6 +22,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
+MAX_OUTPUT_TOKENS_CAP = 16384
+
 # ---------------------------------------------------------------------------
 # Tool rewriting helpers
 # ---------------------------------------------------------------------------
@@ -273,6 +275,9 @@ class CodexVLLMProxy(BaseHTTPRequestHandler):
                 data = json.loads(body)
                 data = rewrite_request_input(data)
                 data = rewrite_request_tools(data)
+                current = data.get("max_output_tokens")
+                if current is None or current > MAX_OUTPUT_TOKENS_CAP:
+                    data["max_output_tokens"] = MAX_OUTPUT_TOKENS_CAP
                 body = json.dumps(data).encode()
             except (json.JSONDecodeError, TypeError):
                 pass
