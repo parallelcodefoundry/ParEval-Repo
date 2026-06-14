@@ -1,0 +1,2 @@
+tool_call_parser: pythonic
+enable_auto_tool_choice: true

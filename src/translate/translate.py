@@ -19,6 +19,8 @@ from repo import Repo
 from naive.naive_translator import NaiveTranslator
 from top_down_agentic.top_down_agentic import TopDownAgenticTranslator
 from swe_agent.swe_agent_translator import SWEAgentTranslator
+from codex.codex_translator import CodexTranslator
+from opencode.opencode_translator import OpenCodeTranslator
 
 logger = logging.getLogger("pareval-repo")
 
@@ -34,7 +36,7 @@ def get_args():
                         "prompt fill-ins.")
     parser.add_argument("-f", "--force-overwrite", action="store_true",
                         help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive", "top-down-agentic", "swe-agent"],
+    parser.add_argument("--method", choices=["naive", "top-down-agentic", "swe-agent", "codex", "opencode"],
                         required=True, help="The translation method to use.")
     parser.add_argument("--src-model", type=str, required=True,
                         help="The source execution model.")
@@ -89,6 +91,14 @@ def get_args():
     swe_agent_args = parser.add_argument_group("SWE-agent translation")
     SWEAgentTranslator.add_args(swe_agent_args)
 
+    # subgroup for Codex translation method
+    codex_args = parser.add_argument_group("Codex translation")
+    CodexTranslator.add_args(codex_args)
+
+    # subgroup for OpenCode translation method
+    opencode_args = parser.add_argument_group("OpenCode translation")
+    OpenCodeTranslator.add_args(opencode_args)
+
     return parser.parse_args()
 
 def get_translator_cls(method: str):
@@ -98,6 +108,10 @@ def get_translator_cls(method: str):
         return TopDownAgenticTranslator
     if method == "swe-agent":
         return SWEAgentTranslator
+    if method == "codex":
+        return CodexTranslator
+    if method == "opencode":
+        return OpenCodeTranslator
     raise ValueError(f"Translation method {method} not recognized.")
 
 

@@ -6,7 +6,10 @@ import os
 import shutil
 import subprocess
 import json
-from typing import List, Optional, Dict, Any
+import time
+import atexit
+from pathlib import Path
+from typing import List, Optional, Dict, Any, Union
 
 # local imports
 from translator import Translator
@@ -19,10 +22,13 @@ class SWEAgentTranslator(Translator):
 
     # Constants
     TEMP_REPO_PATH = "/tmp/temp_sweagent_repo"
+    CONTAINER_REPO_PATH = "/temp_sweagent_repo"
     TRANSLATION_TASK_FILENAME = "translation_task.md"
     TRAJECTORIES_DIR = "trajectories"
     PATCH_FILENAME = "temp.patch"
     EXPERIMENT_METADATA_FILENAME = "experiment_metadata.json"
+    SERVE_CHECK_COOLDOWN = 10
+    _MAX_SERVE_CHECK_ATTEMPTS = 100
 
     # File extensions to remove from output
     REMOVE_EXTENSIONS = (".cu", ".cuh")
@@ -35,6 +41,10 @@ class SWEAgentTranslator(Translator):
     # Instance variables
     _swe_agent_model_name: str
     _swe_agent_per_instance_cost_limit: float
+    _swe_agent_config: Optional[List[str]]
+    _swe_agent_parser: Optional[str]
+    _swe_agent_max_input_token: Optional[int]
+
     _temp_repo_path: str
     _translation_task_path: str
     _output_path: str
@@ -50,7 +60,12 @@ class SWEAgentTranslator(Translator):
         dry: bool = False,
         hide_progress: bool = False,
         swe_agent_model_name: Optional[str] = None,
-        swe_agent_per_instance_cost_limit: float = 0.06
+        swe_agent_per_instance_cost_limit: float = 0.06,
+        swe_agent_config: Optional[Union[str, List[str]]] = None,
+        swe_agent_parser: Optional[str] = None,
+        swe_agent_max_input_token: Optional[int] = None,
+        vllm_environment: Optional[str] = None,
+        vllm_yaml_config: Optional[str] = None,
     ) -> None:
         super().__init__(
             input_repo,
@@ -65,30 +80,100 @@ class SWEAgentTranslator(Translator):
 
         self._swe_agent_model_name = swe_agent_model_name
         self._swe_agent_per_instance_cost_limit = swe_agent_per_instance_cost_limit
+        self._swe_agent_parser = swe_agent_parser
+        self._swe_agent_max_input_token = swe_agent_max_input_token
+
+        # Handle a single-config file or multi-config files
+        if isinstance(swe_agent_config, str):
+            self._swe_agent_config = [swe_agent_config]
+        else:
+            self._swe_agent_config = swe_agent_config
+
         self._temp_repo_path = self.TEMP_REPO_PATH
         self._translation_task_path = os.path.join(
             self._input_repo.path, self.TRANSLATION_TASK_FILENAME
         )
         self._output_path = os.path.join(self._output_paths[0], "repo")
 
+        self._vllm_environment = vllm_environment
+        self._vllm_yaml_config = vllm_yaml_config
+
+        if self._is_ollama_model(self._swe_agent_model_name):
+            if self._swe_agent_parser is None:
+                self._swe_agent_parser = "thought_action"
+            if self._swe_agent_max_input_token is None:
+                self._swe_agent_max_input_token = 4096
+            self._launch_ollama_server()
+
+        else:
+            if self._vllm_environment:
+                self._launch_vllm_server(self._vllm_environment, self._vllm_yaml_config)
+            else:
+                print("Warning: vLLM environment not provided; assuming external vLLM server is running.")
+
+    @staticmethod
+    def _is_ollama_model(name: str) -> bool:
+        name = (name or "").lower()
+        return name.startswith("ollama/")
+
+
+    def _launch_ollama_server(self) -> None:
+        """Launch an Ollama server in the background."""
+        # Check that ollama is installed
+        if not shutil.which("ollama"):
+            raise ValueError("Ollama is not in the path. Please install Ollama and add it to the path.")
+        # Early exit if ollama is already running
+        if subprocess.run(["ollama", "list"], capture_output=True, text=True).returncode == 0:
+            return
+        ollama_command = ["ollama", "serve"]
+        subprocess.Popen(ollama_command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.STDOUT,       
+        stdin=subprocess.DEVNULL,   
+        start_new_session=True)
+        # Check that the server is running
+        checking = True
+        while checking:
+            status = subprocess.run(["ollama", "list"], capture_output=True, text=True)
+            if status.returncode == 0:
+                checking = False
+            else:
+                print(f"Ollama server not ready, checking again after {self.SERVE_CHECK_COOLDOWN} seconds...")
+                time.sleep(self.SERVE_CHECK_COOLDOWN)
+        print(f"Ollama server ready.")
+        return
+
 
     @staticmethod
     def add_args(parser: Any) -> None:
         """Add command line arguments for SWE-agent configuration."""
         parser.add_argument("--swe-agent-model-name", type=str,
-                            help="Name of the agent model to use (e.g. 'gpt-4o').")
+                            help="Name of the agent model to use (e.g. 'gpt-4o', 'ollama/llama3.2:latest').")
         parser.add_argument("--swe-agent-per-instance-cost-limit", type=float,
-                            help="Per-instance cost limit for the agent model.")
-
+                            help="Per-instance cost limit for the agent model; set to 0 for local models.")
+        parser.add_argument("--swe-agent-config", action="append",
+                            help="May be specified multiple times; default config file is used if none is provided.")
+        parser.add_argument("--swe-agent-parser", type=str, choices=["thought_action", "function_calling"],
+                            help="Parsing strategy. Use 'thought_action' for local/Ollama models.")
+        parser.add_argument("--swe-agent-max-input-token", type=int,
+                            help="Override max input tokens to avoid local-model warnings.")
+        parser.add_argument("--vllm-environment", type=str,
+                    help="Path to the Python environment that has vLLM installed (e.g. ~/pssg-venv).")
+        parser.add_argument("--vllm-yaml-config", type=str,
+                    help="Path to vLLM YAML config file to pass via --config.")
 
     @staticmethod
     def parse_args(args: Any) -> Dict[str, Any]:
         """Parse command line arguments for SWE-agent configuration."""
         return {
             "swe_agent_model_name": args.swe_agent_model_name,
-            "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit
+            "swe_agent_per_instance_cost_limit": args.swe_agent_per_instance_cost_limit,
+            "swe_agent_config": args.swe_agent_config,
+            "swe_agent_parser": args.swe_agent_parser,
+            "swe_agent_max_input_token": args.swe_agent_max_input_token,
+            "vllm_environment": args.vllm_environment,
+            "vllm_yaml_config": args.vllm_yaml_config,
         }
-
 
     def translate(self) -> None:
         """Execute the complete translation process using SWE-agent.
@@ -111,6 +196,7 @@ class SWEAgentTranslator(Translator):
         self.initialize_temp_repo()
 
         if self.run_swe_agent():
+            self._fix_makefile_tabs_and_duplicates()
             logger.info("Saving translated output...")
             self.save_output(self._output_path)
             self.remove_unnecessary_output_files()
@@ -141,12 +227,13 @@ class SWEAgentTranslator(Translator):
             f"You are a helpful coding assistant. You are helping a software developer translate a "
             f"codebase from the {self._src_model} execution model to the {self._dst_model} execution "
             f"model.\n\n"
-            f"The codebase is called {data['app']}. Its path is {data['path']}. Given this code "
+            f"The codebase is called {data['app']}. Its path is {self.CONTAINER_REPO_PATH}. Given this code "
             f"repository, translate the {data['app']} codebase's {self._src_model}-specific files to "
             f"the {self._dst_model} execution model.\n\n"
             f"The new files should be in {data['filename_desc']} and all old {self._src_model} files "
-            f"must be deleted. A new {data['build_filename']} should be made to compile accordingly "
-            f"with the new files.\n\n"
+            f"must be deleted. You may use standard command-line tools (e.g., the `rm` command) to "
+            f"remove obsolete {self._src_model}-specific files. A new {data['build_filename']} should "
+            f"be made to compile accordingly with the new files.\n\n"
             f"Ensure that the user can compile this code using, for example, `{data['ex_build_cmd']}` "
             f"to build the code for {data['ex_build_desc']}. Ensure also that the command line "
             f"interface after translation still works as expected, so that, for example, "
@@ -178,7 +265,6 @@ class SWEAgentTranslator(Translator):
         subprocess.run(self.GIT_ADD_ALL, cwd=self._temp_repo_path, check=True)
         subprocess.run(self.GIT_COMMIT_INITIAL, cwd=self._temp_repo_path, check=True)
 
-
     def run_swe_agent(self) -> bool:
         """Run the SWE-agent command and apply the resulting patch."""
         command = self._build_swe_agent_command()
@@ -200,14 +286,25 @@ class SWEAgentTranslator(Translator):
 
     def _build_swe_agent_command(self) -> List[str]:
         """Build the SWE-agent command with all required parameters."""
-        return [
+        cmd = [
             "sweagent", "run",
-            f"--agent.model.name={self._swe_agent_model_name}",
-            f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}",
             f"--env.repo.path={self._temp_repo_path}",
-            "--env.deployment.image=python",
             f"--problem_statement.path={self._translation_task_path}",
         ]
+
+        if self._swe_agent_model_name:
+            cmd.append(f"--agent.model.name={self._swe_agent_model_name}")
+        if self._swe_agent_per_instance_cost_limit:
+            cmd.append(f"--agent.model.per_instance_cost_limit={self._swe_agent_per_instance_cost_limit}")
+        if self._swe_agent_parser:
+            cmd.append(f"--agent.tools.parse_function.type={self._swe_agent_parser}")
+        if self._swe_agent_max_input_token:
+            cmd.append(f"--agent.model.max_input_tokens={self._swe_agent_max_input_token}")
+        if self._swe_agent_config:
+            for cfg in self._swe_agent_config:
+                cmd.extend(["--config", cfg])
+
+        return cmd
 
     def _apply_swe_agent_patch(self) -> bool:
         """Find and apply the patch file generated by SWE-agent."""
@@ -286,6 +383,45 @@ class SWEAgentTranslator(Translator):
                     file_path = os.path.join(root, file)
                     os.remove(file_path)
 
+    def _fix_makefile_tabs_and_duplicates(self) -> None:
+        makefile = Path(self._temp_repo_path) / "Makefile"
+        if not makefile.exists():
+            return
+
+        lines = makefile.read_text(encoding="utf-8", errors="replace").splitlines(True)
+
+        # 1) Remove exact duplicate lines (preserve order)
+        print("Removing duplicate lines in the Makefile...")
+        seen = set()
+        duplicates = []
+        for line in lines:
+            if line not in seen:
+                seen.add(line)
+                duplicates.append(line)
+        lines = duplicates
+
+        # 2) Enforce Makefile tab rules
+        print("Fixing Makefile tabs...")
+        i = 0
+        while i < len(lines) - 1:
+            curr = lines[i].lstrip()
+            nxt = lines[i + 1]
+
+            is_rule = ":" in curr
+            is_conditional = curr.startswith((
+                "ifeq",
+                "ifneq",
+                "ifdef",
+                "ifndef",
+                "else"
+            ))
+            
+            if is_rule or is_conditional:
+                if nxt.strip() and not nxt.startswith("\t") and not nxt.lstrip().startswith("#"):
+                    lines[i + 1] = "\t" + nxt
+            i += 1
+
+        makefile.write_text("".join(lines), encoding="utf-8")
 
     def write_experiment_metadata(self) -> None:
         """Write experiment metadata to a JSON file in the output directory."""
@@ -330,3 +466,41 @@ class SWEAgentTranslator(Translator):
         except OSError as e:
             logger.warning("Error cleaning up temporary repository: %s", e)
             # Don't raise here as this is cleanup code
+
+    def _launch_vllm_server(self, environment_path: str, yaml_config: Optional[str] = None):
+        """Launch a vLLM server in the background using the Python environment directory
+           provided.
+        """
+        # Early exit if vLLM server is already running
+        if subprocess.run(["curl", "http://127.0.0.1:8000/health"], capture_output=True,
+                          text=True, check=False).returncode == 0:
+            return None
+        py_executable = os.path.join(environment_path, "bin", "python")
+        vllm_command = [
+            py_executable, "-m", "vllm.entrypoints.openai.api_server",
+            "--host", "127.0.0.1",
+            "--port", "8000",
+        ]
+        vllm_api_key = os.getenv("VLLM_API_KEY")
+        if self._swe_agent_model_name is not None:
+            vllm_command.extend(["--model", self._swe_agent_model_name])
+        if vllm_api_key is not None:
+            vllm_command.extend(["--api-key", vllm_api_key])
+        if yaml_config:
+            vllm_command.extend(["--config", yaml_config])
+        print("Full vLLM subprocess command:", " ".join(vllm_command))
+        vllm_server = subprocess.Popen(vllm_command)
+        # Ping the server until it is ready at the health endpoint
+        checking, num_attempts = True, 0
+        while checking and num_attempts < self._MAX_SERVE_CHECK_ATTEMPTS:
+            status = subprocess.run(["curl", "http://127.0.0.1:8000/health"], capture_output=True,
+                                    text=True, check=False)
+            if status.returncode == 0:
+                checking = False
+            else:
+                print(f"VLLM server not ready, checking again after {self.SERVE_CHECK_COOLDOWN} seconds...")
+                time.sleep(self.SERVE_CHECK_COOLDOWN)
+                num_attempts += 1
+        atexit.register(vllm_server.terminate)
+        print("VLLM server ready.")
+        return vllm_server

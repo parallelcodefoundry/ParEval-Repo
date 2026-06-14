@@ -3,6 +3,7 @@
     "llvm": "spack load llvm && export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/scratch/zt1/project/bhatele-lab/user/jhdavis/spack-install/linux-rhel8-zen2/gcc-11.3.0/llvm-19.1.7-owz26zzxphj6x4xfgxsyxgfhvktvs4kd/lib/x86_64-unknown-linux-gnu/",
     "cuda": "module load cuda/gcc/11.3.0/zen2/12.3.0",
     "kokkos": "spack load kokkos",
+    "ninja": "spack load ninja",
     "sm": "80",
     "exec_check": "~/llms4hpc/code-translation/src/drivers/exec-check.sh",
     "exec_check_fail_text": "No GPU kernels launched!!"
