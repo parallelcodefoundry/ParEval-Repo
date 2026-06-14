@@ -5,9 +5,12 @@
     date: April 2024
 """
 # std imports
+import logging
 import os
 from typing import Optional, List
 import json
+
+logger = logging.getLogger("pareval-repo")
 
 TASK_FILE = "translation_task.md"
 

@@ -11,11 +11,12 @@ Author: Daniel Nichols
 Date: November 2024
 """
 
+import logging
 import os
 import sys
 import json
 from typing import Dict, Literal, Optional, List, Union, Tuple
-import re
+from pathlib import Path
 
 # Local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -37,6 +38,7 @@ from repo import Repo
 # Third-party imports
 from alive_progress import alive_it
 
+logger = logging.getLogger("pareval-repo")
 
 class TopDownAgenticTranslator(Translator, GeneratorMixin):
     """Translator for entire repositories using the top-down agent method."""
@@ -44,7 +46,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
     def __init__(
             self,
             input_repo: Repo,
-            output_repos: List[Union[str, os.PathLike]],
+            output_repos: List[os.PathLike],
             src_model: str,
             dst_model: str,
             dst_config: dict,
@@ -52,7 +54,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             backend: Literal["openai", "gemini", "hf", "vllm", "local"] = "openai",
             log_interactions: bool = False,
             dry: bool = False,
-            hide_progress: bool = False
+            hide_progress: bool = False,
+            api_key: Optional[str] = None,
+            api_base_url: Optional[str] = None,
+            vllm_environment: Optional[str] = None,
+            vllm_yaml_config: Optional[str] = None,
+            vllm_keepalive_id: Optional[str] = None,
     ):
         """Initialize the top-down agent translator.
 
@@ -67,6 +74,11 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             log_interactions: Whether to log LLM interactions
             dry: Whether to run in dry-run mode
             hide_progress: Whether to hide progress bars
+            api_key: API key for the LLM backend
+            api_base_url: Base URL for the LLM backend API endpoint
+            vllm_environment: Path to the Python venv for launching a vLLM server
+            vllm_yaml_config: Path to a vLLM YAML configuration file
+            vllm_keepalive_id: If set, write vLLM server PID to a file with this ID
         """
         super().__init__(input_repo, output_repos, src_model, dst_model,
                          dst_config, log_interactions, dry, hide_progress)
@@ -76,7 +88,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             dst_model=self._dst_model)
 
         GeneratorMixin.__init__(self, backend, llm_name, system_prompt=self._system_prompt,
-                                async_mode=True)
+                                async_mode=True,
+                                api_key=api_key,
+                                api_base_url=api_base_url,
+                                vllm_environment=vllm_environment,
+                                vllm_yaml_config=vllm_yaml_config,
+                                vllm_keepalive_id=vllm_keepalive_id)
 
         self._interactions_paths = self._setup_interaction_logging()
         self._dependency_agent = self._create_dependency_agent()
@@ -89,7 +106,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
         if not self._log_interactions:
             return None
 
-        interactions_paths = []
+        interactions_paths: List[str | os.PathLike] = []
         for output_repo in self._output_paths:
             interactions_path = os.path.join(output_repo, "interactions.txt")
             interactions_paths.append(interactions_path)
@@ -142,7 +159,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
         """
         return {
             "backend": args.top_down_agentic_backend,
-            "llm_name": args.top_down_agentic_llm_name
+            "llm_name": args.top_down_agentic_llm_name,
+            "api_key": args.api_key,
+            "api_base_url": args.api_base_url,
+            "vllm_environment": args.vllm_environment,
+            "vllm_yaml_config": args.vllm_yaml_config,
+            "vllm_keepalive_id": args.vllm_keepalive_id,
         }
 
 
@@ -206,7 +228,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
         success = write_file_safely(output_file_path, contents)
         if success:
-            print(f"Wrote file {output_file_path}")
+            logger.debug("Wrote file %s.", output_file_path)
         return success
 
 
@@ -235,11 +257,11 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
             success = write_file_safely(exp_meta_fpath, json.dumps(exp_meta_dict, indent=4))
             if success:
-                print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
+                logger.debug("Wrote translation experiment metadata to %s.", exp_meta_fpath)
             return success
 
         except Exception as e:
-            print(f"Error writing metadata: {e}")
+            logger.error("Error writing metadata: %s", e)
             return False
 
 
@@ -266,12 +288,12 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
                     f.write("RESPONSE:\n")
                     f.write(responses[i] + "\n\n")
             except Exception as e:
-                print(f"Error logging interaction to {output_path}: {e}")
+                logger.error("Error logging interaction to %s: %s", output_path, e)
 
 
     def translate(self):
         """Use the top-down method to translate the entire repository."""
-        print(f"Constructing dependency graph on {self._input_repo.path}...")
+        logger.info("Constructing dependency graph on %s...", self._input_repo.path)
 
         # Build dependency graph and prepare for translation
         dep_graph = self._dependency_agent.construct_dependency_graph(self._input_repo.path)
@@ -316,7 +338,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
             graph: Optional dependency graph for build files
             tree: Optional file tree for build files
         """
-        print(f"Translating file {node.rel_path}...")
+        logger.info("Translating file %s...", node.rel_path)
 
         # Get source code and context
         source_code = self._read_file(node.rel_path)
@@ -329,6 +351,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
         # Write translations to output files
         self._write_translations(node, translations, trigger_rename)
+        logger.debug("Completed translation of %s.", node.rel_path)
 
 
     def _translate_file_content(self, source_code: str, contexts: List[str],
@@ -347,7 +370,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
                                node: FileNode, graph: Optional[List[FileNode]] = None,
                                tree: Optional[str] = None) -> Tuple[List[str], Optional[str]]:
         """Translate a single chunk of code."""
-        print("Requesting whole file translation...")
+        logger.debug("Requesting whole-file translation.")
         responses, trigger_rename = self._get_translations(contexts, chunk, node, graph, tree)
         translations = [extract_code_block(response) for response in responses]
         return translations, trigger_rename
@@ -362,7 +385,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
         trigger_rename = None
 
         for i, chunk in enumerate(chunks):
-            print(f"Requesting chunk translation... [{i + 1}/{len(chunks)}]")
+            logger.debug("Requesting chunk translation [%d/%d].", i + 1, len(chunks))
             responses, trigger_rename = self._get_translations(
                 contexts, chunk, node, graph, tree, prev_chunks=prev_chunks
             )
@@ -529,7 +552,7 @@ class TopDownAgenticTranslator(Translator, GeneratorMixin):
 
     def _generate_translations(self, prompts: List[str]) -> Tuple[List[str], List[Union[str, None]]]:
         """Generate translations using the LLM."""
-        response_obs = self.generate_async(prompts, temperature=0.2, top_p=0.95)
+        response_obs = self.generate_async(prompts)
         responses = [r.response for r in response_obs]
         reasonings = [r.reasoning for r in response_obs]
         return responses, reasonings

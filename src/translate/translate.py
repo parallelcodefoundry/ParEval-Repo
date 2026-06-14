@@ -8,6 +8,7 @@
 """
 # std imports
 from argparse import ArgumentParser
+import logging
 import os
 import json
 import shutil
@@ -21,22 +22,62 @@ from swe_agent.swe_agent_translator import SWEAgentTranslator
 from codex.codex_translator import CodexTranslator
 from opencode.opencode_translator import OpenCodeTranslator
 
+logger = logging.getLogger("pareval-repo")
+
+
 def get_args():
     parser = ArgumentParser(description=__doc__)
-    parser.add_argument("-i", "--input", type=str, required=True, help="Path to the input source code repository.")
-    parser.add_argument("-o", "--output", type=str, required=True, help="Path to the output source code repository.")
-    parser.add_argument("-c", "--config", type=str, required=True, help="Path to translation destination model configuration file containing prompt fill-ins.")
-    parser.add_argument("-f", "--force-overwrite", action="store_true", help="Force overwrite of existing output directory.")
-    parser.add_argument("--method", choices=["naive", "top-down-agentic", "swe-agent", "codex", "opencode"], required=True, help="The translation method to use.")
-    parser.add_argument("--src-model", type=str, required=True, help="The source execution model.")
-    parser.add_argument("--dst-model", type=str, required=True, help="The destination execution model.")
-    parser.add_argument("--output-id", type=int, required=True, help="The integer ID of the output, used to count repeat instances of the same translation configuration.")
-    parser.add_argument("-n", "--num-translations", type=int, default=1, help="The number of translations to generate. Currently only supported for OpenAI and vLLM with naive, will write to directories numbered from output-id through output-id + num-translations - 1.")
-    parser.add_argument("--app-name", type=str, help="The name of the application being translated.")
-    parser.add_argument("--dry", "-d", action="store_true", help="Dry run the translation.")
-    parser.add_argument("--log-interactions", action="store_true", help="Log the raw LLM outputs to a text file.")
-    parser.add_argument("--hide-progress", action="store_true", help="Hide the progress bar.")
-    parser.add_argument("--tar-outputs", action="store_true", help="Create a tarball of the output directories.")
+    parser.add_argument("-i", "--input", type=str, required=True,
+                        help="Path to the input source code repository.")
+    parser.add_argument("-o", "--output", type=str, required=True,
+                        help="Path to the output source code repository.")
+    parser.add_argument("-c", "--config", type=str, required=True,
+                        help="Path to translation destination model configuration file containing "
+                        "prompt fill-ins.")
+    parser.add_argument("-f", "--force-overwrite", action="store_true",
+                        help="Force overwrite of existing output directory.")
+    parser.add_argument("--method", choices=["naive", "top-down-agentic", "swe-agent", "codex", "opencode"],
+                        required=True, help="The translation method to use.")
+    parser.add_argument("--src-model", type=str, required=True,
+                        help="The source execution model.")
+    parser.add_argument("--dst-model", type=str, required=True,
+                        help="The destination execution model.")
+    parser.add_argument("--output-id", type=int, required=True,
+                        help="The integer ID of the output, used to count repeat instances of the "
+                        "same translation configuration.")
+    parser.add_argument("-n", "--num-translations", type=int, default=1,
+                        help="The number of translations to generate. Currently only supported "
+                        "for OpenAI and vLLM with naive, will write to directories numbered from "
+                        "output-id through output-id + num-translations - 1 inclusive.")
+    parser.add_argument("--app-name", type=str,
+                        help="The name of the application being translated.")
+    parser.add_argument("--dry", "-d", action="store_true",
+                        help="Dry run the translation.")
+    parser.add_argument("--log-interactions", action="store_true",
+                        help="Log the raw LLM outputs to a text file.")
+    parser.add_argument("--hide-progress", action="store_true",
+                        help="Hide the progress bar.")
+    parser.add_argument("--tar-outputs", action="store_true",
+                        help="Create a tarball of the output directories.")
+    parser.add_argument("-l", "--log-level", type=str, default="INFO",
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help="Logging level (default: INFO).")
+
+    # GeneratorMixin arguments shared across all LLM-based translation methods
+    parser.add_argument("--api-key", type=str, default=None,
+                        help="API key for the LLM backend, overriding any backend-specific "
+                        "environment variable.")
+    parser.add_argument("--api-base-url", type=str, default=None,
+                        help="Base URL for the LLM backend API endpoint.")
+    parser.add_argument("--vllm-environment", type=str, default=None,
+                        help="Path to the Python virtual environment to use when launching a vLLM "
+                        "server.")
+    parser.add_argument("--vllm-yaml-config", type=str, default=None,
+                        help="Path to a vLLM YAML configuration file passed to the server via "
+                        "--config.")
+    parser.add_argument("--vllm-keepalive-id", type=str, default=None,
+                        help="If set, write the vLLM server PID to a file with this ID instead of "
+                        "terminating the server on exit.")
 
     # subgroup of arguments for the naive translation method
     naive_args = parser.add_argument_group("naive translation method")
@@ -76,6 +117,15 @@ def get_translator_cls(method: str):
 
 def main():
     args = get_args()
+
+    # Configure the package logger
+    if not logger.hasHandlers():
+        _handler = logging.StreamHandler()
+        _handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"
+        ))
+        logger.addHandler(_handler)
+    logger.setLevel(getattr(logging, args.log_level))
 
     # check if the input directory exists
     if not os.path.exists(args.input):
@@ -139,7 +189,7 @@ def main():
             if os.path.exists(output_dir):
                 create_tarball(output_dir)
             else:
-                print(f"Output directory {output_dir} does not exist. Skipping tarball creation.")
+                logger.warning("Output directory %s does not exist. Skipping tarball creation.", output_dir)
 
     # translator implements GeneratorMixin, then call print_stats
     if hasattr(translator, "print_stats"):

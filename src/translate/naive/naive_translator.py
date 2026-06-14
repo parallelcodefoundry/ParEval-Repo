@@ -2,11 +2,13 @@
     as much context in the prompt as possible.
 """
 # std imports
+import logging
 import os
 import sys
 import re
 import json
 from typing import Dict, Tuple, Union, Literal, List, Optional
+from pathlib import Path
 
 # tpl imports
 from alive_progress import alive_it
@@ -19,10 +21,10 @@ from repo import Repo
 from naive import naive_constants as nc
 from top_down_agentic.chunk_agent import ChunkFileAgent
 
+logger = logging.getLogger("pareval-repo")
+
 # Constants
 DEFAULT_TERMINAL_COLS = 80
-DEFAULT_TEMPERATURE = 0.2
-DEFAULT_TOP_P = 0.95
 DEFAULT_CHUNK_MAX_TOKENS = 1024
 CODE_BLOCK_PATTERN = re.compile(r"```(?:[+\w]+)?\n(.*?)\n```", re.DOTALL)
 INTERACTIONS_DIR = "interactions"
@@ -51,7 +53,12 @@ class NaiveTranslator(Translator, GeneratorMixin):
             enable_chunking: bool = False,
             log_interactions: bool = False,
             dry: bool = False,
-            hide_progress: bool = False
+            hide_progress: bool = False,
+            api_key: Optional[str] = None,
+            api_base_url: Optional[str] = None,
+            vllm_environment: Optional[str] = None,
+            vllm_yaml_config: Optional[str] = None,
+            vllm_keepalive_id: Optional[str] = None,
     ):
         # Validate inputs
         self._validate_inputs(input_repo, output_repos, src_model, dst_model,
@@ -61,7 +68,12 @@ class NaiveTranslator(Translator, GeneratorMixin):
                          dst_config, log_interactions, dry, hide_progress)
 
         GeneratorMixin.__init__(self, backend, llm_name,
-                                system_prompt=self._get_system_prompt())
+                                system_prompt=self._get_system_prompt(),
+                                api_key=api_key,
+                                api_base_url=api_base_url,
+                                vllm_environment=vllm_environment,
+                                vllm_yaml_config=vllm_yaml_config,
+                                vllm_keepalive_id=vllm_keepalive_id)
 
         if enable_chunking:
             self._chunk_agent = ChunkFileAgent(self, max_tokens=DEFAULT_CHUNK_MAX_TOKENS)
@@ -128,6 +140,11 @@ class NaiveTranslator(Translator, GeneratorMixin):
             "backend": args.naive_backend,
             "llm_name": args.naive_llm_name,
             "enable_chunking": args.naive_enable_chunking,
+            "api_key": args.api_key,
+            "api_base_url": args.api_base_url,
+            "vllm_environment": args.vllm_environment,
+            "vllm_yaml_config": args.vllm_yaml_config,
+            "vllm_keepalive_id": args.vllm_keepalive_id,
         }
 
 
@@ -229,7 +246,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             Formatted base prompt
         """
         if chunk:
-            print(chunk)  # Debug output for chunking
+            logger.debug("Chunk content:\n%s", chunk)
             return nc.CHUNK_PROMPT_TEMPLATE.format(
                 src_model=self._src_model,
                 dst_model=self._dst_model,
@@ -361,7 +378,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """
         match = CODE_BLOCK_PATTERN.search(output)
         if match is None:
-            print(f"No code block found in output:\n{output}")
+            logger.warning("No code block found in output:\n%s", output)
             return None
         return match.group(1)
 
@@ -446,7 +463,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             f.write(response + "\n\n")
 
 
-    def _write_metadata(self, repo_path: os.PathLike) -> None:
+    def _write_metadata(self, repo_path: Path) -> None:
         """Write experiment metadata to JSON file.
 
         Args:
@@ -464,9 +481,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
             with open(exp_meta_fpath, 'w', encoding="UTF-8") as f:
                 json.dump(exp_meta_dict, f, indent=4)
-            print(f"Wrote translation experiment metadata to {exp_meta_fpath}")
-        except (OSError, json.JSONEncodeError) as e:
-            print(f"Error writing metadata file: {e}")
+            logger.debug("Wrote translation experiment metadata to %s", exp_meta_fpath)
+        except (OSError, UnicodeEncodeError, AttributeError, ValueError, TypeError) as e:
+            logger.error("Error writing metadata file: %s", e)
             raise
 
 
@@ -506,24 +523,20 @@ class NaiveTranslator(Translator, GeneratorMixin):
         """
         prompt, trigger_rename = self._get_prompt(fpath, chunk=chunk)
         updated_fname = self._update_file_ext(fpath, trigger_rename=trigger_rename)
-        output_fpaths = [os.path.join(rp, "repo", updated_fname) for rp in self._output_paths]
+        output_fpaths = [Path(rp) / "repo" / updated_fname for rp in self._output_paths]
 
         if self._dry:
             self._handle_dry_run(prompt, fpath, output_fpaths)
             return
 
-        responses = self.generate(
-            prompt,
-            temperature=DEFAULT_TEMPERATURE,
-            top_p=DEFAULT_TOP_P,
-            n=len(self._output_paths)
-        )
+        responses = [self.generate(prompt)[0] for _ in self._output_paths]
+        #TODO: parallelize multiple responses
 
         self._process_responses(responses, prompt, fpath, output_fpaths, chunk, chunk_id)
 
 
     def _handle_dry_run(self, prompt: str, fpath: os.PathLike,
-                       output_fpaths: List[str]) -> None:
+                       output_fpaths: List[Path]) -> None:
         """Handle dry run mode.
 
         Args:
@@ -531,13 +544,13 @@ class NaiveTranslator(Translator, GeneratorMixin):
             fpath: The file path being translated
             output_fpaths: List of output file paths
         """
-        print(prompt)
-        print(f"Skipped translation of {fpath} to " +
-              f"{output_fpaths[0]}..{output_fpaths[-1]} for dry run.")
+        logger.debug("Dry-run prompt:\n%s", prompt)
+        logger.info("Skipped translation of %s to %s..%s for dry run.",
+                    fpath, output_fpaths[0], output_fpaths[-1])
 
 
     def _process_responses(self, responses: List[GenericResponse], prompt: str,
-                          fpath: os.PathLike, output_fpaths: List[str],
+                          fpath: os.PathLike, output_fpaths: List[Path],
                           chunk: Optional[str], chunk_id: int) -> None:
         """Process LLM responses and write to files.
 
@@ -560,7 +573,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             # Process output
             output = self._postprocess(response.response)
             if output is None:
-                print(f"Failed to translate {fpath} to {output_fpath}")
+                logger.warning("Failed to translate %s to %s.", fpath, output_fpath)
                 continue
 
             # Write to file
@@ -587,25 +600,17 @@ class NaiveTranslator(Translator, GeneratorMixin):
             with open(output_fpath, open_mode, encoding="UTF-8") as f:
                 f.write(output)
         except OSError as e:
-            print(f"Error writing file {output_fpath}: {e}")
+            logger.error("Error writing file %s: %s", output_fpath, e)
             raise
 
 
     def _print_translation_status(self, fpath: os.PathLike, output_fpath: os.PathLike,
                                  chunk: Optional[str], chunk_id: int) -> None:
-        """Print translation status message.
-
-        Args:
-            fpath: Original file path
-            output_fpath: Output file path
-            chunk: Optional chunk being translated
-            chunk_id: ID of the chunk
-        """
-        print(f"Translated {fpath} to {output_fpath}", end="")
+        """Log translation status message."""
         if chunk:
-            print(f" (chunk {chunk_id})")
+            logger.info("Translated %s to %s (chunk %d).", fpath, output_fpath, chunk_id)
         else:
-            print("")
+            logger.info("Translated %s to %s.", fpath, output_fpath)
 
 
     def translate(self) -> None:
@@ -615,9 +620,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
         in the repository, handling chunking if enabled, and generates
         experiment metadata.
         """
-        all_files = self._input_repo.get_all_filenames(relpaths=True)
+        all_files = [Path(f) for f in self._input_repo.get_all_filenames(relpaths=True)]
         num_translations = len(self._output_paths)
-        repo_paths = [os.path.join(self._output_paths[i], "repo")
+        repo_paths = [Path(self._output_paths[i]) / "repo"
                       for i in range(num_translations)]
         max_cols = self._safe_get_columns()
 
@@ -635,8 +640,8 @@ class NaiveTranslator(Translator, GeneratorMixin):
 
 
     def _print_translation_start(self, num_translations: int,
-                                repo_paths: List[str],
-                                all_files: List[os.PathLike]) -> None:
+                                repo_paths: List[Path],
+                                all_files: List[Path]) -> None:
         """Print translation start information.
 
         Args:
@@ -644,9 +649,9 @@ class NaiveTranslator(Translator, GeneratorMixin):
             repo_paths: List of repository paths
             all_files: List of files to translate
         """
-        print(f"Beginning {num_translations} batched translation(s) " +
-              f"starting from {repo_paths[0]} using {self._llm_name} with NaiveTranslator.")
-        print(f"Files to translate: {all_files}")
+        logger.info("Beginning %d batched translation(s) starting from %s using %s with NaiveTranslator.",
+                    num_translations, repo_paths[0], self._llm_name)
+        logger.debug("Files to translate: %s", all_files)
 
 
     def _translate_single_file(self, fpath: os.PathLike) -> None:
@@ -660,10 +665,10 @@ class NaiveTranslator(Translator, GeneratorMixin):
             return
 
         # Handle chunking
-        print(f"Chunking file {fpath}...")
+        logger.debug("Chunking file %s...", fpath)
         source_code = self._input_repo.get_file_contents(rel_path=fpath)
         chunks = self._chunk_agent.chunk_file(source_code)
-        print(f"Chunked {fpath} into {len(chunks)} chunks.")
+        logger.debug("Chunked %s into %d chunk(s).", fpath, len(chunks))
 
         if len(chunks) > 1:
             for i, chunk in enumerate(chunks):
@@ -673,7 +678,7 @@ class NaiveTranslator(Translator, GeneratorMixin):
             self._translate_file(fpath)
 
 
-    def _write_all_metadata(self, repo_paths: List[str]) -> None:
+    def _write_all_metadata(self, repo_paths: List[Path]) -> None:
         """Write experiment metadata for all repositories.
 
         Args:
